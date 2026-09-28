@@ -80,6 +80,14 @@ I speak and Show as are the setup list: every language both Apple Translation an
 
 **Preferred.** Download `fluidsubtitles-{version}.zip` from [GitHub Releases](https://github.com/chrisswimlee/fluidSubtitles/releases). A notarized Developer ID zip should stay quiet in Gatekeeper. Drag **fluidSubtitles** to Applications, open Theater, allow the microphone, and press **Listen**.
 
+**Homebrew.**
+
+```bash
+brew tap chrisswimlee/fluidsubtitles
+brew trust chrisswimlee/fluidsubtitles
+brew install --cask fluidsubtitles
+```
+
 **Preview zip (unsigned).** If only a pre-release is published, download `fluidsubtitles-{version}-preview-unsigned.zip`. macOS blocks it the first time: click **Done**, then **System Settings → Privacy & Security → Open Anyway**. In-app updates stay off for previews.
 
 **Build from source (Xcode).** Permissions stay across rebuilds. See [Building from Source](#building-from-source).
