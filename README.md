@@ -16,6 +16,8 @@ Open **Theater**, set **I speak** and **Show as**, then press **Open Theater** a
 
 By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
+[Download 1.6.12](https://github.com/chrisswimlee/fluidSubtitles/releases/tag/v1.6.12) · [Homebrew](https://github.com/chrisswimlee/homebrew-fluidsubtitles) · [Product page](https://chrisswimlee.com/fluidSubtitles) · [For work](https://chrisswimlee.com/fluidSubtitles/license/)
+
 **For work:** if IT or legal need a named commercial license or an SLA, [request one](https://chrisswimlee.com/fluidSubtitles/license/). Personal and evaluation use stays free.
 
 ---
