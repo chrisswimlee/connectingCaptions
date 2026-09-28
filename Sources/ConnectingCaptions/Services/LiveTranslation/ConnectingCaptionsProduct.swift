@@ -37,6 +37,9 @@ nonisolated enum ConnectingCaptionsProduct {
     static let authorName = "Chris Swim Lee"
     static let authorSiteHost = "chrisswimlee.com"
     static let authorURL = URL(string: "https://chrisswimlee.com")!
+    static let publisherName = "Local Host AI"
+    static let publisherSiteHost = "local-host.ai"
+    static let publisherURL = URL(string: "https://local-host.ai")!
     static let commercialLicenseEmail = "suyoung.lee99@gmail.com"
     static let commercialLicenseURL = URL(string: "https://chrisswimlee.com/connectingCaptions/license/")!
     static let licenseKeychainService = "com.connectingcaptions.commercial-license"
@@ -65,7 +68,7 @@ nonisolated enum ConnectingCaptionsProduct {
     }
 
     static let creditShort =
-        "By Chris Swim Lee. GPLv3."
+        "A product of Local Host AI. GPLv3."
 
     static var updateRepository: (owner: String, repo: String)? {
         guard let owner = self.githubOwner, let repo = self.githubRepo,

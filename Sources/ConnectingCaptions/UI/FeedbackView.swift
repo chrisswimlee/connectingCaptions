@@ -64,7 +64,7 @@ struct FeedbackView: View {
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(self.theme.palette.primaryText)
 
-                                Text("\(ConnectingCaptionsProduct.displayName) is by \(ConnectingCaptionsProduct.authorName).")
+                                Text("\(ConnectingCaptionsProduct.displayName) is a product of \(ConnectingCaptionsProduct.publisherName).")
                                     .font(.system(size: 13))
                                     .foregroundStyle(self.theme.palette.secondaryText)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -73,6 +73,19 @@ struct FeedbackView: View {
                             Spacer()
 
                             VStack(alignment: .trailing, spacing: 8) {
+                                Link(destination: ConnectingCaptionsProduct.publisherURL) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "globe")
+                                        Text(ConnectingCaptionsProduct.publisherSiteHost)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .font(.system(size: 14))
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 10)
+                                }
+                                .fluidButton(.glass, size: .medium)
+                                .buttonHoverEffect()
+
                                 Link(destination: ConnectingCaptionsProduct.authorURL) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "globe")

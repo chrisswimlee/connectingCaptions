@@ -323,9 +323,18 @@ struct SettingsView: View {
                                     .font(self.theme.typography.bodySmall)
                                     .foregroundStyle(self.settingsSecondaryText)
 
-                                Link("Made by \(ConnectingCaptionsProduct.authorName) — \(ConnectingCaptionsProduct.authorSiteHost)", destination: ConnectingCaptionsProduct.authorURL)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("A product of \(ConnectingCaptionsProduct.publisherName)")
+                                        .font(self.theme.typography.bodySmall)
+                                        .foregroundStyle(self.settingsSecondaryText)
+                                    HStack(spacing: 12) {
+                                        Link(ConnectingCaptionsProduct.publisherSiteHost, destination: ConnectingCaptionsProduct.publisherURL)
+                                            .textLinkPointer()
+                                        Link(ConnectingCaptionsProduct.authorSiteHost, destination: ConnectingCaptionsProduct.authorURL)
+                                            .textLinkPointer()
+                                    }
                                     .font(self.theme.typography.bodySmall)
-                                    .textLinkPointer()
+                                }
                             }
                             .settingsSearchTarget(.automaticUpdates)
 
