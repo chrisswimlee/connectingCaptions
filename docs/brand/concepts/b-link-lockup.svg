@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1000" viewBox="0 0 1400 1000">
+  <!-- Concept B lockup: the "Link" mark stacked above the name.
+       The mark is b-link.svg without the icon squircle, moved to x 424-976, y 200-570. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B2432"/>
+      <stop offset="1" stop-color="#0A0F17"/>
+    </linearGradient>
+    <!-- Cut the teal C where the amber C passes over it (top crossing). -->
+    <mask id="underAmber" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <path d="M459.8 367.1 A150 150 0 0 1 550.9 437" fill="none" stroke="#000" stroke-width="112" stroke-linecap="round"/>
+    </mask>
+    <!-- Cut the amber C where the teal C passes over it (bottom crossing). -->
+    <mask id="underTeal" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <path d="M551.7 653 A150 150 0 0 1 480.1 598" fill="none" stroke="#000" stroke-width="112" stroke-linecap="butt"/>
+    </mask>
+  </defs>
+  <rect width="1400" height="1000" fill="url(#bg)"/>
+  <g transform="translate(188 -127)">
+    <path d="M521.4 623.5 A150 150 0 1 1 550.9 437" mask="url(#underTeal)"
+          fill="none" stroke="#EBA84E" stroke-width="70" stroke-linecap="round"/>
+    <path d="M732.9 587 A150 150 0 1 1 732.9 437" mask="url(#underAmber)"
+          fill="none" stroke="#5DD0B9" stroke-width="70" stroke-linecap="round"/>
+  </g>
+  <text x="700" y="760" text-anchor="middle"
+        font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif"
+        font-size="112" font-weight="600" letter-spacing="-1.5" fill="#F4F6F8">Connecting <tspan fill="#EBA84E">Captions</tspan></text>
+  <text x="700" y="840" text-anchor="middle"
+        font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif"
+        font-size="38" font-weight="400" letter-spacing="0.5" fill="#8A94A3">Live subtitles, translated on your Mac</text>
+</svg>

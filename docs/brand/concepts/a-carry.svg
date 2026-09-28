@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Concept A, "Carry": the spoken line (amber) carries over into the
+       translated line (teal) and forms a C. The dot is the full stop:
+       each sentence appears when it is ready. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B2432"/>
+      <stop offset="1" stop-color="#0A0F17"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="420" x2="0" y2="604" gradientUnits="userSpaceOnUse">
+      <stop offset="0.28" stop-color="#EBA84E"/>
+      <stop offset="0.72" stop-color="#5DD0B9"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <path d="M728 420 H388 A92 92 0 0 0 388 604 H592"
+        fill="none" stroke="url(#ink)" stroke-width="84" stroke-linecap="round"/>
+  <circle cx="700" cy="604" r="42" fill="#5DD0B9"/>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Concept B, "Link": two Cs woven together like chain links, one per
+       language: amber is "I speak", teal is "Show as". -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1B2432"/>
+      <stop offset="1" stop-color="#0A0F17"/>
+    </linearGradient>
+    <!-- Cut the teal C where the amber C passes over it (top crossing). -->
+    <mask id="underAmber" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <path d="M459.8 367.1 A150 150 0 0 1 550.9 437" fill="none" stroke="#000" stroke-width="112" stroke-linecap="round"/>
+    </mask>
+    <!-- Cut the amber C where the teal C passes over it (bottom crossing). -->
+    <mask id="underTeal" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
+      <rect width="1024" height="1024" fill="#fff"/>
+      <path d="M551.7 653 A150 150 0 0 1 480.1 598" fill="none" stroke="#000" stroke-width="112" stroke-linecap="butt"/>
+    </mask>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <path d="M550.9 587 A150 150 0 1 1 550.9 437" mask="url(#underTeal)"
+        fill="none" stroke="#EBA84E" stroke-width="70" stroke-linecap="round"/>
+  <path d="M732.9 587 A150 150 0 1 1 732.9 437" mask="url(#underAmber)"
+        fill="none" stroke="#5DD0B9" stroke-width="70" stroke-linecap="round"/>
+</svg>
