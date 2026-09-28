@@ -10,10 +10,10 @@ const PLACEHOLDER_PATTERNS = [
 ];
 
 const VISUAL_PATH_PATTERNS = [
-  /^Sources\/FluidSubtitles\/UI\//,
-  /^Sources\/FluidSubtitles\/Views\//,
-  /^Sources\/FluidSubtitles\/Theme\//,
-  /^Sources\/FluidSubtitles\/Assets\.xcassets\//,
+  /^Sources\/ConnectingCaptions\/UI\//,
+  /^Sources\/ConnectingCaptions\/Views\//,
+  /^Sources\/ConnectingCaptions\/Theme\//,
+  /^Sources\/ConnectingCaptions\/Assets\.xcassets\//,
   /^\.github\/screenshots\//,
   /(^|\/)([^/]*View|[^/]*Views|Settings|Onboarding|Overlay|MenuBar|Icon|Animation|Animations)[^/]*\.swift$/,
   /\.xcassets\//,

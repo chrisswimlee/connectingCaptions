@@ -1,0 +1,1492 @@
+//
+//  OnboardingFlow+Steps.swift
+//  fluid
+//
+//  Onboarding landing, language, voice, permissions, and Try Theater.
+//
+
+import AVFoundation
+import SwiftUI
+
+extension OnboardingFlowView {
+    var landingStep: some View {
+        GeometryReader { proxy in
+            let landing = self.theme.metrics.onboardingSurface.landing
+
+            ZStack {
+                VStack(alignment: .center, spacing: self.theme.metrics.onboardingSurface.landing.sectionSpacing) {
+                    FluidOnboardingLandingHero(
+                        eyebrow: "Theater",
+                        title: ConnectingCaptionsProduct.tagline,
+                        accentTitle: "",
+                        firstDetail: "",
+                        secondDetail: ""
+                    ) {
+                        FluidOnboardingLandingPrimaryButton(title: "Get started") {
+                            self.goNext()
+                        }
+                        .frame(
+                            width: FluidOnboardingLandingPrimaryButton.size.width,
+                            height: FluidOnboardingLandingPrimaryButton.size.height
+                        )
+                    }
+                }
+                .frame(width: landing.contentWidth, alignment: .center)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: proxy.size.height, alignment: .center)
+                .offset(y: 0)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 24)
+
+                FluidOnboardingLandingHoverTracker(
+                    onMove: { location, size in
+                        self.updateLandingGlow(location: location, in: size)
+                    },
+                    onExit: {
+                        self.resetLandingGlow()
+                    }
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .accessibilityHidden(true)
+                .zIndex(-1)
+            }
+            .background {
+                FluidOnboardingLandingBackdrop(glowCenter: self.landingGlowCenter)
+            }
+        }
+    }
+
+    func updateLandingGlow(location: CGPoint, in size: CGSize) {
+        guard !self.reduceMotion else { return }
+        guard location.x.isFinite, location.y.isFinite, size.width > 0, size.height > 0 else { return }
+
+        let dx = location.x - self.lastLandingGlowLocation.x
+        let dy = location.y - self.lastLandingGlowLocation.y
+        guard (dx * dx) + (dy * dy) > (self.landingGlowMovementThreshold * self.landingGlowMovementThreshold) else { return }
+
+        self.lastLandingGlowLocation = location
+        let normalizedX = min(max(location.x / size.width, 0), 1)
+        let normalizedY = min(max(location.y / size.height, 0), 1)
+
+        withAnimation(.easeOut(duration: 0.22)) {
+            self.landingGlowCenter = UnitPoint(x: normalizedX, y: normalizedY)
+        }
+    }
+
+    func resetLandingGlow() {
+        guard !self.reduceMotion else { return }
+        self.lastLandingGlowLocation = CGPoint(x: -1000, y: -1000)
+
+        withAnimation(.easeOut(duration: 0.35)) {
+            self.landingGlowCenter = UnitPoint(x: 0.5, y: 0.18)
+        }
+    }
+
+    func playLandingWelcomeSoundIfNeeded() {
+        guard self.step == .landing, !self.hasPlayedLandingWelcomeSound else { return }
+        Task { @MainActor in
+            await AudioStartupGate.shared.scheduleOpenAfterInitialUISettled()
+            await AudioStartupGate.shared.waitUntilOpen()
+            guard self.isOnboardingFlowVisible,
+                  self.step == .landing,
+                  self.hasPlayedLandingWelcomeSound == false
+            else { return }
+            self.hasPlayedLandingWelcomeSound = true
+            OnboardingSoundPlayer.shared.playWelcomeSound()
+        }
+    }
+
+    var languageStep: some View {
+        GeometryReader { proxy in
+            ZStack {
+                FluidOnboardingLandingBackdrop(glowCenter: self.landingGlowCenter)
+
+                VStack(spacing: 0) {
+                    FluidOnboardingCompactProgress(value: self.compactProgressValue)
+                        .padding(.top, 28)
+
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            FluidOnboardingCompactAppIconMark(size: 66)
+                                .padding(.bottom, 22)
+
+                            Text("What language will\nyou speak most?")
+                                .font(.system(size: 28, weight: .semibold))
+                                .foregroundStyle(Color.primary)
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(4)
+                                .padding(.bottom, 18)
+
+                            Text("Pick the language you speak, then the one you want on screen.")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.primary.opacity(0.62))
+                                .multilineTextAlignment(.center)
+                                .padding(.bottom, 26)
+
+                            VStack(alignment: .leading, spacing: 16) {
+                                self.onboardingLanguageMenu(
+                                    title: "I speak",
+                                    selection: Binding(
+                                        get: { self.selectedLanguageID },
+                                        set: { id in
+                                            guard let language = VoiceEngineLanguageCatalog.language(id: id) else { return }
+                                            self.selectOnboardingLanguage(language)
+                                        }
+                                    )
+                                )
+                                self.onboardingLanguageMenu(
+                                    title: "Show as",
+                                    selection: self.$settings.translationTargetLanguageID
+                                )
+                            }
+                            .frame(width: 320)
+
+                            Text("Translate follows I speak into Show as. Same language needs no download.")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color.primary.opacity(0.44))
+                                .padding(.top, 18)
+
+                            if SpokenLanguageResolver.sourceLanguage().id
+                                != SpokenLanguageResolver.targetLanguage().id
+                            {
+                                if self.languagePackIsInstalled {
+                                    Text("Language pack ready")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Color.primary.opacity(0.56))
+                                        .padding(.top, 10)
+                                } else {
+                                    if !self.languagePackAvailability.isEmpty {
+                                        Text(self.languagePackAvailability)
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(Color.primary.opacity(0.56))
+                                            .padding(.top, 10)
+                                    }
+                                    Button("Download language pack") {
+                                        Task {
+                                            await self.refreshLanguagePackAvailability(requestDownload: true)
+                                        }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .padding(.top, self.languagePackAvailability.isEmpty ? 10 : 6)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 30)
+                        .padding(.bottom, 12)
+                    }
+
+                    self.cinematicFooter(
+                        continueTitle: "Continue",
+                        canContinue: self.canContinue
+                    ) {
+                        self.handlePrimaryAction()
+                    }
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+
+                FluidOnboardingLandingHoverTracker(
+                    onMove: { location, size in
+                        self.updateLandingGlow(location: location, in: size)
+                    },
+                    onExit: {
+                        self.resetLandingGlow()
+                    }
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .accessibilityHidden(true)
+            }
+            .task {
+                await self.refreshOnboardingLanguagePack()
+            }
+            .onChange(of: self.settings.translationSourceLanguageID) { _, _ in
+                Task { await self.refreshOnboardingLanguagePack() }
+            }
+            .onChange(of: self.settings.translationTargetLanguageID) { _, _ in
+                Task { await self.refreshOnboardingLanguagePack() }
+            }
+        }
+    }
+
+    func onboardingLanguageMenu(title: String, selection: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.primary.opacity(0.7))
+            TheaterLanguageMenu(
+                title: title,
+                selection: selection
+            )
+        }
+    }
+
+    func cinematicFooter(
+        continueTitle: String,
+        canContinue: Bool,
+        continueAction: @escaping () -> Void,
+        skipTitle: String? = nil,
+        canSkip: Bool = false,
+        skipAction: (() -> Void)? = nil
+    ) -> some View {
+        let canNavigateBack = !self.isModelPreparationInProgress && !self.asr.isRunning && !self.isRecordingAnyShortcut
+
+        return HStack {
+            self.cinematicFooterButton(
+                title: "Back",
+                kind: .back,
+                isEnabled: canNavigateBack
+            ) {
+                self.goBack()
+            }
+            .keyboardShortcut(.cancelAction)
+
+            Spacer()
+
+            if let skipTitle, let skipAction {
+                self.cinematicFooterButton(
+                    title: skipTitle,
+                    kind: .skip,
+                    isEnabled: canSkip
+                ) {
+                    skipAction()
+                }
+            }
+
+            self.cinematicFooterButton(
+                title: continueTitle,
+                kind: .next,
+                isEnabled: canContinue
+            ) {
+                continueAction()
+            }
+            .keyboardShortcut(.defaultAction)
+        }
+        .padding(.horizontal, 30)
+        .padding(.bottom, 24)
+    }
+
+    func cinematicFooterButton(
+        title: String,
+        kind: OnboardingFooterButton,
+        isEnabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isPrimary = kind == .next
+        let isHovered = self.hoveredFooterButton == kind && isEnabled
+
+        return self.onboardingPillButton(
+            configuration: OnboardingPillButtonConfiguration(
+                title: title,
+                systemImage: nil,
+                tone: isPrimary ? .primary : .secondary,
+                width: 132,
+                height: 48,
+                fontSize: 16,
+                iconSize: 14,
+                isHovered: isHovered,
+                isEnabled: isEnabled
+            ),
+            action: action
+        ) { isHovered in
+            self.setHoveredFooterButton(isHovered ? kind : nil)
+        }
+        .accessibilityLabel(title)
+    }
+
+    func setHoveredFooterButton(_ button: OnboardingFooterButton?) {
+        guard self.hoveredFooterButton != button else { return }
+        if self.reduceMotion {
+            self.hoveredFooterButton = button
+        } else {
+            withAnimation(.easeOut(duration: 0.14)) {
+                self.hoveredFooterButton = button
+            }
+        }
+    }
+
+    func selectOnboardingLanguage(_ language: VoiceEngineLanguage) {
+        guard self.selectedLanguageID != language.id else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            self.selectedLanguageID = language.id
+            self.settings.onboardingSelectedLanguageID = language.id
+            if let translationLanguage = TranslationLanguageCatalog.language(id: language.id) {
+                let keepSameLanguage = SpokenLanguageResolver.isSameLanguagePair()
+                self.settings.translationSourceLanguageID = translationLanguage.id
+                if keepSameLanguage {
+                    self.settings.translationTargetLanguageID = translationLanguage.id
+                }
+            }
+            self.selectedModelRouteID = self.preferredOnboardingRoute?.id
+            self.isShowingOtherModelRoutes = false
+            self.resetTryoutValidationForSetupChange()
+        }
+    }
+
+    func syncOnboardingSelectionFromSettings() {
+        let allRoutes = VoiceEngineLanguageCatalog.allLanguages()
+            .flatMap { VoiceEngineLanguageCatalog.routes(for: $0) }
+
+        let storedLanguageID = self.settings.onboardingSelectedLanguageID
+        let storedLanguageRoutes = VoiceEngineLanguageCatalog.routes(forLanguageID: storedLanguageID)
+            .filter { SettingsStore.SpeechModel.availableModels.contains($0.model) }
+        let route = storedLanguageRoutes.first { route in
+            self.isRouteModelAndLanguageSettingsSelected(route)
+        } ?? self.preferredRoute(in: storedLanguageRoutes) ?? allRoutes.first { route in
+            self.isRouteModelAndLanguageSettingsSelected(route)
+                && SettingsStore.SpeechModel.availableModels.contains(route.model)
+        }
+
+        guard let route else {
+            if self.selectedModelRouteID == nil {
+                self.selectedModelRouteID = self.preferredOnboardingRoute?.id
+            }
+            return
+        }
+
+        guard self.selectedLanguageID != route.language.id || self.selectedModelRouteID != route.id else {
+            return
+        }
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            self.selectedLanguageID = route.language.id
+            self.selectedModelRouteID = route.id
+            self.isShowingOtherModelRoutes = false
+        }
+    }
+
+    var voiceModelStep: some View {
+        GeometryReader { proxy in
+            ZStack {
+                FluidOnboardingLandingBackdrop(glowCenter: self.landingGlowCenter)
+
+                VStack(spacing: 0) {
+                    FluidOnboardingCompactProgress(value: self.compactProgressValue)
+                        .padding(.top, 28)
+
+                    ScrollView(.vertical, showsIndicators: self.isShowingOtherModelRoutes) {
+                        VStack(spacing: 0) {
+                            FluidOnboardingCompactAppIconMark(size: 66)
+                                .padding(.bottom, 22)
+
+                            Text("Choose your\nvoice engine")
+                                .font(.system(size: 28, weight: .semibold))
+                                .foregroundStyle(Color.primary)
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(4)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.bottom, 16)
+
+                            Text(self.recommendedModelReasonText)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.primary.opacity(0.62))
+                                .multilineTextAlignment(.center)
+                                .padding(.bottom, 14)
+
+                            Text(self.selectedOnboardingLanguage.displayName)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(FluidOnboardingLandingColors.blue)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(FluidOnboardingLandingColors.blue.opacity(0.12))
+                                        .overlay(Capsule().stroke(FluidOnboardingLandingColors.blue.opacity(0.24), lineWidth: 1))
+                                )
+                                .padding(.bottom, 18)
+
+                            VStack(spacing: 10) {
+                                let defaultRoutes = self.defaultDisplayedModelRoutes
+                                if defaultRoutes.count == 1, let route = defaultRoutes.first {
+                                    self.onboardingRouteCard(for: route)
+                                } else if !defaultRoutes.isEmpty {
+                                    HStack(spacing: 16) {
+                                        ForEach(defaultRoutes) { route in
+                                            self.onboardingRouteCard(for: route)
+                                        }
+                                    }
+                                }
+
+                                if !self.otherModelRoutes.isEmpty {
+                                    self.otherModelRoutesToggleButton
+                                }
+
+                                if self.isShowingOtherModelRoutes {
+                                    LazyVGrid(
+                                        columns: [
+                                            GridItem(.fixed(292), spacing: 16, alignment: .top),
+                                            GridItem(.fixed(292), spacing: 16, alignment: .top),
+                                        ],
+                                        spacing: 16
+                                    ) {
+                                        ForEach(self.otherModelRoutes) { route in
+                                            self.onboardingRouteCard(for: route, enablesHover: false)
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 2)
+                            .transaction { transaction in
+                                transaction.animation = nil
+                            }
+                            .frame(width: 608)
+
+                            if self.isModelPreparationInProgress {
+                                Label("Getting this Mac ready to caption. This can take a minute.", systemImage: "clock.arrow.circlepath")
+                                    .font(self.theme.typography.captionStrong)
+                                    .foregroundStyle(Color.primary.opacity(0.58))
+                                    .labelStyle(.titleAndIcon)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.86)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        Capsule()
+                                            .fill(Color.primary.opacity(0.06))
+                                            .overlay(Capsule().stroke(Color.primary.opacity(0.10), lineWidth: 1))
+                                    )
+                                    .padding(.top, 14)
+                            }
+
+                            Text("You can switch models later in Voice Engine settings.")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color.primary.opacity(0.44))
+                                .padding(.top, self.isModelPreparationInProgress ? 8 : 18)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 30)
+                        .padding(.bottom, 12)
+                    }
+
+                    self.cinematicFooter(
+                        continueTitle: "Continue",
+                        canContinue: self.canContinue
+                    ) {
+                        self.handlePrimaryAction()
+                    }
+                }
+
+                FluidOnboardingLandingHoverTracker(
+                    onMove: { location, size in
+                        self.updateLandingGlow(location: location, in: size)
+                    },
+                    onExit: {
+                        self.resetLandingGlow()
+                    }
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .accessibilityHidden(true)
+            }
+        }
+        .task {
+            self.prepareBuiltInVoiceEngineIfNeeded()
+        }
+    }
+
+    func prepareBuiltInVoiceEngineIfNeeded() {
+        guard self.step == .voiceModel else { return }
+        guard let route = self.selectedOnboardingRoute else { return }
+        guard route.model == .appleSpeech || route.model == .appleSpeechAnalyzer else { return }
+        guard !self.isOnboardingRouteReady(route), !self.isModelPreparationInProgress else { return }
+        self.prepareOnboardingRoute(route)
+    }
+
+    var permissionsStep: some View {
+        GeometryReader { proxy in
+            ZStack {
+                FluidOnboardingLandingBackdrop(glowCenter: self.landingGlowCenter)
+
+                VStack(spacing: 0) {
+                    FluidOnboardingCompactProgress(value: self.compactProgressValue)
+                        .padding(.top, 28)
+
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            FluidOnboardingCompactAppIconMark(size: 66)
+                                .padding(.bottom, 22)
+
+                            Text("Let \(ConnectingCaptionsProduct.displayName)\nhear you")
+                                .font(.system(size: 28, weight: .semibold))
+                                .foregroundStyle(Color.primary)
+                                .multilineTextAlignment(.center)
+                                .lineSpacing(4)
+                                .padding(.bottom, 16)
+
+                            Text("Microphone is required. Accessibility is only if you want a translation typed into another app.")
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.primary.opacity(0.62))
+                                .padding(.bottom, 28)
+
+                            VStack(spacing: 14) {
+                                self.permissionRow(
+                                    stepNumber: 1,
+                                    title: self.isMicrophoneReady ? "Microphone access allowed" : "Allow microphone",
+                                    subtitle: self.isMicrophoneReady
+                                        ? "Choose the microphone you want \(ConnectingCaptionsProduct.displayName) to use."
+                                        : "macOS will ask once. Click Allow so \(ConnectingCaptionsProduct.displayName) can hear you.",
+                                    systemImage: "mic.fill",
+                                    isReady: self.isMicrophoneReady,
+                                    actionTitle: self.microphoneActionButtonTitle
+                                ) {
+                                    self.handleMicrophoneAction()
+                                }
+
+                                if self.isMicrophoneReady {
+                                    OnboardingMicrophoneSetupPanel(
+                                        devices: self.orderedOnboardingInputDevices,
+                                        selectedUID: self.selectedOnboardingInputUID,
+                                        level: self.onboardingMicrophoneLevel,
+                                        errorMessage: self.asr.microphonePreviewError,
+                                        onSelect: { self.selectOnboardingMicrophone(uid: $0) }
+                                    )
+                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                                }
+
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Optional — type into another app")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(Color.primary.opacity(0.42))
+
+                                    self.permissionRow(
+                                        stepNumber: 2,
+                                        title: self.accessibilityPermissionTitle,
+                                        subtitle: self.accessibilityPermissionSubtitle,
+                                        systemImage: "keyboard.fill",
+                                        isReady: self.isAccessibilityReady,
+                                        statusTitle: self.accessibilityPermissionStatusTitle,
+                                        actionTitle: self.accessibilityPermissionActionTitle
+                                    ) {
+                                        self.openAccessibilitySettings()
+                                    }
+
+                                    if !self.isAccessibilityReady {
+                                        Text("Skip this unless you want a translation typed into another app. Theater captions do not need it.")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundStyle(Color.primary.opacity(0.42))
+                                            .padding(.top, 2)
+                                    }
+                                }
+                            }
+                            .frame(width: 560)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 34)
+                        .padding(.bottom, 12)
+                    }
+
+                    self.cinematicFooter(
+                        continueTitle: "Continue",
+                        canContinue: self.canContinue
+                    ) {
+                        self.handlePrimaryAction()
+                    }
+                }
+
+                FluidOnboardingLandingHoverTracker(
+                    onMove: { location, size in
+                        self.updateLandingGlow(location: location, in: size)
+                    },
+                    onExit: {
+                        self.resetLandingGlow()
+                    }
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .accessibilityHidden(true)
+            }
+        }
+    }
+
+    var playgroundStep: some View {
+        GeometryReader { proxy in
+            ZStack {
+                FluidOnboardingLandingBackdrop(glowCenter: self.landingGlowCenter)
+
+                VStack(spacing: 0) {
+                    FluidOnboardingCompactProgress(value: self.compactProgressValue)
+                        .padding(.top, 28)
+
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            FluidOnboardingCompactAppIconMark(size: 66)
+                                .padding(.bottom, 22)
+
+                            Text(TheaterAvailability.isSupported ? "Try a Theater caption." : TheaterAvailability.unsupportedCopy)
+                                .font(.system(size: 28, weight: .semibold))
+                                .foregroundStyle(Color.primary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.74)
+                                .padding(.horizontal, 32)
+                                .padding(.bottom, 14)
+
+                            Text(self.playgroundCaptionHint)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundStyle(Color.primary.opacity(0.62))
+                                .multilineTextAlignment(.center)
+                                .padding(.bottom, 22)
+
+                            if !self.translationController.overlayText.isEmpty {
+                                Text(self.translationController.overlayText)
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundStyle(Color.primary)
+                                    .frame(width: 420, alignment: .leading)
+                                    .padding(14)
+                                    .background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                                    .padding(.bottom, 18)
+                            }
+
+                            if TheaterAvailability.isSupported, !SpokenLanguageResolver.isSameLanguagePair() {
+                                if !self.languagePackAvailability.isEmpty {
+                                    Text(self.languagePackAvailability)
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(Color.primary.opacity(0.56))
+                                        .padding(.bottom, 8)
+                                }
+                                if !self.isOnboardingTranslationPackReady {
+                                    Button("Download language pack") {
+                                        Task {
+                                            await self.refreshLanguagePackAvailability(requestDownload: true)
+                                        }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .padding(.bottom, 16)
+                                }
+                            }
+
+                            if self.showsSetupBlock {
+                                Text(self.asr.errorMessage)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.orange)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.bottom, 12)
+                            }
+
+                            if TheaterAvailability.isSupported {
+                            Button {
+                                if self.playgroundListenIsActive {
+                                    Task { await self.stopAndProcessTranscription() }
+                                    return
+                                }
+                                guard self.canOpenOnboardingTheater, !self.isFinishingOnboarding else { return }
+                                PresenterCaptionController.shared.setVisible(true)
+                                LiveTranslationController.shared.startCaptionListening()
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: self.playgroundListenIsActive ? "stop.fill" : "rectangle.on.rectangle")
+                                    Text(self.playgroundListenIsActive ? "Stop" : "Listen")
+                                }
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.primary)
+                                .frame(width: 200, height: 40)
+                                .background(
+                                    FluidOnboardingLandingColors.blue.opacity(
+                                        self.playgroundListenIsActive || self.canOpenOnboardingTheater ? 0.92 : 0.38
+                                    ),
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(!self.playgroundListenIsActive && !self.canOpenOnboardingTheater)
+                            .onChange(of: self.translationController.subscriber.boardState) { _, board in
+                                guard !board.translatedLines.isEmpty else { return }
+                                self.settings.theaterListenUsed = true
+                                self.settings.onboardingPlaygroundValidated = true
+                            }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 34)
+                        .padding(.bottom, 12)
+                    }
+
+                    self.cinematicFooter(
+                        continueTitle: self.playgroundContinueTitle,
+                        canContinue: self.playgroundContinueEnabled,
+                        continueAction: {
+                            self.handlePrimaryAction()
+                        },
+                        skipTitle: "Skip",
+                        canSkip: !self.isFinishingOnboarding && !self.isRecordingAnyShortcut,
+                        skipAction: {
+                            self.settings.onboardingPlaygroundSkipped = true
+                            self.finishSetupFromPlayground()
+                        }
+                    )
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+
+                FluidOnboardingLandingHoverTracker(
+                    onMove: { location, size in
+                        self.updateLandingGlow(location: location, in: size)
+                    },
+                    onExit: {
+                        self.resetLandingGlow()
+                    }
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .accessibilityHidden(true)
+            }
+        }
+        .task {
+            await self.refreshLanguagePackAvailability()
+        }
+        .onChange(of: self.settings.translationSourceLanguageID) { _, _ in
+            Task { await self.refreshLanguagePackAvailability() }
+        }
+        .onChange(of: self.settings.translationTargetLanguageID) { _, _ in
+            Task { await self.refreshLanguagePackAvailability() }
+        }
+    }
+
+    var microphoneActionButtonTitle: String {
+        switch self.asr.micStatus {
+        case .notDetermined:
+            return "Allow"
+        case .denied, .restricted:
+            return "Open Settings"
+        default:
+            return "Allow"
+        }
+    }
+
+    var accessibilityPermissionTitle: String {
+        if self.isAccessibilityReady {
+            return "Typing access is ready"
+        }
+        return self.accessibilitySetupInProgress ? "Finish typing access" : "Optional: type into another app"
+    }
+
+    var accessibilityPermissionSubtitle: String {
+        if self.isAccessibilityReady {
+            return "\(self.appDisplayName) can place text into the app you're using."
+        }
+        if self.accessibilitySetupInProgress {
+            return "Use the floating guide to drag \(self.appDisplayName) into the Accessibility apps list."
+        }
+        return "Only if you want a translation typed into another app. Theater captions work without it."
+    }
+
+    var appDisplayName: String {
+        Bundle.main.fluidAppDisplayName
+    }
+
+    var accessibilityPermissionStatusTitle: String {
+        if self.isAccessibilityReady {
+            return "Ready"
+        }
+        return self.accessibilitySetupInProgress ? "In Settings" : "Optional"
+    }
+
+    var accessibilityPermissionActionTitle: String {
+        self.accessibilitySetupInProgress ? "Show Guide" : "Open Settings"
+    }
+
+    var otherModelRoutesToggleButton: some View {
+        Button {
+            self.toggleOtherModelRoutes()
+        } label: {
+            HStack(spacing: 6) {
+                Text(self.isShowingOtherModelRoutes ? "Hide other models" : "Show other models")
+
+                Image(systemName: self.isShowingOtherModelRoutes ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color.primary.opacity(0.62))
+            .padding(.horizontal, 10)
+            .frame(height: 24)
+            .background(
+                Capsule()
+                    .fill(Color.primary.opacity(0.025))
+                    .overlay(Capsule().stroke(Color.primary.opacity(0.07), lineWidth: 1))
+            )
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .accessibilityLabel(self.isShowingOtherModelRoutes ? "Hide other models" : "Show other models")
+    }
+
+    func toggleOtherModelRoutes() {
+        self.isShowingOtherModelRoutes.toggle()
+    }
+
+    func isOnboardingModelSelected(_ model: SettingsStore.SpeechModel) -> Bool {
+        self.settings.selectedSpeechModel == model
+    }
+
+    func isOnboardingModelReady(_ model: SettingsStore.SpeechModel) -> Bool {
+        self.isOnboardingModelSelected(model) && self.asr.isAsrReady
+    }
+
+    func isOnboardingRouteReady(_ route: VoiceEngineLanguageRoute) -> Bool {
+        self.isRouteSelectedInSettings(route) && self.asr.isAsrReady
+    }
+
+    func isOnboardingModelDownloaded(_ model: SettingsStore.SpeechModel) -> Bool {
+        self.isOnboardingModelBundledOrInstalled(model) || (self.isOnboardingModelSelected(model) && (self.asr.isAsrReady || self.asr.modelsExistOnDisk))
+    }
+
+    func isOnboardingModelBundledOrInstalled(_ model: SettingsStore.SpeechModel) -> Bool {
+        model.isInstalled
+    }
+
+    func isPreparingOnboardingModel(_ model: SettingsStore.SpeechModel) -> Bool {
+        self.isOnboardingModelSelected(model) && (self.asr.isDownloadingModel || (self.asr.isLoadingModel && !self.asr.isAsrReady))
+    }
+
+    func onboardingModelActionButtonTitle(isPreparing: Bool, isDownloaded: Bool, isReady: Bool) -> String {
+        if isPreparing {
+            return self.asr.isLoadingModel ? "Loading..." : "Downloading..."
+        }
+        if isReady {
+            return "Active now"
+        }
+        if isDownloaded {
+            return "Activate"
+        }
+        return "Download & Activate"
+    }
+
+    func prepareOnboardingRoute(_ route: VoiceEngineLanguageRoute) {
+        guard !self.asr.isRunning, !self.isModelPreparationInProgress, self.uninstallingModelRouteID == nil else { return }
+
+        self.modelPreparationTask?.cancel()
+        self.preparingModelRouteID = route.id
+        self.selectOnboardingRoute(route)
+
+        self.modelPreparationTask = Task { @MainActor in
+            defer {
+                self.preparingModelRouteID = nil
+                self.modelPreparationTask = nil
+            }
+
+            do {
+                try await self.asr.ensureAsrReady()
+            } catch is CancellationError {
+                DebugLogger.shared.info("Cancelled onboarding voice model setup for \(route.model.displayName)", source: "OnboardingFlowView")
+            } catch {
+                DebugLogger.shared.error("Failed to prepare onboarding voice model \(route.model.displayName): \(error)", source: "OnboardingFlowView")
+                // Surface the failure in the UI instead of only logging it, so the user
+                // isn't stuck at a disabled button. The shared ContentView alert (bound to
+                // asr.showError) presents this during onboarding. See #355.
+                self.asr.errorTitle = "Voice Model Setup Failed"
+                self.asr.errorMessage = error.localizedDescription
+                self.asr.showError = true
+            }
+            guard !Task.isCancelled else { return }
+            await self.asr.checkIfModelsExistAsync()
+        }
+    }
+
+    func cancelOnboardingModelPreparation() {
+        self.modelPreparationTask?.cancel()
+        self.asr.cancelModelPreparation()
+    }
+
+    func uninstallOnboardingRoute(_ route: VoiceEngineLanguageRoute) {
+        guard !self.asr.isRunning, !self.isModelPreparationInProgress, self.uninstallingModelRouteID == nil else { return }
+
+        self.uninstallingModelRouteID = route.id
+
+        Task { @MainActor in
+            defer {
+                self.uninstallingModelRouteID = nil
+            }
+
+            do {
+                try await self.asr.clearModelCache(for: route.model)
+                await self.asr.checkIfModelsExistAsync()
+            } catch {
+                DebugLogger.shared.error("Failed to delete onboarding voice model \(route.model.displayName): \(error)", source: "OnboardingFlowView")
+                self.asr.errorTitle = "Model Delete Failed"
+                self.asr.errorMessage = error.localizedDescription
+                self.asr.showError = true
+            }
+        }
+    }
+
+    func onboardingRouteCard(
+        for route: VoiceEngineLanguageRoute,
+        enablesHover: Bool = true
+    ) -> some View {
+        let model = route.model
+        let isSelected = self.isOnboardingRouteSelected(route)
+        let isHovered = enablesHover && self.hoveredModelRouteID == route.id
+        let isRouteActiveInSettings = self.isRouteSelectedInSettings(route)
+        let isDownloaded = self.isOnboardingModelBundledOrInstalled(model) || (isRouteActiveInSettings && (self.asr.isAsrReady || self.asr.modelsExistOnDisk))
+        let isPreparing = self.preparingModelRouteID == route.id || (isRouteActiveInSettings && (self.asr.isDownloadingModel || (self.asr.isLoadingModel && !self.asr.isAsrReady)))
+        let isReady = self.isOnboardingRouteReady(route)
+        let isUninstalling = self.uninstallingModelRouteID == route.id
+        let areModelActionsBlocked = self.asr.isRunning || self.uninstallingModelRouteID != nil || self.preparingModelRouteID != nil || isPreparing || self.isModelPreparationInProgress
+        let isBuiltInAppleModel = model == .appleSpeech || model == .appleSpeechAnalyzer
+        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let cardFill = isHovered
+            ? Color(red: 0.042, green: 0.052, blue: 0.074)
+            : Color(red: 0.030, green: 0.038, blue: 0.056)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Text(self.onboardingModelTitle(for: model))
+                    .font(self.theme.typography.sectionTitle)
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "info.circle")
+                    .font(self.theme.typography.sectionTitle)
+                    .foregroundStyle(Color.primary.opacity(0.58))
+                    .frame(width: 24, height: 24)
+                    .contentShape(Circle())
+                    .help(self.onboardingModelTooltip(for: route))
+                    .accessibilityLabel(self.onboardingModelTooltip(for: route))
+            }
+            .frame(height: 38, alignment: .top)
+
+            self.onboardingModelMetadataRow(badgeText: route.badgeText)
+
+            self.onboardingModelFeaturePanel(for: model)
+
+            Spacer(minLength: 0)
+
+            Divider()
+                .overlay(Color.primary.opacity(0.10))
+
+            HStack(spacing: 10) {
+                Image(systemName: "internaldrive")
+                    .font(self.theme.typography.sectionTitle)
+                    .foregroundStyle(Color.primary.opacity(0.62))
+                    .frame(width: 22)
+
+                Text(model.downloadSize == "Built-in" ? "On this Mac" : "Download size")
+                    .font(self.theme.typography.bodySmallStrong)
+                    .foregroundStyle(Color.primary.opacity(0.62))
+
+                Spacer()
+
+                Text(model.downloadSize)
+                    .font(self.theme.typography.bodySmallStrong)
+                    .foregroundStyle(Color.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.80)
+            }
+
+            if isPreparing || isUninstalling {
+                HStack(spacing: 8) {
+                    self.onboardingModelPreparationStatus(isUninstalling: isUninstalling)
+
+                    if isPreparing {
+                        self.onboardingModelActionButton(
+                            id: "\(route.id)-cancel",
+                            title: self.asr.isCancellingModelPreparation ? "Cancelling…" : "Cancel",
+                            systemImage: "xmark",
+                            tone: .secondary,
+                            width: 104,
+                            isDisabled: self.asr.isCancellingModelPreparation
+                        ) {
+                            self.cancelOnboardingModelPreparation()
+                        }
+                    }
+                }
+                .frame(height: 42, alignment: .center)
+            } else if isDownloaded, isBuiltInAppleModel {
+                self.onboardingModelActionButton(
+                    id: "\(route.id)-activate",
+                    title: self.onboardingModelActionButtonTitle(isPreparing: false, isDownloaded: true, isReady: isReady),
+                    systemImage: isReady ? "checkmark" : "bolt.fill",
+                    tone: .primary,
+                    width: nil,
+                    isDisabled: areModelActionsBlocked || isReady
+                ) {
+                    self.prepareOnboardingRoute(route)
+                }
+            } else if isDownloaded {
+                HStack(spacing: 8) {
+                    self.onboardingModelActionButton(
+                        id: "\(route.id)-activate",
+                        title: self.onboardingModelActionButtonTitle(isPreparing: false, isDownloaded: true, isReady: isReady),
+                        systemImage: isReady ? "checkmark" : "bolt.fill",
+                        tone: .primary,
+                        width: 124,
+                        isDisabled: areModelActionsBlocked || isReady
+                    ) {
+                        self.prepareOnboardingRoute(route)
+                    }
+
+                    self.onboardingModelActionButton(
+                        id: "\(route.id)-uninstall",
+                        title: "Delete",
+                        systemImage: "trash",
+                        tone: .destructive,
+                        width: 124,
+                        isDisabled: areModelActionsBlocked
+                    ) {
+                        self.uninstallOnboardingRoute(route)
+                    }
+                }
+            } else {
+                self.onboardingModelActionButton(
+                    id: "\(route.id)-download-activate",
+                    title: self.onboardingModelActionButtonTitle(isPreparing: false, isDownloaded: false, isReady: false),
+                    systemImage: "arrow.down.circle.fill",
+                    tone: .primary,
+                    width: nil,
+                    isDisabled: areModelActionsBlocked
+                ) {
+                    self.prepareOnboardingRoute(route)
+                }
+            }
+        }
+        .padding(16)
+        .frame(width: 292, height: 292, alignment: .topLeading)
+        .background(
+            shape
+                .fill(cardFill)
+                .overlay(
+                    shape.stroke(
+                        isSelected
+                            ? FluidOnboardingLandingColors.blue.opacity(isHovered ? 0.92 : 0.78)
+                            : (isHovered ? Color.primary.opacity(0.20) : Color.primary.opacity(0.10)),
+                        lineWidth: isSelected ? 1.4 : 1
+                    )
+                )
+        )
+        .contentShape(shape)
+        .onTapGesture {
+            guard !areModelActionsBlocked else { return }
+            self.selectOnboardingRoute(route)
+        }
+        .onHover { isHovered in
+            guard enablesHover else { return }
+            self.setHoveredModelRoute(isHovered ? route.id : nil)
+        }
+    }
+
+    func onboardingModelFeaturePanel(for model: SettingsStore.SpeechModel) -> some View {
+        VStack(spacing: 10) {
+            self.onboardingModelMetricRow(
+                fillPercent: model.speedPercent,
+                color: .yellow,
+                secondaryColor: .orange,
+                icon: "bolt.fill",
+                label: "Speed"
+            )
+
+            self.onboardingModelMetricRow(
+                fillPercent: model.accuracyPercent,
+                color: Color.fluidGreen,
+                secondaryColor: .cyan,
+                icon: "target",
+                label: "Accuracy"
+            )
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Speed \(Int(model.speedPercent * 100)) percent. Accuracy \(Int(model.accuracyPercent * 100)) percent.")
+    }
+
+    func onboardingModelPreparationStatus(isUninstalling: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            if self.asr.isCancellingModelPreparation {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .fixedSize()
+
+                    Text("Cancelling...")
+                        .font(self.theme.typography.captionStrong)
+                        .foregroundStyle(Color.primary.opacity(0.62))
+                }
+            } else if self.asr.isDownloadingModel,
+                      self.asr.modelPreparationPhase == .downloading,
+                      let progress = self.asr.downloadProgress
+            {
+                ProgressView(value: progress)
+                    .tint(FluidOnboardingLandingColors.blue)
+
+                HStack(spacing: 6) {
+                    Text(self.asr.modelPreparationStatusText)
+                        .font(self.theme.typography.captionStrong)
+                        .foregroundStyle(Color.primary.opacity(0.56))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                        .fixedSize()
+
+                    Text(
+                        isUninstalling
+                            ? "Deleting..."
+                            : self.asr.modelPreparationStatusText
+                    )
+                    .font(self.theme.typography.captionStrong)
+                    .foregroundStyle(Color.primary.opacity(0.62))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    func onboardingModelMetadataRow(badgeText: String?) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let badgeText {
+                Label(badgeText, systemImage: "checkmark.seal.fill")
+                    .font(self.theme.typography.badge)
+                    .foregroundStyle(Color.green.opacity(0.92))
+                    .labelStyle(.titleAndIcon)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+        }
+        .frame(height: badgeText == nil ? 0 : 18, alignment: .leading)
+    }
+
+    func onboardingModelMetricRow(
+        fillPercent: Double,
+        color: Color,
+        secondaryColor: Color,
+        icon: String,
+        label: String
+    ) -> some View {
+        let clampedFill = min(max(fillPercent, 0), 1)
+
+        return HStack(spacing: 10) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(self.theme.typography.captionStrong)
+                    .foregroundStyle(color)
+
+                Text(label)
+                    .font(self.theme.typography.captionStrong)
+                    .foregroundStyle(Color.primary.opacity(0.66))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            .frame(width: 86, alignment: .leading)
+
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.primary.opacity(0.075))
+
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [color, secondaryColor],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(8, proxy.size.width * CGFloat(clampedFill)))
+                        .overlay(
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.primary.opacity(0.24),
+                                            Color.clear,
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                        )
+                }
+            }
+            .frame(height: 9)
+
+            Text("\(Int(fillPercent * 100))%")
+                .font(self.theme.typography.bodySmallStrong)
+                .foregroundStyle(fillPercent > 0 ? color : Color.primary.opacity(0.48))
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .contentTransition(.numericText())
+                .frame(width: 46, alignment: .trailing)
+        }
+        .frame(height: 18)
+    }
+
+    func onboardingModelActionButton(
+        id: String,
+        title: String,
+        systemImage: String,
+        tone: OnboardingPillButtonTone = .primary,
+        width: CGFloat?,
+        isDisabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isHovered = self.hoveredModelActionButtonID == id && !isDisabled
+
+        return self.onboardingPillButton(
+            configuration: OnboardingPillButtonConfiguration(
+                title: title,
+                systemImage: systemImage,
+                tone: tone,
+                width: width,
+                height: 36,
+                fontSize: 12,
+                iconSize: 14,
+                isHovered: isHovered,
+                isEnabled: !isDisabled
+            ),
+            action: action
+        ) { isHovered in
+            self.setHoveredModelActionButton(isHovered ? id : nil)
+        }
+    }
+
+    func onboardingPillButton(
+        configuration: OnboardingPillButtonConfiguration,
+        action: @escaping () -> Void,
+        onHover: @escaping (Bool) -> Void
+    ) -> some View {
+        let shape = Capsule()
+        let accentColor: Color = configuration.tone == .destructive ? .red : FluidOnboardingLandingColors.blue
+        let foreground: Color = {
+            switch configuration.tone {
+            case .primary:
+                return accentColor
+            case .destructive:
+                return .red
+            case .secondary:
+                return Color.secondary
+            }
+        }()
+
+        return Button {
+            action()
+        } label: {
+            HStack(spacing: configuration.systemImage == nil ? 0 : 8) {
+                if let systemImage = configuration.systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: configuration.iconSize, weight: .regular))
+                }
+
+                Text(configuration.title)
+                    .font(.system(size: configuration.fontSize, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .foregroundStyle(foreground.opacity(configuration.isEnabled ? 1 : 0.35))
+            .frame(width: configuration.width, height: configuration.height)
+            .frame(maxWidth: configuration.width == nil ? .infinity : nil)
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .contentShape(shape)
+        .disabled(!configuration.isEnabled)
+        .onHover { isHovered in
+            onHover(isHovered && configuration.isEnabled)
+        }
+    }
+
+    func onboardingModelTooltip(for route: VoiceEngineLanguageRoute) -> String {
+        let model = route.model
+        if model == .appleSpeech || model == .appleSpeechAnalyzer {
+            return "Built in on this Mac. No download."
+        }
+        return "\(self.onboardingModelSubtitle(for: model)). \(model.downloadSize)."
+    }
+
+    func onboardingModelTitle(for model: SettingsStore.SpeechModel) -> String {
+        switch model {
+        case .appleSpeech, .appleSpeechAnalyzer:
+            return model == SettingsStore.SpeechModel.defaultModel ? "Apple Speech" : "Apple Speech Analyzer"
+        case .parakeetRealtime:
+            return "Parakeet Flash"
+        default:
+            return model.humanReadableName
+                .replacingOccurrences(of: "Dictation", with: "")
+                .replacingOccurrences(of: "dictation", with: "")
+                .replacingOccurrences(of: "transcription", with: "")
+                .replacingOccurrences(of: "Transcription", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+
+    func onboardingModelSubtitle(for model: SettingsStore.SpeechModel) -> String {
+        switch model {
+        case .parakeetTDT:
+            return "Parakeet v3"
+        case .parakeetTDTv2:
+            return "Parakeet v2"
+        case .parakeetRealtime:
+            return "Parakeet Flash"
+        case .cohereTranscribeSixBit:
+            return "Cohere"
+        case .nemotronStreaming:
+            return "Nemotron Streaming"
+        case .nemotronOffline:
+            return "Nemotron Offline"
+        case .whisperTiny, .whisperBase, .whisperSmall, .whisperMedium, .whisperLarge:
+            return "Whisper"
+        default:
+            return model.displayName
+        }
+    }
+
+    func permissionRow(
+        stepNumber: Int,
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        isReady: Bool,
+        statusTitle: String? = nil,
+        actionTitle: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let resolvedStatusTitle = statusTitle ?? (isReady ? "Ready" : "Needed")
+
+        return HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(isReady ? Color.green.opacity(0.16) : FluidOnboardingLandingColors.blue.opacity(0.12))
+                    .frame(width: 46, height: 46)
+
+                if isReady {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(Color.green.opacity(0.92))
+                } else {
+                    VStack(spacing: 1) {
+                        Image(systemName: systemImage)
+                            .font(.system(size: 14, weight: .bold))
+
+                        Text("\(stepNumber)")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundStyle(FluidOnboardingLandingColors.blue)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.primary)
+
+                    Text(resolvedStatusTitle)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(isReady ? Color.green.opacity(0.92) : FluidOnboardingLandingColors.blue)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill((isReady ? Color.green : FluidOnboardingLandingColors.blue).opacity(0.12))
+                        )
+                }
+
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.primary.opacity(0.55))
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            if !isReady {
+                let actionIcon = ["Open Settings", "Show Guide"].contains(actionTitle) ? "arrow.up.right" : "hand.tap.fill"
+                let buttonID = "permission-\(stepNumber)"
+
+                self.onboardingPillButton(
+                    configuration: OnboardingPillButtonConfiguration(
+                        title: actionTitle,
+                        systemImage: actionIcon,
+                        tone: .primary,
+                        width: 132,
+                        height: 36,
+                        fontSize: 12,
+                        iconSize: 10,
+                        isHovered: self.hoveredPermissionButtonID == buttonID,
+                        isEnabled: true
+                    ),
+                    action: action
+                ) { isHovered in
+                    self.setHoveredPermissionButton(isHovered ? buttonID : nil)
+                }
+            }
+        }
+        .padding(.horizontal, 18)
+        .frame(height: 88)
+        .background(
+            shape
+                .fill(Color.primary.opacity(isReady ? 0.045 : 0.070))
+                .overlay(
+                    shape.stroke(
+                        isReady ? Color.green.opacity(0.18) : FluidOnboardingLandingColors.blue.opacity(0.26),
+                        lineWidth: 1
+                    )
+                )
+        )
+    }
+
+    func isRouteModelAndLanguageSettingsSelected(_ route: VoiceEngineLanguageRoute) -> Bool {
+        guard route.model == self.settings.selectedSpeechModel else {
+            return false
+        }
+
+        switch route.binding {
+        case .automatic, .whisper:
+            return true
+        case let .appleSpeech(localeIdentifier):
+            return self.settings.selectedAppleSpeechLocaleIdentifier == localeIdentifier
+        case let .cohere(language):
+            return self.settings.selectedCohereLanguage == language
+        case let .nemotron(language):
+            return self.settings.selectedNemotronLanguage == language
+        }
+    }
+
+    func selectOnboardingRoute(_ route: VoiceEngineLanguageRoute) {
+        let oldModel = self.settings.selectedSpeechModel
+        let oldAppleSpeechLocaleIdentifier = self.settings.selectedAppleSpeechLocaleIdentifier
+        let oldCohereLanguage = self.settings.selectedCohereLanguage
+        let oldNemotronLanguage = self.settings.selectedNemotronLanguage
+
+        self.selectedModelRouteID = route.id
+        VoiceEngineLanguageCatalog.apply(route, to: self.settings)
+
+        let languageChanged: Bool
+        switch route.binding {
+        case .automatic, .whisper:
+            languageChanged = false
+        case .appleSpeech:
+            languageChanged = oldAppleSpeechLocaleIdentifier != self.settings.selectedAppleSpeechLocaleIdentifier
+        case .cohere:
+            languageChanged = oldCohereLanguage != self.settings.selectedCohereLanguage
+        case .nemotron:
+            languageChanged = oldNemotronLanguage != self.settings.selectedNemotronLanguage
+        }
+
+        if oldModel != self.settings.selectedSpeechModel || languageChanged {
+            self.resetTryoutValidationForSetupChange()
+            self.asr.resetTranscriptionProvider()
+        }
+    }
+
+    func setHoveredModelRoute(_ routeID: String?) {
+        guard self.hoveredModelRouteID != routeID else { return }
+        if self.reduceMotion {
+            self.hoveredModelRouteID = routeID
+        } else {
+            withAnimation(.easeOut(duration: 0.14)) {
+                self.hoveredModelRouteID = routeID
+            }
+        }
+    }
+
+}

@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a reproducible fluidSubtitles bug.
+description: Report a reproducible connectingCaptions bug.
 title: "[BUG] "
 labels: ["bug"]
 body:
@@ -12,7 +12,7 @@ body:
     attributes:
       label: Describe the bug
       description: Briefly describe what is broken.
-      placeholder: fluidSubtitles crashes when...
+      placeholder: connectingCaptions crashes when...
     validations:
       required: true
   - type: textarea
@@ -21,7 +21,7 @@ body:
       label: Reproduction steps
       description: Provide exact steps a maintainer can follow.
       placeholder: |
-        1. Open fluidSubtitles
+        1. Open connectingCaptions
         2. Configure...
         3. Press...
         4. Observe...

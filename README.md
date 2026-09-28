@@ -1,12 +1,12 @@
-# fluidSubtitles
+# Connecting Captions
 
 <p align="center">
-  <img src="docs/screenshots/app-icon.png" width="96" alt="fluidSubtitles icon">
+  <img src="docs/screenshots/app-icon.png" width="96" alt="Connecting Captions icon">
 </p>
 
 **Each sentence appears when it is ready.**
 
-fluidSubtitles is live subtitles for macOS, with translation on the machine. Set **I speak** and **Show as** to any language in the setup list, the languages both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. The same language needs no download. A sentence appears when it is ready. Best with one speaker and a close mic.
+Connecting Captions is live subtitles for macOS, with translation on the machine. Set **I speak** and **Show as** to any language in the setup list, the languages both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. The same language needs no download. A sentence appears when it is ready. Best with one speaker and a close mic.
 
 ![Translate home](docs/screenshots/translate-home.png)
 
@@ -16,9 +16,9 @@ Open **Theater**, set **I speak** and **Show as**, then press **Open Theater** a
 
 By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
-[Download 1.6.12](https://github.com/chrisswimlee/fluidSubtitles/releases/tag/v1.6.12) · [Homebrew](https://github.com/chrisswimlee/homebrew-fluidsubtitles) · [Product page](https://chrisswimlee.com/fluidSubtitles) · [For work](https://chrisswimlee.com/fluidSubtitles/license/)
+[Download 1.6.12](https://github.com/chrisswimlee/connectingCaptions/releases/tag/v1.6.12) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://chrisswimlee.com/connectingCaptions/license/)
 
-**For work:** if IT or legal need a named commercial license or an SLA, [request one](https://chrisswimlee.com/fluidSubtitles/license/). Personal and evaluation use stays free.
+**For work:** if IT or legal need a named commercial license or an SLA, [request one](https://chrisswimlee.com/connectingCaptions/license/). Personal and evaluation use stays free.
 
 ---
 
@@ -80,17 +80,17 @@ I speak and Show as are the setup list: every language both Apple Translation an
 
 ## Install
 
-**Preferred.** Download `fluidsubtitles-{version}.zip` from [GitHub Releases](https://github.com/chrisswimlee/fluidSubtitles/releases). A notarized Developer ID zip should stay quiet in Gatekeeper. Drag **fluidSubtitles** to Applications, open Theater, allow the microphone, and press **Listen**.
+**Preferred.** Download `Connecting-Captions-{version}.zip` from [GitHub Releases](https://github.com/chrisswimlee/connectingCaptions/releases). A notarized Developer ID zip should stay quiet in Gatekeeper. Drag **Connecting Captions** to Applications, open Theater, allow the microphone, and press **Listen**.
 
 **Homebrew.**
 
 ```bash
-brew tap chrisswimlee/fluidsubtitles
-brew trust chrisswimlee/fluidsubtitles
-brew install --cask fluidsubtitles
+brew tap chrisswimlee/connectingcaptions
+brew trust chrisswimlee/connectingcaptions
+brew install --cask connectingcaptions
 ```
 
-**Preview zip (unsigned).** If only a pre-release is published, download `fluidsubtitles-{version}-preview-unsigned.zip`. macOS blocks it the first time: click **Done**, then **System Settings → Privacy & Security → Open Anyway**. In-app updates stay off for previews.
+**Preview zip (unsigned).** If only a pre-release is published, download `Connecting-Captions-{version}-preview-unsigned.zip`. macOS blocks it the first time: click **Done**, then **System Settings → Privacy & Security → Open Anyway**. In-app updates stay off for previews.
 
 **Build from source (Xcode).** Permissions stay across rebuilds. See [Building from Source](#building-from-source).
 
@@ -120,8 +120,8 @@ You need an Apple Silicon Mac on macOS 15 or later, **Xcode 26** (CI uses 26.3),
 2. **Clone and build:**
 
    ```bash
-   git clone https://github.com/chrisswimlee/fluidSubtitles.git
-   cd fluidSubtitles
+   git clone https://github.com/chrisswimlee/connectingCaptions.git
+   cd connectingCaptions
    ./build.sh
    ```
 
@@ -132,7 +132,7 @@ You need an Apple Silicon Mac on macOS 15 or later, **Xcode 26** (CI uses 26.3),
    # set DEVELOPMENT_TEAM to your 10-character team ID
    ```
 
-3. **Launch** `DerivedData/Build/Products/Debug/fluidSubtitles Debug.app`. Always launch this same path after rebuilding so macOS keeps its permissions.
+3. **Launch** `DerivedData/Build/Products/Debug/Connecting Captions Debug.app`. Always launch this same path after rebuilding so macOS keeps its permissions.
 
 4. **First run.** Open **Theater**, allow the microphone, pick **Voice** or **Translate**, and press **Listen**. For Translate, download the Apple Translation pack when asked. Allow Accessibility only if you use Type the board or Listen, then type.
 
@@ -143,7 +143,7 @@ You need an Apple Silicon Mac on macOS 15 or later, **Xcode 26** (CI uses 26.3),
    ./build.sh
    ```
 
-No certificate? `./build.sh unsigned` builds without one, but macOS may ask for Accessibility again after each rebuild. You can also open `fluidSubtitles.xcodeproj` and run from Xcode. App Swift packages are pinned in `fluidSubtitles.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`; root `Package.swift` only builds the C capture helper.
+No certificate? `./build.sh unsigned` builds without one, but macOS may ask for Accessibility again after each rebuild. You can also open `connectingCaptions.xcodeproj` and run from Xcode. App Swift packages are pinned in `connectingCaptions.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`; root `Package.swift` only builds the C capture helper.
 
 Architecture notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Latency budgets and the Theater HUD are in [docs/LIVE_TRANSLATION_LATENCY.md](docs/LIVE_TRANSLATION_LATENCY.md). Score a recorded talk with [docs/STAGE_SCORE.md](docs/STAGE_SCORE.md). Signing and notarization are in [docs/SIGNING.md](docs/SIGNING.md). The systems write-up is [docs/APPLE_SILICON_STREAMING.md](docs/APPLE_SILICON_STREAMING.md).
 
@@ -160,20 +160,20 @@ When a change belongs in the upstream dictation engine rather than translation o
 ## Run Integration Tests
 
 ```bash
-xcodebuild test -project fluidSubtitles.xcodeproj -scheme fluidSubtitles -destination 'platform=macOS'
+xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions -destination 'platform=macOS'
 ```
 
 CI uses unsigned builds:
 
 ```bash
-xcodebuild test -project fluidSubtitles.xcodeproj -scheme fluidSubtitles -destination 'platform=macOS' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions -destination 'platform=macOS' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
 ```
 
 ---
 
 ## Privacy
 
-fluidSubtitles is **local-first**. Your voice, audio, and transcribed text never leave your machine unless you explicitly opt in to a cloud AI provider.
+Connecting Captions is **local-first**. Your voice, audio, and transcribed text never leave your machine unless you explicitly opt in to a cloud AI provider.
 
 This release does not send analytics, feedback, or update checks to a third-party analytics host. A FluidVoice install on the same Mac is left alone: this app does not read or delete that app's Keychain or Application Support folder.
 
@@ -191,8 +191,8 @@ Personal, student, and evaluation use is free under GPLv3. Theater Listen stays 
 
 Firms that need a vendor they can sanction — a named license, a security contact, or a written SLA — request a commercial license:
 
-- [chrisswimlee.com/fluidSubtitles/license](https://chrisswimlee.com/fluidSubtitles/license/)
-- Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=fluidSubtitles%20commercial%20license) with the organization, seat count, and whether you need an SLA
+- [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/)
+- Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=Connecting%20Captions%20commercial%20license) with the organization, seat count, and whether you need an SLA
 
 A paid key is air-gapped. It replaces the in-app work notice with **Licensed to** your organization. It does not phone home. A written SLA and a signed seat list are optional. A Jamf or Fleet package can install the key, the seat list, and caption settings. The on-device audit log stores no captions. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
 

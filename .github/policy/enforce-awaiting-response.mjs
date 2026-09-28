@@ -16,7 +16,7 @@ const LABEL = {
 };
 const DAYS_BEFORE_CLOSE = 3;
 const CLOSE_MARKERS = [
-  "<!-- fluidsubtitles-awaiting-response-close -->",
+  "<!-- connectingcaptions-awaiting-response-close -->",
   "<!-- fluidvoice-awaiting-response-close -->",
 ];
 

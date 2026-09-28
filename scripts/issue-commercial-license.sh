@@ -1,10 +1,10 @@
 #!/bin/bash
-# Issue a fluidSubtitles commercial license token.
+# Issue a connectingCaptions commercial license token.
 # The Ed25519 private key never belongs in git.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DEFAULT_KEY="${HOME}/.config/fluidsubtitles/commercial-license.ed25519"
+DEFAULT_KEY="${HOME}/.config/connectingcaptions/commercial-license.ed25519"
 
 usage() {
     cat <<'EOF'
@@ -14,8 +14,8 @@ Usage:
   ./scripts/issue-commercial-license.sh --generate-key
 
 Private key, standard Base64 of 32 raw bytes:
-  FLUIDSUBTITLES_LICENSE_PRIVATE_KEY
-  or ~/.config/fluidsubtitles/commercial-license.ed25519 (mode 600)
+  CONNECTINGCAPTIONS_LICENSE_PRIVATE_KEY
+  or ~/.config/connectingcaptions/commercial-license.ed25519 (mode 600)
 
 Optional: --issued YYYY-MM-DD (UTC, default today)
           --sla              written SLA
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-PRIVATE_KEY="${FLUIDSUBTITLES_LICENSE_PRIVATE_KEY:-}"
+PRIVATE_KEY="${CONNECTINGCAPTIONS_LICENSE_PRIVATE_KEY:-}"
 if [[ -z "${PRIVATE_KEY}" && -f "${DEFAULT_KEY}" ]]; then
     PRIVATE_KEY="$(tr -d '[:space:]' < "${DEFAULT_KEY}")"
 fi
@@ -118,7 +118,7 @@ if issuedArg.isEmpty {
 guard let keyData = Data(base64Encoded: privateKeyBase64),
       let privateKey = try? Curve25519.Signing.PrivateKey(rawRepresentation: keyData)
 else {
-    FileHandle.standardError.write(Data("Set FLUIDSUBTITLES_LICENSE_PRIVATE_KEY or \(defaultKeyPath).\n".utf8))
+    FileHandle.standardError.write(Data("Set CONNECTINGCAPTIONS_LICENSE_PRIVATE_KEY or \(defaultKeyPath).\n".utf8))
     exit(1)
 }
 
@@ -151,7 +151,7 @@ let encoder = JSONEncoder()
 encoder.outputFormatting = [.sortedKeys]
 let data = try encoder.encode(
     Wire(
-        product: "fluidSubtitles",
+        product: "connectingCaptions",
         org: org,
         seats: seats,
         issued: issued,

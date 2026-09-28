@@ -1,8 +1,16 @@
 # Changelog
 
-All notable changes to fluidSubtitles are documented in this file.
+All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
+
+- The app icon, menu bar mark, sidebar logo, and wordmark use a gold **CC** monogram on the Theater plate.
+- The app is **Connecting Captions** again. Downloads ship as `Connecting-Captions-{version}.zip` with **Connecting Captions.app** inside. The GitHub repo and bundle identifier stay **connectingCaptions**. Application Support and Keychain data from **fluidSubtitles** still migrate forward.
+- The Apple Translation pack window now names the language pair, shows installation status, and closes when the pack is ready.
+- Returning to a language pair no longer repeats its cold Translation warmup, while a newly selected pair still warms before its first caption.
+- When Accessibility was denied or dismissed, Listen and type now explains why typing cannot start and links to the correct System Settings page.
+- A growing caption now stays above the Theater task bar. Speech that is translated but waiting for an earlier sentence remains visible there, and a recovered backlog arrives one line at a time instead of dumping onto the board.
+- A lone finished sentence waits for the next speech tick, the next sentence, or silence before it prints. A close speech correction waits for the corrected line, so Theater does not translate the earlier wording.
 
 ## [1.6.12] — 2026-09-28
 
@@ -29,8 +37,8 @@ All notable changes to fluidSubtitles are documented in this file.
 - Theater Listen leaves spoken words like "period" and "um" on the board. It does not pause the presenter's media, play a stop chime, or switch Parakeet to Faster Long Dictation's incremental window.
 - Listen and type asks for Accessibility when the shortcut cannot run. Until macOS allows this app, Left Option and any other Listen and type shortcut never start a Listen.
 - The old dictation shortcut no longer starts a separate recording, and releasing it does not stop Theater Listen. Theater Listen and Listen and type are unchanged. A missing dictation callback leaves the microphone idle.
-- The Dock icon, menu bar, and in-app mark are a caption lower-third, not chat bubbles. Theater Home leads with the board. The accent defaults to caption gold instead of the dictation teal. The sidebar says fluidSubtitles, live captions.
-- Theater Listen is no longer the old dictation path. Captions and Listen and type start as `.theater`, own the ASR partial bus, and skip spoken-send / prompt-mode Stop. Escape stops the mic without dictation Stop. A busy Listen and type start unlocks so the next Listen is not stuck. A sentence stays off the board until it is accepted, then the whole sentence appears once. The first Apple Translation still has a 25 s floor. Leftover peel keeps the Korean, Japanese, or Thai rest of the line. Microphone-change alerts default off and only appear in fluidSubtitles. Settings hide Dictation. FluidVoice's Application Support folder and Keychain are left untouched. A connectingCaptions folder from this app's earlier name is still renamed.
+- The Dock icon, menu bar, and in-app mark are a caption lower-third, not chat bubbles. Theater Home leads with the board. The accent defaults to caption gold instead of the dictation teal. The sidebar says connectingCaptions, live captions.
+- Theater Listen is no longer the old dictation path. Captions and Listen and type start as `.theater`, own the ASR partial bus, and skip spoken-send / prompt-mode Stop. Escape stops the mic without dictation Stop. A busy Listen and type start unlocks so the next Listen is not stuck. A sentence stays off the board until it is accepted, then the whole sentence appears once. The first Apple Translation still has a 25 s floor. Leftover peel keeps the Korean, Japanese, or Thai rest of the line. Microphone-change alerts default off and only appear in connectingCaptions. Settings hide Dictation. FluidVoice's Application Support folder and Keychain are left untouched. A connectingCaptions folder from this app's earlier name is still renamed.
 - Settings, Getting Started, Feedback, and Theater Home show a For work notice with a commercial-license page and email. A signed offline key replaces that notice with Licensed to the organization. Personal use stays free; Listen stays unlocked.
 - Theater wrap fills the line until the next word does not fit. A restitch no longer hops leftover words to the next line at twelve words. A clause that grows in place updates that same printed line.
 - Same-language Voice appends each accepted sentence. A lagged restitch does not rewrite a sentence already on the board.
@@ -73,7 +81,7 @@ All notable changes to fluidSubtitles are documented in this file.
 - Also hear others still translates I speak → Show as, but clause rules follow the script of a Korean, Japanese, or Thai question.
 - Switching Overlay's caption bar to Pop-up opens a lower-third board instead of filling the display.
 - Apple Translation now keeps one serve loop. Opening Theater or the pack sheet no longer starts a second host that can hang the first Translate.
-- Listen and type uses the app you clicked when you started, even if fluidSubtitles is frontmost on Stop. If there is no other app, it says to click into one.
+- Listen and type uses the app you clicked when you started, even if connectingCaptions is frontmost on Stop. If there is no other app, it says to click into one.
 - Check for Updates on an unsigned or ad-hoc build says updates are not published yet, instead of You're Up To Date. A cold pack status waits instead of opening the download sheet.
 - An unsigned preview zip can be downloaded from GitHub pre-releases without Xcode. macOS asks for Open Anyway the first time. `./build.sh preview` builds it and a `preview-<version>-<n>` tag publishes it; signed releases still need a Developer ID.
 - Theater's first idle Overlay says how to get back: slides stay clickable, Control-Option-T shows tools, Control-Option-L starts Listen. With presenter shortcuts off it points to the menu bar.
@@ -113,7 +121,7 @@ All notable changes to fluidSubtitles are documented in this file.
 
 ## [1.6.10] — 2026-02-23
 
-First public tree of fluidSubtitles, focused on live translation and Theater captions.
+First public tree of connectingCaptions, focused on live translation and Theater captions.
 
 - Korean, English, and Thai in either direction via Apple on-device Translation
 - Theater floating captions with Listen, Insert, Copy, and Speak/Show on the window

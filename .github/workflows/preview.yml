@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
-          zip="dist/fluidsubtitles-${version}-preview-unsigned.zip"
+          zip="dist/Connecting-Captions-${version}-preview-unsigned.zip"
           tag="${GITHUB_REF_NAME}"
           case "${tag}" in
             "preview-${version}-"*) ;;
@@ -51,9 +51,9 @@ jobs:
           cat > "${RUNNER_TEMP}/notes.md" <<EOF
           **Unsigned preview.** This build is not signed with a Developer ID or notarized, so macOS blocks it the first time.
 
-          1. Download \`$(basename "${zip}")\`, unzip it, and drag **fluidSubtitles** to Applications.
+          1. Download \`$(basename "${zip}")\`, unzip it, and drag **connectingCaptions** to Applications.
           2. Open it. When macOS says it cannot verify the app, click **Done**.
-          3. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to fluidSubtitles. Confirm.
+          3. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to connectingCaptions. Confirm.
           4. Allow the microphone. Allow Accessibility only if you use Type into app.
 
           In-app updates are off for previews. Download the next preview by hand; macOS may ask for Microphone and Accessibility again.
@@ -63,5 +63,5 @@ jobs:
           gh release create "${tag}" "${zip}" "dist/SHA256SUMS" \
             --verify-tag \
             --prerelease \
-            --title "fluidSubtitles ${version} preview (unsigned)" \
+            --title "connectingCaptions ${version} preview (unsigned)" \
             --notes-file "${RUNNER_TEMP}/notes.md"

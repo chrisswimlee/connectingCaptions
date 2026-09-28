@@ -32,7 +32,7 @@ opt_in_rules:
 excluded:
   - .build
   - DerivedData
-  - fluidSubtitles.xcodeproj
+  - connectingCaptions.xcodeproj
   - scratch
 
 line_length:

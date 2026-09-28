@@ -9,9 +9,9 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>© Chris Swim Lee. Licensed under GPLv3.</string>
 	<key>CFBundleDisplayName</key>
-	<string>fluidSubtitles</string>
+	<string>Connecting Captions</string>
 	<key>CFBundleName</key>
-	<string>fluidSubtitles</string>
+	<string>Connecting Captions</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleVersion</key>
@@ -23,14 +23,14 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>NSAccessibilityUsageDescription</key>
-	<string>fluidSubtitles needs Accessibility permission to type Transcription into other apps. Theater captions on your screen do not require this.</string>
+	<string>Connecting Captions needs Accessibility permission to type Transcription into other apps. Theater captions on your screen do not require this.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>fluidSubtitles needs microphone access to caption speech on this Mac. Audio stays on this Mac unless you opt in to a cloud AI provider.</string>
+	<string>Connecting Captions needs microphone access to caption speech on this Mac. Audio stays on this Mac unless you opt in to a cloud AI provider.</string>
 	<key>LSUIElement</key>
 	<false/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>fluidSubtitles needs permission to control system events for managing launch at startup settings.</string>
+	<string>Connecting Captions needs permission to control system events for managing launch at startup settings.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>fluidSubtitles uses on-device speech recognition to transcribe your voice and translate it locally.</string>
+	<string>Connecting Captions uses on-device speech recognition to transcribe your voice and translate it locally.</string>
 </dict>
 </plist>

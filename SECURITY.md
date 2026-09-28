@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Please report vulnerabilities against the current `main` branch of fluidSubtitles.
+Please report vulnerabilities against the current `main` branch of connectingCaptions.
 
 ## Reporting a vulnerability
 
@@ -12,7 +12,7 @@ Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com) with:
 
 - A description of the issue and its impact
 - Steps to reproduce, or a proof of concept if you have one
-- The fluidSubtitles version, macOS version, and architecture
+- The connectingCaptions version, macOS version, and architecture
 
 If the repository has GitHub Private Vulnerability Reporting enabled, you may also use **Security → Report a vulnerability**.
 
@@ -41,9 +41,9 @@ The app is **unsandboxed**. Theater and dictation need the microphone. Insert-in
 Automatic updates only install a zip that:
 
 - matches `SHA256SUMS` on the GitHub Release
-- contains a single top-level `fluidSubtitles.app`
+- contains a single top-level `Connecting Captions.app`
 - passes `codesign --verify --deep --strict`
-- uses bundle id `com.fluidsubtitles.app`
+- uses bundle id `com.connectingcaptions.app`
 - is signed with a usable Developer ID team, not ad-hoc or `not set`
 
 GitHub Release jobs fail closed when Developer ID or notarization credentials are missing. This tree does not ship a local HTTP API or analytics. Live Theater does not send telemetry.

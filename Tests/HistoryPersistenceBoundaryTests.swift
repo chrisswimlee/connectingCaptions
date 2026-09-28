@@ -34,9 +34,9 @@ final class DebugLogger {
     func warning(_ message: String, source: String) {}
 }
 
-enum FluidProduct {
+enum ConnectingCaptionsProduct {
     static let displayName = "Fluid"
-    static let supportFolderName = "fluidSubtitles"
+    static let supportFolderName = "connectingCaptions"
     static let priorSupportFolderNames = [String]()
 }
 

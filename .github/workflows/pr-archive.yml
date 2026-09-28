@@ -8,12 +8,12 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'Sources/**'
-      - 'fluidSubtitles.xcodeproj/**'
+      - 'connectingCaptions.xcodeproj/**'
       - 'Package.swift'
       - 'Package.resolved'
-      - 'fluidSubtitles.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
+      - 'connectingCaptions.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
       - 'Info.plist'
-      - 'fluidSubtitles.entitlements'
+      - 'connectingCaptions.entitlements'
 
 permissions:
   contents: read
@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   archive:
-    name: "Archive fluidSubtitles PR #${{ github.event.pull_request.number }}"
+    name: "Archive connectingCaptions PR #${{ github.event.pull_request.number }}"
     if: github.event.pull_request.draft == false
     runs-on: macos-15
     timeout-minutes: 45
@@ -33,8 +33,8 @@ jobs:
       AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
       PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      APP_NAME: "fluidSubtitles #${{ github.event.pull_request.number }}"
-      BUNDLE_IDENTIFIER: com.fluidsubtitles.app.pr${{ github.event.pull_request.number }}
+      APP_NAME: "connectingCaptions #${{ github.event.pull_request.number }}"
+      BUNDLE_IDENTIFIER: com.connectingcaptions.app.pr${{ github.event.pull_request.number }}
 
     steps:
       - name: Validate PR commits
@@ -91,13 +91,13 @@ jobs:
 
       - name: Archive PR build
         env:
-          ARCHIVE_PATH: ${{ runner.temp }}/fluidSubtitles-PR-${{ github.event.pull_request.number }}.xcarchive
+          ARCHIVE_PATH: ${{ runner.temp }}/connectingCaptions-PR-${{ github.event.pull_request.number }}.xcarchive
         run: |
           set -euo pipefail
 
           xcodebuild archive \
-            -project fluidSubtitles.xcodeproj \
-            -scheme fluidSubtitles \
+            -project connectingCaptions.xcodeproj \
+            -scheme connectingCaptions \
             -configuration Release \
             -destination 'generic/platform=macOS' \
             -archivePath "$ARCHIVE_PATH" \
@@ -110,32 +110,32 @@ jobs:
       - name: Validate and package archive
         id: package
         env:
-          ARCHIVE_PATH: ${{ runner.temp }}/fluidSubtitles-PR-${{ github.event.pull_request.number }}.xcarchive
-          STAGING_PATH: ${{ runner.temp }}/fluidSubtitles-PR-${{ github.event.pull_request.number }}
+          ARCHIVE_PATH: ${{ runner.temp }}/connectingCaptions-PR-${{ github.event.pull_request.number }}.xcarchive
+          STAGING_PATH: ${{ runner.temp }}/connectingCaptions-PR-${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
-          ORIGINAL_APP_PATH="$ARCHIVE_PATH/Products/Applications/fluidSubtitles.app"
+          ORIGINAL_APP_PATH="$ARCHIVE_PATH/Products/Applications/Connecting Captions.app"
           APP_PATH="$ARCHIVE_PATH/Products/Applications/$APP_NAME.app"
-          EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/fluidSubtitles"
+          EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/connectingCaptions"
           INFO_PLIST="$APP_PATH/Contents/Info.plist"
           ARCHIVE_INFO_PLIST="$ARCHIVE_PATH/Info.plist"
           MANIFEST_PATH="$STAGING_PATH/build-manifest.json"
           MANIFEST_PLIST="$STAGING_PATH/build-manifest.plist"
           README_PATH="$STAGING_PATH/README.txt"
-          ARCHIVE_ZIP="$STAGING_PATH/fluidSubtitles-PR-$PR_NUMBER.xcarchive.zip"
-          APP_ZIP="$STAGING_PATH/fluidSubtitles-PR-$PR_NUMBER.app.zip"
-          VERIFY_PATH="$RUNNER_TEMP/fluidSubtitles-PR-$PR_NUMBER-verify"
-          EFFECTIVE_ENTITLEMENTS="$RUNNER_TEMP/fluidSubtitles-PR-$PR_NUMBER.entitlements"
-          VERIFIED_ENTITLEMENTS="$RUNNER_TEMP/fluidSubtitles-PR-$PR_NUMBER-verified.entitlements"
+          ARCHIVE_ZIP="$STAGING_PATH/connectingCaptions-PR-$PR_NUMBER.xcarchive.zip"
+          APP_ZIP="$STAGING_PATH/connectingCaptions-PR-$PR_NUMBER.app.zip"
+          VERIFY_PATH="$RUNNER_TEMP/connectingCaptions-PR-$PR_NUMBER-verify"
+          EFFECTIVE_ENTITLEMENTS="$RUNNER_TEMP/connectingCaptions-PR-$PR_NUMBER.entitlements"
+          VERIFIED_ENTITLEMENTS="$RUNNER_TEMP/connectingCaptions-PR-$PR_NUMBER-verified.entitlements"
           SHORT_SHA="${PR_HEAD_SHA:0:12}"
-          ARTIFACT_NAME="fluidSubtitles-PR-$PR_NUMBER-$SHORT_SHA"
+          ARTIFACT_NAME="connectingCaptions-PR-$PR_NUMBER-$SHORT_SHA"
 
           test -d "$ARCHIVE_PATH"
           test -d "$ORIGINAL_APP_PATH"
           test -f "$ARCHIVE_INFO_PLIST"
 
-          # Preserve Xcode's expanded entitlements, which combine fluidSubtitles.entitlements
+          # Preserve Xcode's expanded entitlements, which combine connectingCaptions.entitlements
           # with target capabilities such as Hardened Runtime Audio Input.
           codesign -d --entitlements - --xml "$ORIGINAL_APP_PATH" \
             > "$EFFECTIVE_ENTITLEMENTS" 2>/dev/null
@@ -249,7 +249,7 @@ jobs:
           rm "$MANIFEST_PLIST"
 
           cat > "$README_PATH" <<EOF
-          fluidSubtitles PR #$PR_NUMBER
+          connectingCaptions PR #$PR_NUMBER
           ================================
 
           This is an ad-hoc-signed test build from pull request #$PR_NUMBER.
@@ -286,7 +286,7 @@ jobs:
 
           ditto -x -k "$APP_ZIP" "$VERIFY_PATH"
           VERIFIED_APP_PATH="$VERIFY_PATH/$APP_NAME.app"
-          test -x "$VERIFIED_APP_PATH/Contents/MacOS/fluidSubtitles"
+          test -x "$VERIFIED_APP_PATH/Contents/MacOS/connectingCaptions"
           test -L "$VERIFIED_APP_PATH/Contents/Frameworks/CTranscribe.framework/Versions/Current"
           codesign --verify --deep --strict --verbose=2 "$VERIFIED_APP_PATH"
           if [[ "$(codesign -d --entitlements - --xml "$VERIFIED_APP_PATH" 2>/dev/null | plutil -extract 'com\.apple\.security\.device\.audio-input' raw -o - -)" != "true" ]]; then

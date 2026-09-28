@@ -4,7 +4,7 @@ body:
   - type: markdown
     attributes:
       value: >
-        General conversation about fluidSubtitles. Bugs still need an issue.
+        General conversation about connectingCaptions. Bugs still need an issue.
         Ideas still need the Ideas category.
   - type: textarea
     id: note

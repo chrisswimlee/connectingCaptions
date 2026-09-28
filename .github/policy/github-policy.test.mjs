@@ -25,11 +25,11 @@ Attach screenshots or a video for UI, UX, settings, onboarding, overlay, menu ba
 
 test("docs and test-only paths skip Theater screenshots", () => {
   assert.equal(
-    isDocsOrTestOnly(["docs/STAGE_SCORE.md", "README.md", "Tests/FluidSubtitlesIntegrationTests/LiveTranslationClauseTests.swift"]),
+    isDocsOrTestOnly(["docs/STAGE_SCORE.md", "README.md", "Tests/ConnectingCaptionsIntegrationTests/LiveTranslationClauseTests.swift"]),
     true,
   );
   assert.equal(
-    isDocsOrTestOnly(["Sources/FluidSubtitles/UI/LiveTranslation/PresenterCaptionWindow.swift"]),
+    isDocsOrTestOnly(["Sources/ConnectingCaptions/UI/LiveTranslation/PresenterCaptionWindow.swift"]),
     false,
   );
 });
@@ -46,7 +46,7 @@ test("docs-only PR is not blocked on screenshots", () => {
 test("Theater UI PR still needs screenshots or the no-visual checkbox", () => {
   const result = validatePullRequest({
     body: readyBody,
-    changedFiles: ["Sources/FluidSubtitles/UI/LiveTranslation/PresenterCaptionWindow.swift"],
+    changedFiles: ["Sources/ConnectingCaptions/UI/LiveTranslation/PresenterCaptionWindow.swift"],
   });
   assert.equal(result.ok, false);
   assert.ok(result.missing.includes("Screenshots / Video"));

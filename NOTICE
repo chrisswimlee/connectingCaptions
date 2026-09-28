@@ -1,4 +1,4 @@
-fluidSubtitles
+connectingCaptions
 Copyright (C) 2026 Chris Swim Lee
 
 Speech recognition comes from FluidVoice by altic-dev
@@ -36,7 +36,7 @@ MIT License. Compatible with GPLv3.
 
 Transitive Swift package pins (EventSource, Path.swift, Version, yyjson,
 Hugging Face / Apple Swift packages used by FluidAudio) are listed in
-`fluidSubtitles.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`.
+`connectingCaptions.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`.
 Those pins are Apache-2.0, MIT, or Unlicense and are compatible with GPLv3.
 The combined work stays GPLv3.
 
@@ -63,4 +63,4 @@ Optional local cleanup runner. See the MLX project licenses.
 ------------------------------------------------------------------------
 
 This NOTICE file is for attribution. The GNU GPLv3 in LICENSE governs the
-source code of fluidSubtitles.
+source code of connectingCaptions.

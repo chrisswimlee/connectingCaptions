@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PBXPROJ="${ROOT}/fluidSubtitles.xcodeproj/project.pbxproj"
+PBXPROJ="${ROOT}/connectingCaptions.xcodeproj/project.pbxproj"
 
 if grep -E 'DEVELOPMENT_TEAM\s*=\s*[A-Z0-9]{10}' "${PBXPROJ}" | grep -vq 'DEVELOPMENT_TEAM = "";'; then
     echo "project.pbxproj must not contain a DEVELOPMENT_TEAM. Use xcconfig/Local.xcconfig." >&2

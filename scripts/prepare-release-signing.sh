@@ -1,12 +1,12 @@
 #!/bin/bash
-# Show whether this Mac can ship a Developer ID zip for fluidSubtitles.
+# Show whether this Mac can ship a Developer ID zip for connectingCaptions.
 # Does not export certificates or write secrets.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG="${ROOT}/xcconfig/Local.xcconfig"
 
-echo "fluidSubtitles release signing"
+echo "connectingCaptions release signing"
 echo
 
 configured=""
@@ -48,7 +48,7 @@ while IFS= read -r identity; do
         echo "  → matches Local.xcconfig. This is the identity ./build.sh release should use."
     elif [ -n "${configured}" ] && [ -n "${team}" ]; then
         echo "  → team ${team} does not match Local.xcconfig ${configured}."
-        echo "    Do not sign fluidSubtitles with another team's Developer ID."
+        echo "    Do not sign connectingCaptions with another team's Developer ID."
     fi
 done <<< "${developer_ids}"
 echo

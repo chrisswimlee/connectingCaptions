@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# fluidSubtitles build router
+# connectingCaptions build router
 #
 # Usage:
 #   ./build.sh            # signed Debug build
@@ -8,17 +8,19 @@
 #   ./build.sh unsigned   # unsigned Debug build (CI / no signing identity)
 #   ./build.sh release    # signed Release zip and disk image; notarize when Apple credentials are set
 #   ./build.sh preview    # ad-hoc signed Release zip for a GitHub pre-release
-#   ./build.sh disk-image /path/to/fluidSubtitles.app
+#   ./build.sh disk-image /path/to/connectingCaptions.app
 
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROFILE="${1:-${BUILD_PROFILE:-public}}"
-DERIVED_DATA_PATH="${FLUIDSUBTITLES_DERIVED_DATA_PATH:-${PROJECT_DIR}/DerivedData}"
+DERIVED_DATA_PATH="${CONNECTINGCAPTIONS_DERIVED_DATA_PATH:-${PROJECT_DIR}/DerivedData}"
+RELEASE_APP_BUNDLE_NAME="${CONNECTINGCAPTIONS_RELEASE_APP_BUNDLE_NAME:-Connecting Captions.app}"
+RELEASE_ZIP_PREFIX="${CONNECTINGCAPTIONS_RELEASE_ZIP_PREFIX:-Connecting-Captions}"
 
 resolve_development_team() {
-    if [ -n "${FLUIDSUBTITLES_DEVELOPMENT_TEAM:-}" ]; then
-        printf '%s\n' "${FLUIDSUBTITLES_DEVELOPMENT_TEAM}"
+    if [ -n "${CONNECTINGCAPTIONS_DEVELOPMENT_TEAM:-}" ]; then
+        printf '%s\n' "${CONNECTINGCAPTIONS_DEVELOPMENT_TEAM}"
         return
     fi
 
@@ -45,8 +47,8 @@ run_public_build() {
     local signing_mode="$1"
     local development_team
     local -a build_args=(
-        -project fluidSubtitles.xcodeproj
-        -scheme fluidSubtitles
+        -project connectingCaptions.xcodeproj
+        -scheme connectingCaptions
         -configuration Debug
         -destination 'platform=macOS'
         -derivedDataPath "${DERIVED_DATA_PATH}"
@@ -56,7 +58,7 @@ run_public_build() {
     cd "${PROJECT_DIR}"
 
     if [ "${signing_mode}" = "unsigned" ]; then
-        echo "Running unsigned fluidSubtitles build..."
+        echo "Running unsigned connectingCaptions build..."
         echo "Accessibility permission may need to be granted again after rebuilding."
         exec xcodebuild "${build_args[@]}" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
     fi
@@ -73,7 +75,7 @@ Then open Manage Certificates and create an Apple Development certificate.
 
 A free Personal Team is sufficient. Copy xcconfig/Local.xcconfig.example to
 xcconfig/Local.xcconfig and set DEVELOPMENT_TEAM, or export
-FLUIDSUBTITLES_DEVELOPMENT_TEAM.
+CONNECTINGCAPTIONS_DEVELOPMENT_TEAM.
 
 To build without signing instead, run:
   ./build.sh unsigned
@@ -81,8 +83,8 @@ EOF
         exit 1
     fi
 
-    echo "Running signed fluidSubtitles build..."
-    echo "Build product: ${DERIVED_DATA_PATH}/Build/Products/Debug/fluidSubtitles Debug.app"
+    echo "Running signed connectingCaptions build..."
+    echo "Build product: ${DERIVED_DATA_PATH}/Build/Products/Debug/Connecting Captions Debug.app"
     exec xcodebuild "${build_args[@]}" DEVELOPMENT_TEAM="${development_team}"
 }
 
@@ -101,7 +103,7 @@ write_drag_dmg() {
     ln -s /Applications "${stage}/Applications"
     rm -f "${dmg_path}"
     hdiutil create \
-        -volname "fluidSubtitles" \
+        -volname "Connecting Captions" \
         -srcfolder "${stage}" \
         -ov \
         -format UDZO \
@@ -121,7 +123,7 @@ submit_notarization() {
 
 resolve_developer_id() {
     local development_team="$1"
-    local identity="${FLUIDSUBTITLES_CODESIGN_IDENTITY:-}"
+    local identity="${CONNECTINGCAPTIONS_CODESIGN_IDENTITY:-}"
     local identity_hash=""
     identity_hash="$(security find-identity -v -p codesigning 2>/dev/null \
         | grep "Developer ID Application:.*(${development_team})" \
@@ -166,8 +168,8 @@ run_release_build() {
     local dmg_name
     local dmg_path
     local -a build_args=(
-        -project fluidSubtitles.xcodeproj
-        -scheme fluidSubtitles
+        -project connectingCaptions.xcodeproj
+        -scheme connectingCaptions
         -configuration Release
         -destination 'platform=macOS'
         -derivedDataPath "${DERIVED_DATA_PATH}"
@@ -197,7 +199,7 @@ run_release_build() {
     fi
     echo "Developer ID identity: ${identity}"
 
-    echo "Running signed Release fluidSubtitles build..."
+    echo "Running signed Release connectingCaptions build..."
     # Ad-hoc compile. SPM package targets reject a project-wide Developer ID
     # identity. Hosted CI only imports the Developer ID .p12. Re-sign below.
     xcodebuild "${build_args[@]}" \
@@ -205,7 +207,7 @@ run_release_build() {
         CODE_SIGN_IDENTITY=- \
         CODE_SIGNING_REQUIRED=NO
 
-    app_path="${DERIVED_DATA_PATH}/Build/Products/Release/fluidSubtitles.app"
+    app_path="${DERIVED_DATA_PATH}/Build/Products/Release/${RELEASE_APP_BUNDLE_NAME}"
     if [ ! -d "${app_path}" ]; then
         app_path="$(find "${DERIVED_DATA_PATH}/Build/Products/Release" -maxdepth 1 -name '*.app' | head -n 1)"
     fi
@@ -218,12 +220,12 @@ run_release_build() {
     codesign --force --sign "${identity}" --timestamp --options runtime \
         "${app_path}/Contents/Frameworks/CTranscribe.framework"
     codesign --force --sign "${identity}" --timestamp --options runtime \
-        --entitlements "${PROJECT_DIR}/fluidSubtitles.entitlements" \
+        --entitlements "${PROJECT_DIR}/connectingCaptions.entitlements" \
         "${app_path}"
     codesign --verify --deep --strict "${app_path}"
 
     version="$(app_version)"
-    zip_name="fluidsubtitles-${version}.zip"
+    zip_name="${RELEASE_ZIP_PREFIX}-${version}.zip"
     zip_path="${PROJECT_DIR}/dist/${zip_name}"
     mkdir -p "${PROJECT_DIR}/dist"
 
@@ -260,8 +262,8 @@ run_preview_build() {
     local zip_name
     local zip_path
     local -a build_args=(
-        -project fluidSubtitles.xcodeproj
-        -scheme fluidSubtitles
+        -project connectingCaptions.xcodeproj
+        -scheme connectingCaptions
         -configuration Release
         -destination 'platform=macOS'
         -derivedDataPath "${DERIVED_DATA_PATH}"
@@ -269,10 +271,10 @@ run_preview_build() {
     )
 
     cd "${PROJECT_DIR}"
-    echo "Running unsigned Release fluidSubtitles build for a preview zip..."
+    echo "Running unsigned Release connectingCaptions build for a preview zip..."
     xcodebuild "${build_args[@]}" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM=
 
-    app_path="${DERIVED_DATA_PATH}/Build/Products/Release/fluidSubtitles.app"
+    app_path="${DERIVED_DATA_PATH}/Build/Products/Release/${RELEASE_APP_BUNDLE_NAME}"
     if [ ! -d "${app_path}" ]; then
         app_path="$(find "${DERIVED_DATA_PATH}/Build/Products/Release" -maxdepth 1 -name '*.app' | head -n 1)"
     fi
@@ -285,12 +287,12 @@ run_preview_build() {
     codesign --force --deep --sign - --options runtime \
         "${app_path}/Contents/Frameworks/CTranscribe.framework"
     codesign --force --deep --sign - --options runtime \
-        --entitlements "${PROJECT_DIR}/fluidSubtitles.entitlements" \
+        --entitlements "${PROJECT_DIR}/connectingCaptions.entitlements" \
         "${app_path}"
     codesign --verify --deep --strict "${app_path}"
 
     version="$(app_version)"
-    zip_name="fluidsubtitles-${version}-preview-unsigned.zip"
+    zip_name="${RELEASE_ZIP_PREFIX}-${version}-preview-unsigned.zip"
     zip_path="${PROJECT_DIR}/dist/${zip_name}"
     mkdir -p "${PROJECT_DIR}/dist"
     rm -f "${zip_path}"

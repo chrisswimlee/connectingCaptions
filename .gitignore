@@ -120,7 +120,7 @@ config/secrets.yml
 */*.entitlements.bak
 ## Developer-specific Xcode settings (for open source)
 # Each developer should have their own team/bundle ID setup
-fluidSubtitles.xcodeproj/project.pbxproj.local
+connectingCaptions.xcodeproj/project.pbxproj.local
 xcconfig/Local.xcconfig
 
 ## Logs
@@ -204,7 +204,7 @@ RELEASE_NOTES_*
 .agent/
 create_dmg_only.sh
 **.m4a
-!Sources/FluidSubtitles/Resources/*.m4a
+!Sources/ConnectingCaptions/Resources/*.m4a
 # Scratch directory
 scratch/
 

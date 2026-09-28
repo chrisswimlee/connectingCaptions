@@ -1,10 +1,10 @@
 #!/bin/bash
 # Apply the maintainer GitHub gates from CONTRIBUTING.md.
-# Needs `gh` authenticated as an owner of chrisswimlee/fluidSubtitles.
+# Needs `gh` authenticated as an owner of chrisswimlee/connectingCaptions.
 set -euo pipefail
 
 OWNER="${GITHUB_REPOSITORY_OWNER:-chrisswimlee}"
-REPO="${GITHUB_REPOSITORY_NAME:-fluidSubtitles}"
+REPO="${GITHUB_REPOSITORY_NAME:-connectingCaptions}"
 FULL="${OWNER}/${REPO}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -39,7 +39,7 @@ gh api --method PATCH "repos/${FULL}" --input - >/dev/null <<'EOF' || true
 EOF
 
 echo "Discussion categories should include Ideas, Q&A, and General (GitHub defaults)."
-gh api graphql -f query='query { repository(owner:"chrisswimlee", name:"fluidSubtitles") { discussionCategories(first:20) { nodes { name } } } }' --jq '.data.repository.discussionCategories.nodes[].name'
+gh api graphql -f query='query { repository(owner:"chrisswimlee", name:"connectingCaptions") { discussionCategories(first:20) { nodes { name } } } }' --jq '.data.repository.discussionCategories.nodes[].name'
 
 echo "Creating Environment release with the current user as a reviewer..."
 USER_ID="$(gh api user --jq .id)"

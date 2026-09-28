@@ -33,12 +33,12 @@ jobs:
           relevant:
             - 'Sources/**'
             - 'Tests/**'
-            - 'fluidSubtitles.xcodeproj/**'
+            - 'connectingCaptions.xcodeproj/**'
             - 'Package.swift'
             - 'Package.resolved'
-            - 'fluidSubtitles.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
+            - 'connectingCaptions.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
             - 'Info.plist'
-            - 'fluidSubtitles.entitlements'
+            - 'connectingCaptions.entitlements'
             - '.swiftlint.yml'
             - '.github/workflows/build.yml'
 
@@ -58,11 +58,11 @@ jobs:
         docker run --rm \
           --volume "$PWD:$PWD" \
           --workdir "$PWD" \
-          ghcr.io/realm/swiftlint:0.63.2 \
+          ghcr.io/realm/swiftlint:0.65.1 \
           lint --strict --config .swiftlint.yml
 
   build:
-    name: Build fluidSubtitles
+    name: Build connectingCaptions
     if: needs.changes.outputs.relevant == 'true' && needs.lint.result == 'success'
     needs: [changes, lint]
     runs-on: macos-15
@@ -97,11 +97,11 @@ jobs:
       run: |
         set -o pipefail
         xcodebuild test \
-          -project fluidSubtitles.xcodeproj \
-          -scheme fluidSubtitles \
+          -project connectingCaptions.xcodeproj \
+          -scheme connectingCaptions \
           -destination 'platform=macOS,arch=arm64' \
-          -skip-testing:FluidSubtitlesUITests \
-          -skip-testing:FluidSubtitlesIntegrationTests/DictationE2ETests/testDictationEndToEnd_whisperTiny_transcribesFixture \
+          -skip-testing:ConnectingCaptionsUITests \
+          -skip-testing:ConnectingCaptionsIntegrationTests/DictationE2ETests/testDictationEndToEnd_whisperTiny_transcribesFixture \
           -test-timeouts-enabled YES \
           -default-test-execution-time-allowance 60 \
           -maximum-test-execution-time-allowance 300 \

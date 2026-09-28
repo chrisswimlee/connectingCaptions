@@ -6,17 +6,17 @@ set -euo pipefail
 usage() {
     cat <<'EOF'
 Usage:
-  ./scripts/build-mdm-pkg.sh --app dist/fluidSubtitles.app --output dist/fluidSubtitles-mdm.pkg
-  ./scripts/build-mdm-pkg.sh --app dist/fluidSubtitles.app --license ./license.key \
-      --roster ./seats.roster --settings ./settings.fleet.json --output dist/fluidSubtitles-mdm.pkg
+  ./scripts/build-mdm-pkg.sh --app dist/Connecting Captions.app --output dist/connectingCaptions-mdm.pkg
+  ./scripts/build-mdm-pkg.sh --app dist/Connecting Captions.app --license ./license.key \
+      --roster ./seats.roster --settings ./settings.fleet.json --output dist/connectingCaptions-mdm.pkg
 
 Installs the app in /Applications and, when given, these root-owned files:
-  /Library/Application Support/fluidSubtitles/license.key
-  /Library/Application Support/fluidSubtitles/seats.roster
-  /Library/Application Support/fluidSubtitles/settings.fleet.json
+  /Library/Application Support/connectingCaptions/license.key
+  /Library/Application Support/connectingCaptions/seats.roster
+  /Library/Application Support/connectingCaptions/settings.fleet.json
 
 Optional: --version 1.2.3 (default: CFBundleShortVersionString, or 0)
-          --identifier com.fluidsubtitles.mdm
+          --identifier com.connectingcaptions.mdm
           --dry-run   print the staged payload and skip pkgbuild
 EOF
 }
@@ -27,7 +27,7 @@ ROSTER=""
 SETTINGS=""
 OUTPUT=""
 VERSION=""
-IDENTIFIER="com.fluidsubtitles.mdm"
+IDENTIFIER="com.connectingcaptions.mdm"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do
@@ -77,7 +77,7 @@ APP_NAME="$(basename "${APP}")"
 mkdir -p "${STAGE}/Applications"
 cp -R "${APP}" "${STAGE}/Applications/${APP_NAME}"
 
-MANAGED="${STAGE}/Library/Application Support/fluidSubtitles"
+MANAGED="${STAGE}/Library/Application Support/connectingCaptions"
 mkdir -p "${MANAGED}"
 [[ -n "${LICENSE}" ]] && cp "${LICENSE}" "${MANAGED}/license.key"
 [[ -n "${ROSTER}" ]] && cp "${ROSTER}" "${MANAGED}/seats.roster"

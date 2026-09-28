@@ -4,7 +4,7 @@ Personal, student, and evaluation use is free under GPLv3. Theater Listen stays 
 
 If IT or legal need a vendor they can sanction — a named license, a security contact, or an SLA — request a commercial license.
 
-**Request:** [chrisswimlee.com/fluidSubtitles/license](https://chrisswimlee.com/fluidSubtitles/license/) or email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=fluidSubtitles%20commercial%20license).
+**Request:** [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/) or email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=connectingCaptions%20commercial%20license).
 
 This is not consulting. Consulting is [Engage](https://chrisswimlee.com/engage/).
 
@@ -34,7 +34,7 @@ The key does not lock Talk notes, the dictionary, export, or Listen. A refused s
 
 The token is `base64url(json).base64url(ed25519)`.
 
-JSON fields: `product` (`fluidSubtitles`), `org`, `seats`, `issued` (`YYYY-MM-DD`), `expires` (`YYYY-MM-DD`). Optional: `sla` (`true`), `enforceSeats` (`true`). Older keys omit those two and keep working.
+JSON fields: `product` (`connectingCaptions`), `org`, `seats`, `issued` (`YYYY-MM-DD`), `expires` (`YYYY-MM-DD`). Optional: `sla` (`true`), `enforceSeats` (`true`). Older keys omit those two and keep working.
 
 The app verifies the signature with the public key in `CommercialLicense.swift`. It does not phone home. Expired or tampered keys fail closed.
 
@@ -59,7 +59,7 @@ A pkg can drop the same file. The app applies it when the file bytes change. An 
 
 ```json
 {
-  "product": "fluidSubtitles",
+  "product": "connectingCaptions",
   "iSpeak": "en",
   "showAs": "ko",
   "spokenLine": "afterPause",
@@ -81,20 +81,20 @@ Each line is hashed and signed with a key that stays on that Mac. Export writes 
 
 ```bash
 ./scripts/build-mdm-pkg.sh \
-  --app dist/fluidSubtitles.app \
+  --app dist/Connecting Captions.app \
   --license ./license.key \
   --roster ./seats.roster \
   --settings ./settings.fleet.json \
-  --output dist/fluidSubtitles-mdm.pkg
+  --output dist/connectingCaptions-mdm.pkg
 ```
 
 The pkg is unsigned. Sign it with a Developer ID Installer certificate before Jamf or Fleet ships it.
 
 It installs the app in `/Applications` and these root-owned files:
 
-- `/Library/Application Support/fluidSubtitles/license.key`
-- `/Library/Application Support/fluidSubtitles/seats.roster`
-- `/Library/Application Support/fluidSubtitles/settings.fleet.json`
+- `/Library/Application Support/connectingCaptions/license.key`
+- `/Library/Application Support/connectingCaptions/seats.roster`
+- `/Library/Application Support/connectingCaptions/settings.fleet.json`
 
 While `license.key` is present, it wins over a key pasted in Settings. The row says **Installed for this Mac.**
 
@@ -102,8 +102,8 @@ While `license.key` is present, it wins over a key pasted in Settings. The row s
 
 The Ed25519 **private** key never belongs in git.
 
-1. Put the raw 32-byte private key, standard Base64, in `FLUIDSUBTITLES_LICENSE_PRIVATE_KEY`, or in `~/.config/fluidsubtitles/commercial-license.ed25519` (mode `600`).
-2. Confirm the matching public key is the one baked into `Sources/FluidSubtitles/Services/LiveTranslation/CommercialLicense.swift`. Rotating the key needs a new app release.
+1. Put the raw 32-byte private key, standard Base64, in `CONNECTINGCAPTIONS_LICENSE_PRIVATE_KEY`, or in `~/.config/connectingcaptions/commercial-license.ed25519` (mode `600`).
+2. Confirm the matching public key is the one baked into `Sources/ConnectingCaptions/Services/LiveTranslation/CommercialLicense.swift`. Rotating the key needs a new app release.
 3. Issue:
 
 ```bash

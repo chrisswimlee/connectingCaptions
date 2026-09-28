@@ -1,6 +1,6 @@
 # Credits
 
-fluidSubtitles is by Chris Swim Lee. Theater captions and type-this-listen are this product.
+connectingCaptions is by Chris Swim Lee. Theater captions and type-this-listen are this product.
 
 Speech recognition — the microphone graph, Parakeet, Whisper, Apple Speech, Cohere, and Nemotron — comes from [FluidVoice](https://github.com/altic-dev/FluidVoice) by altic-dev. Those files stay under GPLv3. The header on an upstream file says `Upstream: FluidVoice (altic-dev), GPLv3`.
 

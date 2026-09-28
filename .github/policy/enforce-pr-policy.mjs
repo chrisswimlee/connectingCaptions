@@ -13,7 +13,7 @@ import {
 } from "./github-api.mjs";
 
 const MARKERS = [
-  "<!-- fluidsubtitles-pr-policy -->",
+  "<!-- connectingcaptions-pr-policy -->",
   "<!-- fluidvoice-pr-policy -->",
 ];
 const HOURS_BEFORE_CLOSE = 168;

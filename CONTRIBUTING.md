@@ -1,13 +1,13 @@
-# Contributing to fluidSubtitles
+# Contributing to Connecting Captions
 
-This repo is Theater captions and dictation insert for the setup languages: every language both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. Speech recognition engines come from [FluidVoice](https://github.com/altic-dev/FluidVoice). Theater Listen, captions, History, and the app identity are owned here. See [CREDITS.md](CREDITS.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues only through [SECURITY.md](SECURITY.md). Commercial and procurement questions go to [docs/COMMERCIAL.md](docs/COMMERCIAL.md) or [chrisswimlee.com/fluidSubtitles/license](https://chrisswimlee.com/fluidSubtitles/license/), not GitHub Issues.
+This repo is Theater captions and dictation insert for the setup languages: every language both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. Speech recognition engines come from [FluidVoice](https://github.com/altic-dev/FluidVoice). Theater Listen, captions, History, and the app identity are owned here. See [CREDITS.md](CREDITS.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues only through [SECURITY.md](SECURITY.md). Commercial and procurement questions go to [docs/COMMERCIAL.md](docs/COMMERCIAL.md) or [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/), not GitHub Issues.
 
 ## Who this repo is for
 
 | Change | File it here | File it upstream |
 | --- | --- | --- |
 | Theater window, Voice / Translate, captions, Apple Translation, latency HUD | Yes | No |
-| Theater Listen start/stop, partial bus, History, fluidSubtitles identity | Yes | No |
+| Theater Listen start/stop, partial bus, History, connectingCaptions identity | Yes | No |
 | Dictation insert of **this Listen** into another app | Yes | Only if the typing engine itself is wrong |
 | Voice Engine picker for the setup languages | Yes | No |
 | ASR decode, microphone graph, Parakeet / Whisper / Nemotron internals | Ask first | Usually [FluidVoice](https://github.com/altic-dev/FluidVoice) |
@@ -24,13 +24,13 @@ Leave these FluidVoice-era files alone unless the accepted issue is about that e
 - `MenuBarManager.swift`
 - `CustomDictionaryView.swift`
 
-New Theater work belongs in `Sources/FluidSubtitles/Services/LiveTranslation/` or `Sources/FluidSubtitles/UI/LiveTranslation/`. New settings go in `SettingsStore+*.swift`. Do not add product surfaces to files marked `Tracked grandfather`.
+New Theater work belongs in `Sources/ConnectingCaptions/Services/LiveTranslation/` or `Sources/ConnectingCaptions/UI/LiveTranslation/`. New settings go in `SettingsStore+*.swift`. Do not add product surfaces to files marked `Tracked grandfather`.
 
 ## First hour
 
 You need an **Apple Silicon** Mac. Theater Listen, Voice, Translate, and language swap work on **macOS 15** and later. Apple Speech Analyzer needs **macOS 26**.
 
-1. **Install (preferred):** download `fluidsubtitles-{version}.zip` from [GitHub Releases](https://github.com/chrisswimlee/fluidSubtitles/releases) and open the app. A notarized Developer ID zip should stay quiet in Gatekeeper.
+1. **Install (preferred):** download `Connecting-Captions-{version}.zip` from [GitHub Releases](https://github.com/chrisswimlee/connectingCaptions/releases) and open the app. A notarized Developer ID zip should stay quiet in Gatekeeper.
 
 2. **Or build** if you are changing the tree. A free Personal Team is enough:
 
@@ -40,7 +40,7 @@ cp xcconfig/Local.xcconfig.example xcconfig/Local.xcconfig
 ./build.sh
 ```
 
-Launch `DerivedData/Build/Products/Debug/fluidSubtitles Debug.app`. Keep using that product so macOS can keep Accessibility and Microphone. An unsigned or ad-hoc rebuild can drop those grants; allow **fluidSubtitles Debug** again in System Settings → Privacy & Security.
+Launch `DerivedData/Build/Products/Debug/Connecting Captions Debug.app`. Keep using that product so macOS can keep Accessibility and Microphone. An unsigned or ad-hoc rebuild can drop those grants; allow **Connecting Captions Debug** again in System Settings → Privacy & Security.
 
 3. First run selects **Apple Speech** on this Mac (Analyzer on macOS 26, otherwise Apple Speech) and ends when a sentence appears. **Setup Wizard** opens only from the sidebar. Use **Parakeet Flash** only for faster English (Show other models). Do not start with Nemotron Thai.
 
@@ -50,12 +50,12 @@ Launch `DerivedData/Build/Products/Debug/fluidSubtitles Debug.app`. Keep using t
 
 ```bash
 ./scripts/format-and-lint.sh
-xcodebuild test -project fluidSubtitles.xcodeproj -scheme fluidSubtitles \
+xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions \
   -destination 'platform=macOS,arch=arm64' \
-  -skip-testing:FluidSubtitlesUITests
+  -skip-testing:ConnectingCaptionsUITests
 ```
 
-`FluidSubtitlesUITests` is the Theater smoke. It needs macOS UI automation. Local machines can skip it. Hosted CI uses Xcode 26 on a `macos-15` runner; it **cannot** prove a live Theater listen. Prove a talk on your Mac with [docs/STAGE_SCORE.md](docs/STAGE_SCORE.md). Do not invent WER or HUD numbers.
+`ConnectingCaptionsUITests` is the Theater smoke. It needs macOS UI automation. Local machines can skip it. Hosted CI uses Xcode 26 on a `macos-15` runner; it **cannot** prove a live Theater listen. Prove a talk on your Mac with [docs/STAGE_SCORE.md](docs/STAGE_SCORE.md). Do not invent WER or HUD numbers.
 
 Do not commit `xcconfig/Local.xcconfig` or a `DEVELOPMENT_TEAM` value in `project.pbxproj`. Optional hook:
 
@@ -66,9 +66,9 @@ cp scripts/check-team-id.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-com
 Unsigned fallback for machines without a team: `./build.sh unsigned`. To run the tests without a team, sign ad hoc:
 
 ```bash
-xcodebuild test -project fluidSubtitles.xcodeproj -scheme fluidSubtitles \
+xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions \
   -destination 'platform=macOS,arch=arm64' \
-  -skip-testing:FluidSubtitlesUITests \
+  -skip-testing:ConnectingCaptionsUITests \
   CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM=
 ```
 
@@ -80,8 +80,8 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing Theater or the
 
 | Area | Path | Role |
 | --- | --- | --- |
-| Live translation | `Sources/FluidSubtitles/Services/LiveTranslation/` | Clause split, Apple Translation, Theater archive, latency HUD, optional MLX |
-| Theater UI | `Sources/FluidSubtitles/UI/LiveTranslation/` | Home, Theater window, presenter chrome, Setup Wizard |
+| Live translation | `Sources/ConnectingCaptions/Services/LiveTranslation/` | Clause split, Apple Translation, Theater archive, latency HUD, optional MLX |
+| Theater UI | `Sources/ConnectingCaptions/UI/LiveTranslation/` | Home, Theater window, presenter chrome, Setup Wizard |
 | Speech engine | `ASRService.swift` plus `ASRService+*.swift` | Microphone audio → transcript. Reads `SpeechCapturePolicy`. Keep this as the engine, not the product. |
 | Theater Listen | `ContentView+TheaterListen.swift`, `TheaterSpeechSession.swift` | Caption and insert start/stop. Do not start Theater as dictation. |
 | Dictation insert | `TypingService`, `GlobalHotkeyManager`, `QuickTranslateInsert` | Listen, then type uses the app captured at start and shows that line on a bar. Type the board uses the frontmost field. |
@@ -93,15 +93,15 @@ New settings belong in a `SettingsStore+*.swift` file. New ContentView routing b
 
 ## Start with Discussions
 
-Start a [GitHub Discussion](https://github.com/chrisswimlee/fluidSubtitles/discussions) first when you want to:
+Start a [GitHub Discussion](https://github.com/chrisswimlee/connectingCaptions/discussions) first when you want to:
 
 - Ask a support question.
 - Propose a broad idea or feature.
 - Explore a design direction.
-- Report behavior that you are not sure is a fluidSubtitles bug.
+- Report behavior that you are not sure is a connectingCaptions bug.
 - Ask whether a change would be accepted before writing code.
 
-Do not open an issue to buy or quote a commercial license. Send IT and legal to [the license page](https://chrisswimlee.com/fluidSubtitles/license/).
+Do not open an issue to buy or quote a commercial license. Send IT and legal to [the license page](https://chrisswimlee.com/connectingCaptions/license/).
 
 Feature ideas should begin in the Ideas category. Maintainers may turn an accepted discussion into a tracked issue.
 
@@ -114,7 +114,7 @@ Use a bug issue only when you can provide:
 - A clear description of the bug.
 - Exact reproduction steps.
 - Expected behavior and actual behavior.
-- fluidSubtitles version, macOS version, and architecture.
+- connectingCaptions version, macOS version, and architecture.
 - Logs, crash reports, screenshots, or recordings when relevant.
 
 Incomplete bug reports may be labeled `needs reproduction`. If the missing details are not provided after 14 days, the issue-intake workflow may close them.
@@ -141,9 +141,9 @@ Add a `[Unreleased]` bullet to [CHANGELOG.md](CHANGELOG.md) for user-facing chan
 
 These are not CI checks. Run [`scripts/enable-github-gates.sh`](scripts/enable-github-gates.sh) as an owner when `gh` is logged in.
 
-- Make `chrisswimlee/fluidSubtitles` **public**. In-app update checks, issue templates, and feedback links already point there.
+- Make `chrisswimlee/connectingCaptions` **public**. In-app update checks, issue templates, and feedback links already point there.
 - Enable Issues, Discussions (Ideas / Q&A Help / General), and Private Vulnerability Reporting.
 - Require the `Build and Test` check and the `PR Policy` check on `main`.
 - Create a GitHub Environment named `release` with required reviewers. The release workflow fails closed unless Developer ID and notarization secrets are present.
 - Fill one [stage score](docs/STAGE_SCORE.md) on a real Mac. Do not invent numbers. Watch is not a product gate.
-- After the first Developer ID zip, publish a `v*` GitHub Release with `SHA256SUMS`. `FluidProduct.allowedUpdateTeamIDs` already includes `C6BH3WS28B`. See [docs/SIGNING.md](docs/SIGNING.md).
+- After the first Developer ID zip, publish a `v*` GitHub Release with `SHA256SUMS`. `ConnectingCaptionsProduct.allowedUpdateTeamIDs` already includes `C6BH3WS28B`. See [docs/SIGNING.md](docs/SIGNING.md).

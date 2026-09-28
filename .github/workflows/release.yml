@@ -16,6 +16,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Validate release metadata
+        run: |
+          set -euo pipefail
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
+          expected_tag="v${version}"
+          if [ "${GITHUB_REF_NAME}" != "${expected_tag}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match Info.plist version ${version}." >&2
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/main; then
+            echo "${GITHUB_REF_NAME} does not point to a commit on main." >&2
+            exit 1
+          fi
+          if [ -z "$(python3 scripts/extract-changelog.py "${GITHUB_REF_NAME}")" ]; then
+            echo "CHANGELOG.md has no notes for ${GITHUB_REF_NAME}." >&2
+            exit 1
+          fi
+
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
@@ -31,7 +50,7 @@ jobs:
             echo "Developer ID .p12 secrets are required. Refusing to publish an unsigned zip." >&2
             exit 1
           fi
-          KEYCHAIN_PATH="${RUNNER_TEMP}/fluidsubtitles-release.keychain-db"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/connectingcaptions-release.keychain-db"
           KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
           echo "$DEVELOPER_ID_P12_BASE64" | base64 --decode > "${RUNNER_TEMP}/developer-id.p12"
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -45,8 +64,8 @@ jobs:
 
       - name: Build Release zip
         env:
-          FLUIDSUBTITLES_DEVELOPMENT_TEAM: ${{ secrets.FLUIDSUBTITLES_DEVELOPMENT_TEAM }}
-          FLUIDSUBTITLES_CODESIGN_IDENTITY: ${{ secrets.FLUIDSUBTITLES_CODESIGN_IDENTITY }}
+          CONNECTINGCAPTIONS_DEVELOPMENT_TEAM: ${{ secrets.CONNECTINGCAPTIONS_DEVELOPMENT_TEAM }}
+          CONNECTINGCAPTIONS_CODESIGN_IDENTITY: ${{ secrets.CONNECTINGCAPTIONS_CODESIGN_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -57,13 +76,13 @@ jobs:
         run: |
           set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
-          zip="dist/fluidsubtitles-${version}.zip"
-          app="$(find dist -maxdepth 2 -name 'fluidSubtitles.app' -print -quit)"
+          zip="dist/Connecting-Captions-${version}.zip"
+          app="$(find dist -maxdepth 2 -name 'Connecting Captions.app' -print -quit)"
           if [ ! -d "${app:-}" ]; then
             rm -rf "${RUNNER_TEMP}/release-verify"
             mkdir -p "${RUNNER_TEMP}/release-verify"
             ditto -x -k "$zip" "${RUNNER_TEMP}/release-verify"
-            app="$(find "${RUNNER_TEMP}/release-verify" -maxdepth 2 -name 'fluidSubtitles.app' -print -quit)"
+            app="$(find "${RUNNER_TEMP}/release-verify" -maxdepth 2 -name 'Connecting Captions.app' -print -quit)"
           fi
           if [ ! -d "${app:-}" ]; then
             echo "Release app was not found for verification." >&2
@@ -79,7 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
-          zip="dist/fluidsubtitles-${version}.zip"
+          zip="dist/Connecting-Captions-${version}.zip"
           if [ ! -f "${zip}" ]; then
             echo "Expected release zip at ${zip}" >&2
             exit 1
@@ -91,5 +110,5 @@ jobs:
             exit 1
           fi
           gh release create "${GITHUB_REF_NAME}" "${zip}" "dist/SHA256SUMS" \
-            --title "fluidSubtitles ${version}" \
+            --title "Connecting Captions ${version}" \
             --notes "$notes"

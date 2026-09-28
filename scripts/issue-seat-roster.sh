@@ -1,9 +1,9 @@
 #!/bin/bash
-# Sign a fluidSubtitles seat list. Seat ids are hardware UUIDs.
+# Sign a connectingCaptions seat list. Seat ids are hardware UUIDs.
 # The Ed25519 private key never belongs in git.
 set -euo pipefail
 
-DEFAULT_KEY="${HOME}/.config/fluidsubtitles/commercial-license.ed25519"
+DEFAULT_KEY="${HOME}/.config/connectingcaptions/commercial-license.ed25519"
 
 usage() {
     cat <<'EOF'
@@ -12,8 +12,8 @@ Usage:
   ./scripts/issue-seat-roster.sh --org "Example LLP" --expires 2027-09-21 --seats-file ./seats.txt
 
 Private key, standard Base64 of 32 raw bytes:
-  FLUIDSUBTITLES_LICENSE_PRIVATE_KEY
-  or ~/.config/fluidsubtitles/commercial-license.ed25519 (mode 600)
+  CONNECTINGCAPTIONS_LICENSE_PRIVATE_KEY
+  or ~/.config/connectingcaptions/commercial-license.ed25519 (mode 600)
 
 --seats-file is one hardware UUID per line. Blank lines and # comments are ignored.
 Optional: --issued YYYY-MM-DD (UTC, default today)
@@ -54,7 +54,7 @@ if [[ -n "${SEATS_FILE}" ]]; then
     done < "${SEATS_FILE}"
 fi
 
-PRIVATE_KEY="${FLUIDSUBTITLES_LICENSE_PRIVATE_KEY:-}"
+PRIVATE_KEY="${CONNECTINGCAPTIONS_LICENSE_PRIVATE_KEY:-}"
 if [[ -z "${PRIVATE_KEY}" && -f "${DEFAULT_KEY}" ]]; then
     PRIVATE_KEY="$(tr -d '[:space:]' < "${DEFAULT_KEY}")"
 fi
@@ -123,7 +123,7 @@ if issuedArg.isEmpty {
 guard let keyData = Data(base64Encoded: privateKeyBase64),
       let privateKey = try? Curve25519.Signing.PrivateKey(rawRepresentation: keyData)
 else {
-    FileHandle.standardError.write(Data("Set FLUIDSUBTITLES_LICENSE_PRIVATE_KEY or \(defaultKeyPath).\n".utf8))
+    FileHandle.standardError.write(Data("Set CONNECTINGCAPTIONS_LICENSE_PRIVATE_KEY or \(defaultKeyPath).\n".utf8))
     exit(1)
 }
 
@@ -144,7 +144,7 @@ struct Wire: Encodable {
 let encoder = JSONEncoder()
 encoder.outputFormatting = [.sortedKeys]
 let data = try encoder.encode(
-    Wire(product: "fluidSubtitles", org: org, seatIDs: canonical, issued: issued, expires: expires)
+    Wire(product: "connectingCaptions", org: org, seatIDs: canonical, issued: issued, expires: expires)
 )
 let signature = try privateKey.signature(for: data)
 print("\(base64URL(data)).\(base64URL(signature))")

@@ -1,21 +1,21 @@
 name: Feature Request
-description: Suggest an idea for fluidSubtitles.
+description: Suggest an idea for connectingCaptions.
 title: "[FEATURE] "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Start a [Discussion](https://github.com/chrisswimlee/fluidSubtitles/discussions) in Ideas first.
+        Start a [Discussion](https://github.com/chrisswimlee/connectingCaptions/discussions) in Ideas first.
         Open this issue only after a maintainer accepts that direction.
 
-        Describe the user problem and the behavior you want in fluidSubtitles.
+        Describe the user problem and the behavior you want in connectingCaptions.
   - type: input
     id: discussion
     attributes:
       label: Accepted Discussion
       description: Link the Ideas discussion a maintainer accepted. Broad or unclear features may be redirected there.
-      placeholder: https://github.com/chrisswimlee/fluidSubtitles/discussions/
+      placeholder: https://github.com/chrisswimlee/connectingCaptions/discussions/
   - type: textarea
     id: problem
     attributes:

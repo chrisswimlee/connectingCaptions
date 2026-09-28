@@ -13,11 +13,11 @@ import {
 } from "./github-api.mjs";
 
 const BUG_MARKERS = [
-  "<!-- fluidsubtitles-bug-intake -->",
+  "<!-- connectingcaptions-bug-intake -->",
   "<!-- fluidvoice-bug-intake -->",
 ];
 const STALE_MARKERS = [
-  "<!-- fluidsubtitles-stale-repro -->",
+  "<!-- connectingcaptions-stale-repro -->",
   "<!-- fluidvoice-stale-repro -->",
 ];
 const STALE_REPRODUCTION_DAYS = 14;
