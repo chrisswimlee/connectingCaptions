@@ -722,7 +722,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_CODE_COVERAGE = NO;
@@ -752,7 +752,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.6.13;
+				MARKETING_VERSION = 1.6.14;
 				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.app.debug;
 				PRODUCT_MODULE_NAME = ConnectingCaptions_Debug;
 				PRODUCT_NAME = "Connecting Captions Debug";
@@ -781,7 +781,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_CODE_COVERAGE = NO;
@@ -811,7 +811,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.6.13;
+				MARKETING_VERSION = 1.6.14;
 				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.app;
 				PRODUCT_MODULE_NAME = ConnectingCaptions;
 				PRODUCT_NAME = "Connecting Captions";

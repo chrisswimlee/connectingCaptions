@@ -16,7 +16,7 @@ Open **Theater**, set **I speak** and **Show as**, then press **Open Theater** a
 
 By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
-[Download 1.6.13](https://github.com/chrisswimlee/connectingCaptions/releases/tag/v1.6.13) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://chrisswimlee.com/connectingCaptions/license/)
+[Download 1.6.14](https://github.com/chrisswimlee/connectingCaptions/releases/tag/v1.6.14) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://chrisswimlee.com/connectingCaptions/license/)
 
 **For work:** if IT or legal need a named commercial license or an SLA, [request one](https://chrisswimlee.com/connectingCaptions/license/). Personal and evaluation use stays free.
 

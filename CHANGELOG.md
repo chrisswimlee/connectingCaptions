@@ -4,6 +4,8 @@ All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
 
+## [1.6.14] — 2026-09-29
+
 - The menu bar mark and the Theater task bar use the linked CC. The name shows on the Pop-up bar only while it is idle.
 - Voice Engine weights stay in this app's Application Support folder. A model already in the shared FluidAudio cache is copied once, and that cache is not deleted.
 - Settings names FluidVoice as the source of speech recognition.
