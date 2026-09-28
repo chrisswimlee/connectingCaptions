@@ -24,6 +24,16 @@ resolve_development_team() {
         return
     fi
 
+    if [ -n "${FLUIDSUBTITLES_DEVELOPMENT_TEAM:-}" ]; then
+        printf '%s\n' "${FLUIDSUBTITLES_DEVELOPMENT_TEAM}"
+        return
+    fi
+
+    if [ -n "${APPLE_TEAM_ID:-}" ]; then
+        printf '%s\n' "${APPLE_TEAM_ID}"
+        return
+    fi
+
     local from_xcconfig
     from_xcconfig="$(awk -F= '/^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=/{gsub(/[[:space:]]/, "", $2); if ($2 != "" && $2 != "YOUR_TEAM_ID") print $2; exit}' \
         "${PROJECT_DIR}/xcconfig/Local.xcconfig" 2>/dev/null || true)"
@@ -123,7 +133,7 @@ submit_notarization() {
 
 resolve_developer_id() {
     local development_team="$1"
-    local identity="${CONNECTINGCAPTIONS_CODESIGN_IDENTITY:-}"
+    local identity="${CONNECTINGCAPTIONS_CODESIGN_IDENTITY:-${FLUIDSUBTITLES_CODESIGN_IDENTITY:-}}"
     local identity_hash=""
     identity_hash="$(security find-identity -v -p codesigning 2>/dev/null \
         | grep "Developer ID Application:.*(${development_team})" \
