@@ -4,6 +4,8 @@ All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
 
+## [1.6.13] — 2026-09-28
+
 - The app icon, menu bar mark, sidebar logo, and wordmark use a gold **CC** monogram on the Theater plate.
 - The app is **Connecting Captions** again. Downloads ship as `Connecting-Captions-{version}.zip` with **Connecting Captions.app** inside. The GitHub repo and bundle identifier stay **connectingCaptions**. Application Support and Keychain data from **fluidSubtitles** still migrate forward.
 - The Apple Translation pack window now names the language pair, shows installation status, and closes when the pack is ready.
