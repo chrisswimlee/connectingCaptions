@@ -6,7 +6,7 @@
 
 **Each sentence appears when it is ready.**
 
-fluidSubtitles is live captions for macOS. Set **I speak** and **Show as** to any language in the setup list, the languages both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. The same language needs no download. A sentence appears when it is ready. Best with one speaker and a close mic.
+fluidSubtitles is live subtitles for macOS, with translation on the machine. Set **I speak** and **Show as** to any language in the setup list, the languages both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. The same language needs no download. A sentence appears when it is ready. Best with one speaker and a close mic.
 
 ![Translate home](docs/screenshots/translate-home.png)
 
