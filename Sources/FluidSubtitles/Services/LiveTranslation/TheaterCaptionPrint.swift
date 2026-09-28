@@ -71,7 +71,7 @@ enum TheaterLinePrint: String, CaseIterable, Identifiable {
     var help: String {
         switch self {
         case .atOnce:
-            return "The whole line appears together."
+            return "The whole line eases in together."
         case .word:
             return "The line fills in one word at a time."
         case .letter:
@@ -198,12 +198,17 @@ enum TheaterBoardPreview {
     }
 }
 
-/// Place Theater on the visible display. With no chosen position, Pop-up fills
-/// that display on Open. A chosen position is used instead, including after
-/// Open and when the display changes. A resize is kept for this open and
-/// across Minimize. Overlay falls back to a caption bar and never upgrades a
-/// thin frame to the whole screen.
+/// Place Theater on the visible display. With no chosen position, Pop-up opens
+/// as a lower third so the slides stay visible. Fill screen is a position the
+/// presenter picks. A smaller saved resize is kept, including after Minimize
+/// and when the display changes. A frame that covers the display, an Overlay
+/// caption bar, or the old default opens as a lower third. Overlay falls back
+/// to a caption bar only after that rectangle is kept.
 enum TheaterWindowPlacement {
+    struct OverlayFrameDecision: Equatable {
+        var frame: CGRect
+        var needsPlacement: Bool
+    }
     static let legacyDefaultSize = CGSize(width: 1100, height: 440)
 
     static func resolvedFrame(
@@ -227,22 +232,25 @@ enum TheaterWindowPlacement {
         if let preset {
             return preset.resolved(for: .popup).frame(in: visible)
         }
-        if keepUserSize, let stored, stored.width > 200, stored.height > 160 {
+        let lowerThird = TheaterPositionPreset.lowerThird.frame(in: visible)
+        guard let stored, stored.width > 200, stored.height > 160 else {
+            return lowerThird
+        }
+        if keepUserSize || !Self.shouldUseLowerThird(stored: stored, visible: visible) {
             return Self.clamped(stored, to: visible)
         }
-        return visible
+        return lowerThird
     }
 
-    /// Overlay caption bar is ~180 tall. Pop-up fills the display so the board
-    /// is not stuck as a thin leftover strip.
+    /// Overlay caption bar is ~180 tall. A strip that thin is not a chosen
+    /// Pop-up board.
     static func isOverlayCaptionBar(_ stored: CGRect, visible: CGRect) -> Bool {
         stored.height > 80
             && stored.height < 220
             && stored.width >= visible.width * 0.6
     }
 
-    /// Auto-converted Overlay leftovers used to land on lower-third. Fill those
-    /// unless the presenter picked Lower third as a preset.
+    /// A stored rectangle that already matches Lower third.
     static func isLowerThirdLeftover(_ stored: CGRect, visible: CGRect) -> Bool {
         Self.isClose(stored, TheaterPositionPreset.lowerThird.frame(in: visible))
     }
@@ -258,7 +266,63 @@ enum TheaterWindowPlacement {
         return Self.clamped(stored, to: visible)
     }
 
-    static func shouldFillScreen(
+    /// True when Overlay would throw this frame away and use the caption bar.
+    /// Full screen, the legacy 1100×440 default, and a missing frame need a
+    /// placement pass. A caption bar, a lower third, and any other kept rect do not.
+    static func needsOverlayPlacement(stored: CGRect?, visible: CGRect) -> Bool {
+        let resolved = Self.resolvedOverlayFrame(stored: stored, visible: visible)
+        let bar = TheaterPositionPreset.captionBar.frame(in: visible)
+        guard Self.isClose(resolved, bar) else { return false }
+        guard let stored else { return true }
+        return !Self.isClose(stored, bar)
+    }
+
+    /// Which rectangle Overlay should use, and whether the presenter still
+    /// has to keep it. A live placement pass keeps the frame under the pointer
+    /// instead of jumping back to a saved spot.
+    static func overlayFrameDecision(
+        stored: CGRect?,
+        saved: CGRect?,
+        visible: CGRect,
+        preset: TheaterPositionPreset?,
+        placing: Bool
+    ) -> OverlayFrameDecision {
+        if placing {
+            let candidate = stored ?? TheaterPositionPreset.captionBar.frame(in: visible)
+            return OverlayFrameDecision(
+                frame: Self.clamped(candidate, to: visible),
+                needsPlacement: true
+            )
+        }
+        if let preset, preset.isAvailable(for: .transparent) {
+            let resolved = preset.resolved(for: .transparent)
+            return OverlayFrameDecision(
+                frame: resolved.frame(in: visible),
+                needsPlacement: false
+            )
+        }
+        if let saved, !Self.needsOverlayPlacement(stored: saved, visible: visible) {
+            return OverlayFrameDecision(
+                frame: Self.clamped(saved, to: visible),
+                needsPlacement: false
+            )
+        }
+        if Self.needsOverlayPlacement(stored: stored, visible: visible) {
+            let candidate = stored ?? CGRect(origin: visible.origin, size: Self.legacyDefaultSize)
+            return OverlayFrameDecision(
+                frame: Self.clamped(candidate, to: visible),
+                needsPlacement: true
+            )
+        }
+        return OverlayFrameDecision(
+            frame: Self.resolvedOverlayFrame(stored: stored, visible: visible),
+            needsPlacement: false
+        )
+    }
+
+    /// Overlay strips, a display-sized frame, and the old 1100×440 default
+    /// open as a lower third. A smaller resize the presenter kept does not.
+    static func shouldUseLowerThird(
         stored: CGRect,
         visible: CGRect,
         presentation: TheaterPresentationStyle = .popup
@@ -266,6 +330,8 @@ enum TheaterWindowPlacement {
         if presentation == .transparent { return false }
         if visible.width < 200 || visible.height < 160 { return false }
         if Self.isLegacyDefault(stored) { return true }
+        if Self.isOverlayCaptionBar(stored, visible: visible) { return true }
+        if Self.isFillScreen(stored, visible: visible) { return true }
         if stored.width < 700 || stored.height < 220 { return true }
         return false
     }
@@ -339,10 +405,11 @@ enum TheaterPositionPreset: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Overlay caption bar becomes Fill screen on Pop-up, and the reverse.
+    /// Overlay caption bar becomes Lower third on Pop-up, so switching
+    /// presentation does not cover the slides. Fill screen becomes the caption bar.
     func resolved(for presentation: TheaterPresentationStyle) -> TheaterPositionPreset {
         switch (self, presentation) {
-        case (.captionBar, .popup): .fillScreen
+        case (.captionBar, .popup): .lowerThird
         case (.fillScreen, .transparent): .captionBar
         default: self
         }
@@ -396,6 +463,14 @@ enum TheaterCaptionScale {
 
     static func translatedSize(setting: CGFloat) -> CGFloat {
         min(max(setting, 1) * Self.translatedMultiplier, Self.maxPointSize)
+    }
+
+    /// Room under the controls for the first caption. At the default Show-as
+    /// size this is `floor`. A larger title moves down by the same amount it grew.
+    static func openingDrop(titleSize: CGFloat, floor: CGFloat) -> CGFloat {
+        let reference = Self.translatedSize(setting: 42)
+        let extra = max(0, titleSize - reference)
+        return ceil(max(floor, 0) + extra)
     }
 
     static func sizes(setting: CGFloat, stageWidth: CGFloat) -> (spoken: CGFloat, translated: CGFloat) {

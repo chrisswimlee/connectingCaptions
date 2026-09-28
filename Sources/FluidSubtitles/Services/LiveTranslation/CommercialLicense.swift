@@ -21,6 +21,10 @@ nonisolated enum CommercialLicense {
         var seats: Int
         var issued: Date
         var expires: Date
+        /// Written response window. Omitted keys stay false so older tokens still verify.
+        var sla: Bool = false
+        /// When true, Licensed to requires this Mac on a signed seat list. Listen stays unlocked either way.
+        var enforceSeats: Bool = false
 
         var licensedToLine: String {
             "Licensed to \(self.org)"
@@ -71,6 +75,58 @@ nonisolated enum CommercialLicense {
         var seats: Int
         var issued: String
         var expires: String
+        var sla: Bool?
+        var enforceSeats: Bool?
+
+        enum CodingKeys: String, CodingKey {
+            case product
+            case org
+            case seats
+            case issued
+            case expires
+            case sla
+            case enforceSeats
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(self.product, forKey: .product)
+            try container.encode(self.org, forKey: .org)
+            try container.encode(self.seats, forKey: .seats)
+            try container.encode(self.issued, forKey: .issued)
+            try container.encode(self.expires, forKey: .expires)
+            try container.encodeIfPresent(self.sla, forKey: .sla)
+            try container.encodeIfPresent(self.enforceSeats, forKey: .enforceSeats)
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.product = try container.decode(String.self, forKey: .product)
+            self.org = try container.decode(String.self, forKey: .org)
+            self.seats = try container.decode(Int.self, forKey: .seats)
+            self.issued = try container.decode(String.self, forKey: .issued)
+            self.expires = try container.decode(String.self, forKey: .expires)
+            self.sla = try container.decodeIfPresent(Bool.self, forKey: .sla)
+            self.enforceSeats = try container.decodeIfPresent(Bool.self, forKey: .enforceSeats)
+        }
+
+        init(
+            product: String,
+            org: String,
+            seats: Int,
+            issued: String,
+            expires: String,
+            sla: Bool? = nil,
+            enforceSeats: Bool? = nil
+        ) {
+            self.product = product
+            self.org = org
+            self.seats = seats
+            self.issued = issued
+            self.expires = expires
+            self.sla = sla
+            self.enforceSeats = enforceSeats
+        }
     }
 
     static func makeToken(
@@ -120,7 +176,9 @@ nonisolated enum CommercialLicense {
             org: org,
             seats: wire.seats,
             issued: issued,
-            expires: expires
+            expires: expires,
+            sla: wire.sla == true,
+            enforceSeats: wire.enforceSeats == true
         )
         if now >= self.endOfDay(expires) {
             return .failure(.expired)
@@ -134,7 +192,9 @@ nonisolated enum CommercialLicense {
             org: record.org,
             seats: record.seats,
             issued: self.dayString(record.issued),
-            expires: self.dayString(record.expires)
+            expires: self.dayString(record.expires),
+            sla: record.sla ? true : nil,
+            enforceSeats: record.enforceSeats ? true : nil
         )
     }
 

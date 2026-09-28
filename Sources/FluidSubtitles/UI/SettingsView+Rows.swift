@@ -798,7 +798,7 @@ extension SettingsView {
             await self.prepareAudioSettings()
         case .dictation:
             await self.refreshAudioHistoryUsageInBackground()
-        case .notifications, .aiProviders, .dataAndDiagnostics, .experimental, .translation:
+        case .notifications, .aiProviders, .dataAndDiagnostics, .experimental, .translation, .speakAndType:
             break
         }
     }

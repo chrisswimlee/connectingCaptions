@@ -264,7 +264,7 @@ extension SettingsStore {
             switch self {
             case .parakeetTDT: return "Blazing Fast - Multilingual"
             case .parakeetTDTv2: return "Blazing Fast - English"
-            case .parakeetRealtime: return "Flash Dictation"
+            case .parakeetRealtime: return "Parakeet Flash"
             case .qwen3Asr: return "Qwen3 - Multilingual"
             case .cohereTranscribeSixBit: return "Cohere - High Accuracy"
             case .nemotronOffline: return "Nemotron 3.5 Multilingual"
@@ -287,9 +287,9 @@ extension SettingsStore {
             case .parakeetTDT:
                 return "Fast English transcription. Other languages need Apple Speech or Whisper."
             case .parakeetTDTv2:
-                return "English-only. Fastest Parakeet for English Theater and dictation."
+                return "English-only. Fastest Parakeet for English Theater Listen."
             case .parakeetRealtime:
-                return "English-only streaming dictation with live partial text. Other languages need another Voice Engine."
+                return "English-only streaming for Theater Listen, with live partial text. Other languages need another Voice Engine."
             case .qwen3Asr:
                 return "Local FluidAudio model for Korean, English, Thai, or Japanese. Heavier memory footprint."
             case .cohereTranscribeSixBit:

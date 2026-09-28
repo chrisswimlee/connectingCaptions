@@ -8,7 +8,7 @@ Please report vulnerabilities against the current `main` branch of fluidSubtitle
 
 Do not open a public issue for a security report.
 
-Email [chris.suyoung.lee@gmail.com](mailto:chris.suyoung.lee@gmail.com) with:
+Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com) with:
 
 - A description of the issue and its impact
 - Steps to reproduce, or a proof of concept if you have one

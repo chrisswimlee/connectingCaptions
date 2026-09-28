@@ -90,7 +90,7 @@ struct TheaterAppCommands: Commands {
             .disabled(!self.controller.subscriber.canRetryTranslation)
 
             Button("Clear Captions") {
-                self.controller.clearBoard()
+                self.controller.requestClearBoard()
             }
             .keyboardShortcut(self.shortcut(.clear), modifiers: self.presenterModifiers)
             .disabled(!self.controller.hasClearableBoard)

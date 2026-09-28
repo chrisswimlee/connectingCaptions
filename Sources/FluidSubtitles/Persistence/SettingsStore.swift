@@ -1177,7 +1177,7 @@ final class SettingsStore: ObservableObject {
         self.snoozedUpdateVersion = nil
     }
 
-    /// Legacy FluidVoice key. Now means the user has tried voice (Theater or dictation).
+    /// The user has tried voice (Theater or dictation).
     var playgroundUsed: Bool {
         get { self.defaults.bool(forKey: Keys.playgroundUsed) }
         set { self.defaults.set(newValue, forKey: Keys.playgroundUsed) }

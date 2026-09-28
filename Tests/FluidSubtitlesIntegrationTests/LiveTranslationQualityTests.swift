@@ -644,6 +644,12 @@ final class LiveTranslationQualityTests: XCTestCase {
             LLMTranslationEngine.captionSafeForBoard("오늘 모델을 학습했습니다.", sourceText: source),
             "오늘 모델을 학습했습니다."
         )
+        XCTAssertNil(
+            LLMTranslationEngine.captionSafeForBoard(
+                "\u{25B9} Tejun, hello. \u{25C3} Tejun",
+                sourceText: "안녕하세요."
+            )
+        )
         XCTAssertFalse(
             LLMTranslationEngine.looksLikeEngineError("The API key is stored locally on this Mac.")
         )
@@ -1090,7 +1096,20 @@ final class LiveTranslationQualityTests: XCTestCase {
         let before = subscriber.nextCaptionID
         XCTAssertGreaterThan(before, 0)
         await subscriber.waitForIdleForTesting()
-        XCTAssertEqual(subscriber.nextCaptionID, before)
+        // Both sentences fail every attempt. The Listen's one free retry
+        // belongs to whichever fails first; the other is skipped straight
+        // to its own failure slot. Each still resolves to its own row —
+        // neither is abandoned mid-retry just because the other sentence's
+        // failure happened to land in between.
+        XCTAssertEqual(subscriber.nextCaptionID, before + 2)
+        XCTAssertEqual(
+            subscriber.committedLines,
+            [TheaterCaptionFailure.line, TheaterCaptionFailure.line]
+        )
+        XCTAssertEqual(
+            subscriber.committedSourceLines,
+            ["Today we trained the model.", "Then we applied it."]
+        )
     }
 
 }

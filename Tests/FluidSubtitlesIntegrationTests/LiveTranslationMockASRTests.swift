@@ -82,7 +82,11 @@ final class LiveTranslationMockASRTests: XCTestCase {
         await subscriber.waitForIdleForTesting()
         XCTAssertEqual(
             subscriber.committedSourceLines,
-            ["Today we trained the model.", "Then we applied it."]
+            [
+                "Today we trained the model.",
+                "Then we applied it.",
+                "And we shipped it to production.",
+            ]
         )
 
         subscriber.handleEndOfUtterance()

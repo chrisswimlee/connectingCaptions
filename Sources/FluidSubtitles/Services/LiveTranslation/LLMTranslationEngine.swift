@@ -113,8 +113,9 @@ final class LLMTranslationEngine: TranslationEngine {
         )
         config.maxRetries = 1
         config.timeoutSeconds = Double(LiveTranslationTiming.commitTranslationTimeoutNanoseconds) / 1_000_000_000
+        let finalConfig = config
         let response = try await TheaterAcceleratorGate.shared.track {
-            try await LLMClient.shared.call(config)
+            try await LLMClient.shared.call(finalConfig)
         }
         let cleaned = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
         switch Self.commitVerdict(cleaned, sourceText: text, target: target) {
@@ -172,6 +173,11 @@ final class LLMTranslationEngine: TranslationEngine {
         if cleaned.isEmpty { return nil }
         if Self.looksLikeEngineError(cleaned) { return nil }
         if Self.looksLikeEcho(cleaned, sourceText: sourceText) { return nil }
+        if LiveTranslationCommitContext.containsContextClauseMark(cleaned),
+           !LiveTranslationCommitContext.containsContextClauseMark(sourceText)
+        {
+            return nil
+        }
         return cleaned
     }
 
@@ -249,9 +255,10 @@ final class LLMTranslationEngine: TranslationEngine {
         )
         config.maxRetries = 1
         config.timeoutSeconds = Double(LiveTranslationTiming.commitTranslationTimeoutNanoseconds) / 1_000_000_000
+        let finalConfig = config
         let started = ProcessInfo.processInfo.systemUptime
         let response = try await TheaterAcceleratorGate.shared.track {
-            try await client.call(config)
+            try await client.call(finalConfig)
         }
         let ms = Int(((ProcessInfo.processInfo.systemUptime - started) * 1000).rounded())
         DebugLogger.shared.info(
@@ -277,6 +284,11 @@ final class LLMTranslationEngine: TranslationEngine {
         if polished.isEmpty { return nil }
         if polished.contains(where: \.isNewline) { return nil }
         if Self.looksLikeEngineError(polished) { return nil }
+        if LiveTranslationCommitContext.containsContextClauseMark(polished),
+           !LiveTranslationCommitContext.containsContextClauseMark(draft)
+        {
+            return nil
+        }
         if CaptionJunkGate.shouldDrop(polished) { return nil }
         let draftCount = max(draft.trimmingCharacters(in: .whitespacesAndNewlines).count, 1)
         let ratio = Double(polished.count) / Double(draftCount)

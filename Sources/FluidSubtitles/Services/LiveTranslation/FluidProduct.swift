@@ -9,15 +9,12 @@ nonisolated enum FluidProduct {
     static let manifesto = "Language is no longer a barrier."
 
     static let supportFolderName = "fluidSubtitles"
-    static let priorSupportFolderNames = ["connectingCaptions", "FluidVoice"]
-    static let legacySupportFolderName = "FluidVoice"
+    /// Earlier name of this app. FluidVoice is a different product and is not migrated.
+    static let priorSupportFolderNames = ["connectingCaptions"]
     static let keychainService = "com.fluidsubtitles.provider-api-keys"
-    static let legacyKeychainService = "com.fluidvoice.provider-api-keys"
     static let keychainAccount = "fluidSubtitlesApiKeys"
-    static let legacyKeychainAccount = "fluidApiKeys"
     static let priorKeychainIdentities: [(service: String, account: String)] = [
         ("com.connectingcaptions.provider-api-keys", "connectingCaptionsApiKeys"),
-        ("com.fluidvoice.provider-api-keys", "fluidApiKeys"),
     ]
 
     static var keychainLookupIdentities: [(service: String, account: String)] {
@@ -60,13 +57,6 @@ nonisolated enum FluidProduct {
         ]
         return components.url ?? URL(string: "mailto:\(self.commercialLicenseEmail)")!
     }
-
-    static let upstreamName = "FluidVoice"
-    static let upstreamAuthor = "altic-dev"
-    static let upstreamURL = URL(string: "https://github.com/altic-dev/FluidVoice")!
-
-    static let creditLine =
-        "fluidSubtitles is by Chris Swim Lee (chrisswimlee.com). Speech recognition comes from FluidVoice by altic-dev. Theater captions and insert are ours. Licensed under GPLv3."
 
     static let creditShort =
         "By Chris Swim Lee. GPLv3."

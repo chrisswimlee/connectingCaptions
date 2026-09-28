@@ -9,6 +9,7 @@ import Foundation
 
 enum SidebarItem: Hashable {
     case liveTranslation
+    case speakAndType
     case welcome
     case voiceEngine
     case translationEngine
@@ -23,6 +24,7 @@ enum SidebarItem: Hashable {
     var accessibilityIdentifier: String {
         switch self {
         case .liveTranslation: return "sidebar.theater"
+        case .speakAndType: return "sidebar.speakAndType"
         case .welcome: return "sidebar.welcome"
         case .voiceEngine: return "sidebar.voiceEngine"
         case .translationEngine: return "sidebar.translationEngine"
@@ -39,6 +41,7 @@ enum SidebarItem: Hashable {
 
 enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     case translation
+    case speakAndType
     case general
     case dictation
     case aiProviders
@@ -54,6 +57,7 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     var title: String {
         switch self {
         case .translation: return "Theater"
+        case .speakAndType: return "Speak and type"
         case .general: return "General"
         case .dictation: return "Dictation"
         case .aiProviders: return "AI Providers"
@@ -73,6 +77,7 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     var systemImage: String {
         switch self {
         case .translation: return "captions.bubble"
+        case .speakAndType: return "text.cursor"
         case .general: return "gearshape"
         case .dictation: return "keyboard"
         case .aiProviders: return "cpu"

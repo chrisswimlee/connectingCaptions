@@ -45,8 +45,24 @@ private enum TheaterChromeLayout {
     static let overlayIdleClearance: CGFloat = 12
     /// Compact buttons are 24pt. The shelf is taller so the stroke is not clipped.
     static let barHeight: CGFloat = 36
-    static let barGap: CGFloat = 20
+    /// Room under the shelf so the first caption is not clipped by the controls.
+    static let barGap: CGFloat = 32
     static let barInset: CGFloat = 16
+    /// Room at the top of the caption viewport at the default caption size.
+    /// Larger Show-as type adds to this and moves the first line down.
+    static let captionTopGap: CGFloat = 20
+
+    static func openingGap(titleSize: CGFloat) -> CGFloat {
+        TheaterCaptionScale.openingDrop(titleSize: titleSize, floor: Self.captionTopGap)
+    }
+}
+
+private struct TheaterOverlayDockHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
 }
 
 struct PresenterCaptionView: View {
@@ -68,8 +84,11 @@ struct PresenterCaptionView: View {
     @State private var copyBounceToken = 0
     @State private var pacePulseToken = 0
     @State private var isRequestingPack = false
+    @State private var sizeEditorShown = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @StateObject private var hoverHelp = TheaterHoverHelpBroker()
+    @State private var overlayHandleBright = true
+    @State private var overlayHandleToken = 0
 
     private var appearance: TheaterAppearance {
         TheaterAppearance.resolved(self.settings.theaterAppearance)
@@ -137,6 +156,32 @@ struct PresenterCaptionView: View {
                     self.hoverHelp.clear()
                 }
             }
+            .onChange(of: self.chromePinned) { _, _ in
+                self.syncOverlayDockHolding()
+            }
+            .onChange(of: self.sizeEditorShown) { _, _ in
+                self.syncOverlayDockHolding()
+            }
+            .onChange(of: self.showClearConfirmation) { _, _ in
+                self.syncOverlayDockHolding()
+            }
+            .onChange(of: self.model.showCloseConfirmation) { _, _ in
+                self.syncOverlayDockHolding()
+            }
+            .onChange(of: self.showsOverlayHoverDock) { _, show in
+                if show { self.scheduleOverlayHandleFade() }
+            }
+            .onChange(of: self.overlayDockVisible) { _, visible in
+                if !visible, self.showsOverlayHoverDock {
+                    self.scheduleOverlayHandleFade()
+                }
+            }
+            .onAppear {
+                self.syncOverlayDockHolding()
+                if self.showsOverlayHoverDock {
+                    self.scheduleOverlayHandleFade()
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSMenu.didBeginTrackingNotification)) { _ in
                 self.chromePinned = true
             }
@@ -168,32 +213,40 @@ struct PresenterCaptionView: View {
     }
 
     private var theaterContent: some View {
-        Group {
-            if !self.settings.theaterMinimized {
-                self.boardFill
-            } else {
-                Color.clear
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        // The shelf is an inset, not a layer on the captions. A hover shelf
-        // used to paint over the first line.
-        .safeAreaInset(edge: .top, spacing: self.showsToolShelf ? TheaterChromeLayout.barGap : 0) {
+        // The shelf is a row above the captions. An inset still let the
+        // scroll view draw underneath it, so the first line lost its opening.
+        VStack(spacing: 0) {
             if self.showsToolShelf {
                 self.toolBarBand
                     .padding(.top, self.topChromeClearance)
+                Color.clear
+                    .frame(height: TheaterChromeLayout.barGap)
+                    .accessibilityHidden(true)
             } else {
                 Color.clear
                     .frame(height: self.topChromeClearance)
                     .accessibilityHidden(true)
             }
+            if !self.settings.theaterMinimized {
+                self.boardFill
+            } else {
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if self.showsIncomingBar {
+                self.incomingBar
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ignoresSafeArea()
-        .background(self.theaterFill)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background {
+            self.theaterFill
+                .ignoresSafeArea()
+        }
         .background {
             if self.presentationStyle == .popup, !self.settings.theaterHighContrast {
-                Rectangle().fill(self.theme.materials.window)
+                Rectangle()
+                    .fill(self.theme.materials.window)
+                    .ignoresSafeArea()
             }
         }
         .coordinateSpace(name: TheaterHoverHelp.space)
@@ -220,6 +273,24 @@ struct PresenterCaptionView: View {
                 .accessibilityHidden(true)
             }
         }
+        .overlay {
+            if self.model.isPlacingOverlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.88), lineWidth: 5)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.95), lineWidth: 2)
+                    }
+                    .padding(2)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
+        .overlay(alignment: .top) {
+            if self.showsOverlayHoverDock {
+                self.overlayHoverDock
+            }
+        }
         .environment(\.theaterButtonColors, TheaterButtonColors(
             fill: self.captionColors.menuFill,
             stroke: self.captionColors.menuStroke,
@@ -227,27 +298,68 @@ struct PresenterCaptionView: View {
         ))
     }
 
+    private var overlayPlacementBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(TheaterReadiness.overlayPlacementHint)
+                .font(self.theme.typography.caption)
+                .foregroundStyle(self.captionColors.chrome)
+                .fixedSize(horizontal: false, vertical: true)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    self.overlayPlacementPresets
+                    Spacer(minLength: 8)
+                    self.keepOverlayTextButton
+                }
+                VStack(alignment: .leading, spacing: 8) {
+                    self.overlayPlacementPresets
+                    self.keepOverlayTextButton
+                }
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("theater.overlay.placement")
+    }
+
+    private var overlayPlacementPresets: some View {
+        HStack(spacing: 6) {
+            ForEach(TheaterPositionPreset.available(for: .transparent)) { preset in
+                Button {
+                    PresenterCaptionController.shared.applyPositionPreset(preset)
+                } label: {
+                    if self.settings.theaterPositionPreset == preset {
+                        Label(preset.displayName, systemImage: "checkmark")
+                    } else {
+                        Text(preset.displayName)
+                    }
+                }
+                .buttonStyle(.theaterTextCompact)
+                .accessibilityIdentifier("theater.overlay.place.\(preset.rawValue)")
+                .theaterTag(TheaterChromeHelp.position(preset))
+            }
+        }
+    }
+
+    private var keepOverlayTextButton: some View {
+        Button {
+            PresenterCaptionController.shared.confirmOverlayPlacement()
+        } label: {
+            Text("Keep text here")
+        }
+        .buttonStyle(.theaterTextCompactProminent)
+        .disabled(!self.model.canConfirmOverlayPlacement)
+        .accessibilityIdentifier("theater.overlay.keepTextHere")
+        .theaterTag(TheaterChromeHelp.keepOverlayText)
+    }
+
     /// Languages, how words arrive, and Listen stay on the shelf. The shelf
     /// keeps a slot above the captions, including while hover tools are up,
     /// so the first line cannot draw under the buttons.
     private var toolBarBand: some View {
         VStack(alignment: .leading, spacing: 8) {
-            ViewThatFits(in: .horizontal) {
-                self.shelfPrimaryRow
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .center, spacing: 8) {
-                        self.languagePairControls
-                        Spacer(minLength: 8)
-                        self.windowModePicker
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
-                    HStack(alignment: .center, spacing: 8) {
-                        Spacer(minLength: 8)
-                        self.trailingChrome
-                            .fixedSize(horizontal: true, vertical: false)
-                    }
-                }
+            if self.model.isPlacingOverlay {
+                self.overlayPlacementBar
             }
+            self.shelfRows
 
             if self.showsFlowChoices || self.showsStatusCluster {
                 HStack(alignment: .center, spacing: 8) {
@@ -271,6 +383,25 @@ struct PresenterCaptionView: View {
 
     /// One row when the board is wide. Theater mode stays with the languages
     /// and the tools drop to the next line when that row would overlap.
+    private var shelfRows: some View {
+        ViewThatFits(in: .horizontal) {
+            self.shelfPrimaryRow
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .center, spacing: 8) {
+                    self.languagePairControls
+                    Spacer(minLength: 8)
+                    self.windowModePicker
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                HStack(alignment: .center, spacing: 8) {
+                    Spacer(minLength: 8)
+                    self.trailingChrome
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+        }
+    }
+
     private var shelfPrimaryRow: some View {
         HStack(alignment: .center, spacing: 8) {
             self.languagePairControls
@@ -300,11 +431,126 @@ struct PresenterCaptionView: View {
 
     @ViewBuilder
     private var toolShelf: some View {
-        if self.presentationStyle == .popup {
+        if self.presentationStyle == .popup || self.model.isPlacingOverlay {
             let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
             shape
                 .fill(self.captionColors.menuFill)
                 .overlay(shape.strokeBorder(self.captionColors.menuStroke, lineWidth: 1))
+        }
+    }
+
+    /// Idle Overlay keeps this bar. It fades after a moment and returns while
+    /// the pointer is on it. The rest of the window still clicks through to the slides.
+    private var overlayHoverDock: some View {
+        ZStack(alignment: .top) {
+            self.overlayHoverDockBar
+                .opacity(self.overlayDockVisible ? 1 : 0)
+                .allowsHitTesting(self.overlayDockVisible)
+                .accessibilityHidden(!self.overlayDockVisible)
+            if !self.overlayDockVisible {
+                self.overlayDockHandle
+                    .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .top)
+        .animation(self.reduceMotion ? .linear(duration: 0) : .easeOut(duration: 0.28), value: self.overlayDockVisible)
+        .accessibilityIdentifier("theater.overlay.hoverDock")
+    }
+
+    private var overlayHoverDockBar: some View {
+        self.shelfRows
+            .padding(.horizontal, TheaterChromeLayout.barInset)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background { self.hoverDockPlate }
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+            .padding(.bottom, 2)
+            .background {
+                GeometryReader { geo in
+                    Color.clear.preference(key: TheaterOverlayDockHeightKey.self, value: geo.size.height)
+                }
+            }
+            .onPreferenceChange(TheaterOverlayDockHeightKey.self) { height in
+                guard height > 1, abs(self.model.overlayDockHeight - height) > 1 else { return }
+                self.model.overlayDockHeight = height
+            }
+    }
+
+    private var overlayDockHandle: some View {
+        Text(self.overlayDockHandleTitle)
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(self.captionColors.chrome)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background { self.hoverDockPlate }
+            .padding(.top, 8)
+            .opacity(self.overlayHandleOpacity)
+            .animation(
+                self.reduceMotion ? .linear(duration: 0) : .easeOut(duration: 0.45),
+                value: self.overlayHandleBright
+            )
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(self.overlayDockHandleTitle)
+            .accessibilityHint("Hover to show Listen and the other controls. The bar fades when you move away.")
+            .accessibilityIdentifier("theater.overlay.dockHandle")
+    }
+
+    private var overlayDockHandleTitle: String {
+        if self.model.isPaused { return "Paused · Tools" }
+        if self.model.isListening { return "Listening · Tools" }
+        return "Tools"
+    }
+
+    private var overlayHandleOpacity: Double {
+        if self.reduceMotion { return 0.85 }
+        return self.overlayHandleBright ? 1 : 0.62
+    }
+
+    private var hoverDockPlate: some View {
+        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        return shape
+            .fill(self.captionColors.menuFill)
+            .overlay(shape.strokeBorder(self.captionColors.menuStroke, lineWidth: 1))
+            .shadow(color: Color.black.opacity(0.28), radius: 8, y: 3)
+    }
+
+    private var overlayDockVisible: Bool {
+        TheaterOverlayPolicy.showsHoverDock(
+            engaged: self.model.overlayDockEngaged,
+            holding: self.model.overlayDockHolding
+        )
+    }
+
+    private var showsOverlayHoverDock: Bool {
+        self.overlayHidesChrome && !self.settings.theaterMinimized
+    }
+
+    private func syncOverlayDockHolding() {
+        let hold = self.chromePinned
+            || self.sizeEditorShown
+            || self.showClearConfirmation
+            || self.model.showCloseConfirmation
+        if self.model.overlayDockHolding != hold {
+            self.model.overlayDockHolding = hold
+        }
+    }
+
+    /// The resting label starts solid, then fades so the slides stay readable.
+    /// Hovering brings the full bar back and restarts this.
+    private func scheduleOverlayHandleFade() {
+        guard !self.reduceMotion else {
+            self.overlayHandleBright = false
+            return
+        }
+        self.overlayHandleBright = true
+        self.overlayHandleToken += 1
+        let token = self.overlayHandleToken
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_600_000_000)
+            guard self.overlayHandleToken == token, !self.overlayDockVisible else { return }
+            self.overlayHandleBright = false
         }
     }
 
@@ -355,7 +601,8 @@ struct PresenterCaptionView: View {
     private var overlayHidesChrome: Bool {
         TheaterOverlayPolicy.hidesAllChrome(
             presentation: self.presentationStyle,
-            toolsPinned: self.model.overlayToolsPinned
+            toolsPinned: self.model.overlayToolsPinned,
+            placing: self.model.isPlacingOverlay
         )
     }
 
@@ -372,7 +619,8 @@ struct PresenterCaptionView: View {
         let showsWindowButtons = !TheaterOverlayPolicy.hidesTitlebarButtons(
             presentation: self.presentationStyle,
             toolsPinned: self.model.overlayToolsPinned,
-            hideChrome: self.settings.theaterHideChrome
+            hideChrome: self.settings.theaterHideChrome,
+            placing: self.model.isPlacingOverlay
         )
         return showsWindowButtons
             ? TheaterChromeLayout.titlebarClearance
@@ -387,6 +635,49 @@ struct PresenterCaptionView: View {
             return self.showsHoverTools
         }
         return true
+    }
+
+    /// Incoming speech stays visible after the tools hide, including Overlay
+    /// and Captions only. Overlay keeps one line so the caption bar still fits.
+    private var showsIncomingBar: Bool {
+        !self.settings.theaterMinimized && !self.model.inboxLines.isEmpty
+    }
+
+    private var visibleInboxLines: [String] {
+        if self.presentationStyle == .transparent || !self.showsToolShelf {
+            return Array(self.model.inboxLines.suffix(1))
+        }
+        return self.model.inboxLines
+    }
+
+    private var incomingBar: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            ForEach(Array(self.visibleInboxLines.enumerated()), id: \.offset) { _, line in
+                Text(line)
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundStyle(self.captionColors.chrome.opacity(0.78))
+                    .lineLimit(1)
+                    .truncationMode(.head)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(.horizontal, TheaterChromeLayout.barInset)
+        .padding(.top, 4)
+        .padding(.bottom, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(self.captionColors.chrome.opacity(0.22))
+                    .frame(height: 1)
+                self.captionColors.menuFill
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Incoming")
+        .accessibilityValue(self.model.inboxLines.joined(separator: " "))
+        .accessibilityIdentifier("theater.inbox")
+        .theaterTag(TheaterChromeHelp.inbox)
     }
 
     private var showsFlowChoices: Bool {
@@ -532,7 +823,9 @@ struct PresenterCaptionView: View {
             .buttonStyle(.theaterTextCompact)
             .theaterTag(TheaterChromeHelp.retry)
             .accessibilityIdentifier("theater.retry")
-            if !SpokenLanguageResolver.isSameLanguagePair() {
+            if !SpokenLanguageResolver.isSameLanguagePair(),
+               self.controller.packAvailability != .unsupported
+            {
                 Button(self.isRequestingPack ? TheaterReadiness.downloadPackBusy : TheaterReadiness.downloadPack) {
                     self.isRequestingPack = true
                     PresenterCaptionController.shared.performChromeAction {
@@ -651,8 +944,28 @@ struct PresenterCaptionView: View {
     }
 
     private var sizeMenu: some View {
-        Menu {
-            HStack {
+        Button {
+            self.sizeEditorShown = true
+        } label: {
+            TheaterMenuLabel(title: "Size", systemImage: "textformat.size", compact: true)
+        }
+        .buttonStyle(.plain)
+        .fixedSize(horizontal: true, vertical: true)
+        .controlSize(.small)
+        .popover(isPresented: self.$sizeEditorShown, arrowEdge: .bottom) {
+            self.sizeEditor
+                .padding(12)
+        }
+        .theaterTag(TheaterChromeHelp.captionSize)
+        .accessibilityLabel("Size \(self.captionPointSize)")
+        .accessibilityIdentifier("theater.window.size")
+    }
+
+    /// Smaller and Larger stay. The point field is outside a menu so a typed
+    /// size can commit. A menu only delivered those two buttons.
+    private var sizeEditor: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
                 Text("Size")
                 TheaterPointField(
                     label: "Caption size",
@@ -665,23 +978,10 @@ struct PresenterCaptionView: View {
                 )
                 Text("pt")
             }
-            HStack {
-                Text("Spacing")
-                TheaterPointField(
-                    label: "Spacing",
-                    range: TheaterCaptionSpacing.range,
-                    value: self.$settings.theaterCaptionSpacing,
-                    accessibilityIdentifier: "theater.window.captionSpacing"
-                )
-                Text("pt")
-            }
-            Divider()
-            Button("\(self.captionPointSize) pt") {}
-                .disabled(true)
             if self.isCaptionSizeFitted {
                 let fittedSize = Int(TheaterCaptionScale.translatedSize(setting: self.lockedDisplaySize).rounded())
-                Button("Fitted to \(fittedSize) pt") {}
-                    .disabled(true)
+                Text("Showing \(fittedSize) pt")
+                    .font(.caption)
                     .accessibilityIdentifier("theater.window.sizeFitted")
             }
             Button {
@@ -689,6 +989,7 @@ struct PresenterCaptionView: View {
             } label: {
                 Label("Smaller captions", systemImage: "minus")
             }
+            .buttonStyle(.theaterTextCompact)
             .disabled(self.settings.presenterFontSize <= SettingsStore.presenterFontSizeRange.lowerBound)
             .help(TheaterChromeHelp.smaller)
             .accessibilityLabel("Smaller captions")
@@ -697,16 +998,12 @@ struct PresenterCaptionView: View {
             } label: {
                 Label("Larger captions", systemImage: "plus")
             }
+            .buttonStyle(.theaterTextCompact)
             .disabled(self.settings.presenterFontSize >= SettingsStore.presenterFontSizeRange.upperBound)
             .help(TheaterChromeHelp.larger)
             .accessibilityLabel("Larger captions")
-        } label: {
-            TheaterMenuLabel(title: "Size", systemImage: "textformat.size", compact: true)
         }
-        .theaterBarMenu()
-        .theaterTag(TheaterChromeHelp.captionSize)
-        .accessibilityLabel("Size \(self.captionPointSize)")
-        .accessibilityIdentifier("theater.window.size")
+        .frame(width: 220, alignment: .leading)
     }
 
     private var fontMenu: some View {
@@ -762,15 +1059,15 @@ struct PresenterCaptionView: View {
             Button {
                 self.controller.insertCaptionText()
             } label: {
-                Label("Type into app", systemImage: "text.cursor")
+                Label("Type the board", systemImage: "text.cursor")
             }
             .disabled(self.insertIsEmpty)
             .help(
                 self.insertIsEmpty && !self.deliveryIsEmpty
-                    ? TheaterChromeHelp.tag("Type into app", does: TheaterReadiness.insertAlreadyTyped)
+                    ? TheaterChromeHelp.tag("Type the board", does: TheaterReadiness.insertAlreadyTyped)
                     : TheaterChromeHelp.insert
             )
-            .accessibilityLabel("Type into app")
+            .accessibilityLabel("Type the board")
             .accessibilityIdentifier("theater.window.insert")
 
             Button {
@@ -933,6 +1230,17 @@ struct PresenterCaptionView: View {
 
             Divider()
 
+            Button("Open History") {
+                AppNavigationRouter.shared.request(.history)
+                if let window = MainWindowReveal.preferred(in: NSApp.windows) {
+                    MainWindowReveal.bringToFront(window)
+                } else {
+                    NSApp.activate()
+                }
+            }
+            .help(TheaterReadiness.historyFromBoard)
+            .accessibilityIdentifier("theater.window.history")
+
             Menu("Export") {
                 Button("Bilingual text") {
                     PresenterCaptionController.shared.exportCaptions(format: .bilingualText)
@@ -968,28 +1276,47 @@ struct PresenterCaptionView: View {
 
     private var presentationStage: some View {
         let settingSize = CGFloat(self.settings.presenterFontSize)
-        let lines = TheaterCaptionFlow.lines(board: self.model.board)
+        let review = self.presentationStyle == .transparent
+        let lines = TheaterCaptionFlow.lines(
+            board: self.model.board,
+            limit: review ? TheaterOverlayPolicy.reviewLineCount : nil
+        )
         return GeometryReader { geometry in
             let proposed = TheaterCaptionScale.displaySize(
                 setting: settingSize,
                 stageWidth: geometry.size.width
             )
-            // The button bar is already outside this viewport. Padding, the
-            // gap before the bottom marker, and the marker sit outside the line.
-            let captionBudget = geometry.size.height - 24
+            // The button bar is already outside this viewport. The opening
+            // gap grows with the Show-as size, and that room, the bottom
+            // inset, and the end marker sit outside the line.
+            let pairHeight = self.captionPairHeight(typeface: self.typeface)
+            let occupied: (CGFloat) -> CGFloat = { display in
+                let title = TheaterCaptionScale.translatedSize(setting: display)
+                let gap = TheaterChromeLayout.openingGap(titleSize: title)
+                let chrome = 4
+                    + gap
+                    + TheaterChromeLayout.captionTopGap
+                    + CGFloat(self.settings.theaterCaptionSpacing)
+                    + 1
+                    + TheaterBoardScroll.viewportSlop
+                return pairHeight(display) + chrome
+            }
             let fitted = TheaterCaptionScale.fittedDisplaySize(
                 proposed: proposed,
-                stageHeight: captionBudget,
-                pairHeight: self.captionPairHeight(typeface: self.typeface)
+                stageHeight: geometry.size.height,
+                pairHeight: occupied
             )
             let display = TheaterCaptionScale.resolvedDisplaySize(
                 proposed: fitted,
                 locked: self.lockedDisplaySize,
                 lockedFits: self.lockedDisplaySize >= 8
-                    && self.captionPairHeight(typeface: self.typeface)(self.lockedDisplaySize) <= captionBudget
+                    && occupied(self.lockedDisplaySize) <= geometry.size.height
             )
             let spokenSize = TheaterCaptionScale.spokenSize(setting: display)
             let translatedSize = TheaterCaptionScale.translatedSize(setting: display)
+            let openingGap = review
+                ? TheaterChromeLayout.captionTopGap
+                : TheaterChromeLayout.openingGap(titleSize: translatedSize)
             let wrapWidth = TheaterBilingualWrap.resolvedWrapWidth(
                 proposed: geometry.size.width,
                 locked: self.lockedWrapWidth
@@ -1003,27 +1330,33 @@ struct PresenterCaptionView: View {
             )
             let layouts = lines.map { line in
                 let spoken = self.spokenLine(for: line)
+                let lineTranslatedSize = line.failed
+                    ? max(15, (translatedSize * 0.4).rounded())
+                    : translatedSize
+                let lineTranslatedFont = line.failed
+                    ? self.typeface.nsFont(size: lineTranslatedSize, weight: .medium)
+                    : translatedFont
                 let rows = TheaterBilingualWrap.rows(
                     spoken: spoken,
                     translated: line.text,
                     spokenFont: spokenFont,
-                    translatedFont: translatedFont,
+                    translatedFont: lineTranslatedFont,
                     width: wrapWidth
                 )
                 let realHeight = TheaterBilingualWrap.displayHeight(
                     rows: rows,
                     spokenFont: spokenFont,
-                    translatedFont: translatedFont
+                    translatedFont: lineTranslatedFont
                 )
                 // The wrap-ahead slot is real content for the scroll budget, but
                 // it must not be part of the box `scrollLiveCaption` anchors to.
                 // Anchoring the padded box to the viewport bottom pushed the
                 // real ink up by a full slot and clipped the line above it.
-                let reservedExtra: CGFloat = line.isCurrent
+                let reservedExtra: CGFloat = line.isCurrent && !line.failed
                     ? max(0, TheaterBilingualWrap.reservedDisplayHeight(
                         rows: rows,
                         spokenFont: spokenFont,
-                        translatedFont: translatedFont,
+                        translatedFont: lineTranslatedFont,
                         width: wrapWidth
                     ) - realHeight)
                     : 0
@@ -1038,19 +1371,22 @@ struct PresenterCaptionView: View {
             let boardHeight = self.boardContentHeight(
                 lineHeights: layouts.flatMap { layout in
                     layout.reservedExtra > 0 ? [layout.height, layout.reservedExtra] : [layout.height]
-                }
+                },
+                openingGap: openingGap
             )
-            let pinsToBottom = TheaterBoardScroll.pinsToBottom(
+            let pinsToBottom = review || TheaterBoardScroll.pinsToBottom(
                 boardHeight: boardHeight,
                 viewportHeight: geometry.size.height
             )
-            // Scrolling to keep the live line at the bottom lands mid-line at
-            // the top whenever the board height is not an exact multiple of
-            // the line height. Fading that sliver instead of leaving it a
-            // hard crop reads as an edge, not a clipped word.
-            let topFadeHeight = min(TheaterBilingualWrap.lineHeight(for: translatedFont), geometry.size.height / 4)
+            let liveHeight = layouts.last(where: { $0.line.isCurrent })?.height ?? layouts.last?.height ?? 0
+            let showOpening = self.showsLineOpening(lineHeight: liveHeight, viewportHeight: geometry.size.height)
             ScrollViewReader { proxy in
                 ScrollView {
+                    VStack(spacing: 0) {
+                    Color.clear
+                        .frame(height: openingGap)
+                        .accessibilityHidden(true)
+                        .id("theater-opening")
                     VStack(alignment: .leading, spacing: CGFloat(self.settings.theaterCaptionSpacing)) {
                         if lines.isEmpty {
                             let preview = TheaterBoardPreview.current(
@@ -1072,6 +1408,12 @@ struct PresenterCaptionView: View {
                             .frame(minHeight: openingHeight, alignment: .topLeading)
                         } else {
                             ForEach(layouts) { layout in
+                                let titleSize = layout.line.failed
+                                    ? max(15, (translatedSize * 0.4).rounded())
+                                    : translatedSize
+                                let titleColor = layout.line.failed
+                                    ? self.translatedNS.withAlphaComponent(0.62)
+                                    : self.translatedNS
                                 TheaterCaptionLineLabel(
                                     lineID: layout.line.id,
                                     text: layout.line.text,
@@ -1082,12 +1424,12 @@ struct PresenterCaptionView: View {
                                     paint: TheaterCaptionLinePaint(
                                         typeface: self.typeface,
                                         spokenFontSize: spokenSize,
-                                        translatedFontSize: translatedSize,
+                                        translatedFontSize: titleSize,
                                         spokenColor: self.spokenNS,
-                                        translatedColor: self.translatedNS,
-                                        shadowColor: self.captionColors.shadowColor,
-                                        shadowBlur: self.captionColors.shadowBlur,
-                                        showsCaptionPlate: self.showsCaptionPlate
+                                        translatedColor: titleColor,
+                                        shadowColor: layout.line.failed ? nil : self.captionColors.shadowColor,
+                                        shadowBlur: layout.line.failed ? 0 : self.captionColors.shadowBlur,
+                                        showsCaptionPlate: layout.line.failed ? false : self.showsCaptionPlate
                                     )
                                 )
                                 .frame(
@@ -1115,32 +1457,17 @@ struct PresenterCaptionView: View {
                         minHeight: geometry.size.height,
                         alignment: pinsToBottom ? .bottom : .top
                     )
-                    .padding(.top, TheaterBilingualWrap.boardTopClearance + 8)
+                    }
+                    .padding(.bottom, TheaterChromeLayout.captionTopGap)
                 }
                 // While the area under the buttons has room, new text grows
                 // downward and lines already printed stay put. Once the area
                 // is full, the newest line stays at the bottom and older lines
                 // slide up.
-                .defaultScrollAnchor(pinsToBottom ? .bottom : .top, for: .sizeChanges)
+                // The opening spacer is a real scroll target. Scrolling the
+                // line itself to the top tucked its first glyphs under the clip.
+                .defaultScrollAnchor((pinsToBottom && !showOpening) ? .bottom : .top, for: .sizeChanges)
                 .scrollIndicators(.hidden)
-                .contentMargins(.top, 8, for: .scrollContent)
-                .mask(alignment: .top) {
-                    // Nothing sits above the first line until the board has
-                    // scrolled, so only fade the top edge once pinning to the
-                    // bottom can leave an older line's opening half-visible.
-                    VStack(spacing: 0) {
-                        if pinsToBottom {
-                            LinearGradient(
-                                colors: [Color.black.opacity(0), Color.black],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .frame(height: topFadeHeight)
-                        }
-                        Color.black
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
                 .onChange(of: display) { _, next in
                     if abs(next - self.lockedDisplaySize) > 0.5 {
                         self.lockedDisplaySize = next
@@ -1164,6 +1491,17 @@ struct PresenterCaptionView: View {
                 .onChange(of: lines.map(\.id)) { oldIDs, newIDs in
                     guard Set(newIDs).subtracting(oldIDs).isEmpty == false else { return }
                     self.snappedNewRowThisTurn = true
+                    self.scrollLiveCaption(
+                        proxy: proxy,
+                        lines: lines,
+                        layouts: layouts,
+                        viewportHeight: geometry.size.height,
+                        boardHeight: boardHeight,
+                        animated: false
+                    )
+                }
+                .onChange(of: geometry.size.height) { oldHeight, newHeight in
+                    guard abs(newHeight - oldHeight) > 1 else { return }
                     self.scrollLiveCaption(
                         proxy: proxy,
                         lines: lines,
@@ -1218,34 +1556,45 @@ struct PresenterCaptionView: View {
     ) {
         guard let current = lines.last(where: \.isCurrent) ?? lines.last else { return }
         let lineHeight = layouts.first(where: { $0.line.id == current.id })?.height ?? 0
-        let showOpening = TheaterBoardScroll.showsOpeningOfLine(
-            lineHeight: lineHeight,
-            viewportHeight: viewportHeight
-        )
+        let showOpening = self.showsLineOpening(lineHeight: lineHeight, viewportHeight: viewportHeight)
         guard showOpening || TheaterBoardScroll.pinsToBottom(
             boardHeight: boardHeight,
             viewportHeight: viewportHeight
         ) else { return }
+        let target = (showOpening && lines.first?.id == current.id)
+            ? "theater-opening"
+            : current.id
         let anchor: UnitPoint = showOpening ? .top : .bottom
         if animated {
             withAnimation(.easeOut(duration: 0.35)) {
-                proxy.scrollTo(current.id, anchor: anchor)
+                proxy.scrollTo(target, anchor: anchor)
             }
         } else {
-            proxy.scrollTo(current.id, anchor: anchor)
+            proxy.scrollTo(target, anchor: anchor)
         }
     }
 
+    /// The live line is taller than the area under the controls. Keep its
+    /// opening on screen. A line that fits stays put, so the spacer is not
+    /// scrolled up over the bottom of the first caption.
+    private func showsLineOpening(lineHeight: CGFloat, viewportHeight: CGFloat) -> Bool {
+        TheaterBoardScroll.showsOpeningOfLine(
+            lineHeight: lineHeight,
+            viewportHeight: viewportHeight
+        )
+    }
+
     /// Mirrors the board's VStack spacing: a gap follows every child
-    /// except the first, including the trailing marker. The tool bar sits
-    /// above this viewport, so it is not part of the scrolled height.
-    /// Undercounting those gaps understates the real content height, which
-    /// makes `TheaterBoardScroll.pinsToBottom` miss the point where the live
+    /// except the first, including the trailing marker, plus the top and
+    /// bottom caption insets. The tool bar sits above this viewport, so it
+    /// is not part of the scrolled height. Undercounting those gaps
+    /// understates the real content height, which makes
+    /// `TheaterBoardScroll.pinsToBottom` miss the point where the live
     /// line has actually scrolled out of view.
-    private func boardContentHeight(lineHeights: [CGFloat]) -> CGFloat {
+    private func boardContentHeight(lineHeights: [CGFloat], openingGap: CGFloat) -> CGFloat {
         guard !lineHeights.isEmpty else { return 0 }
         let rowSpacing = CGFloat(self.settings.theaterCaptionSpacing)
-        var height: CGFloat = 4
+        var height: CGFloat = 4 + openingGap + TheaterChromeLayout.captionTopGap
         for (index, lineHeight) in lineHeights.enumerated() {
             if index > 0 {
                 height += rowSpacing
@@ -1272,10 +1621,13 @@ struct PresenterCaptionView: View {
         if self.model.isListening {
             return TheaterReadiness.boardListening
         }
+        if self.model.isPlacingOverlay {
+            return TheaterReadiness.overlayPlacementHint
+        }
         if !self.readySnapshot.canListen {
             return self.readySnapshot.nextAction
         }
-        // Idle Overlay has no Listen button to press.
+        // Idle Overlay hides Listen until the pointer is on the Tools bar.
         if self.presentationStyle == .transparent, !self.model.overlayToolsPinned {
             if !self.settings.theaterPresenterHotkeysEnabled {
                 return TheaterReadiness.overlayIdleMenuBarHint
@@ -1417,8 +1769,6 @@ private final class TheaterCaptionLineNSView: NSView {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        self.wantsLayer = true
-        self.layer?.isGeometryFlipped = true
         self.clipsToBounds = false
     }
 
@@ -1531,7 +1881,7 @@ private final class TheaterCaptionLineNSView: NSView {
         }
         if !sameLine {
             let style = SettingsStore.shared.theaterLinePrint
-            if style == .fade {
+            if style == .fade || style == .atOnce {
                 self.revealedSpoken = .max
                 self.revealedTranslated = .max
                 self.alphaValue = 0
@@ -1569,18 +1919,20 @@ private final class TheaterCaptionLineNSView: NSView {
 
     private func stepReveal() {
         let style = SettingsStore.shared.theaterLinePrint
-        if style == .atOnce {
+        if style == .atOnce, self.fadeStart == nil {
             self.alphaValue = 1
             self.finishReveal()
             self.applyPrintedText()
             return
         }
-        if style == .fade {
+        if style == .fade || style == .atOnce {
             let start = self.fadeStart ?? CACurrentMediaTime()
             self.fadeStart = start
             self.revealedSpoken = .max
             self.revealedTranslated = .max
-            let duration = max(SettingsStore.shared.theaterPrintGap.fadeSeconds, 0.05)
+            let duration = style == .atOnce
+                ? 0.16
+                : max(SettingsStore.shared.theaterPrintGap.fadeSeconds, 0.05)
             let fraction = min(1, (CACurrentMediaTime() - start) / duration)
             self.alphaValue = CGFloat(fraction)
             self.applyPrintedText()
@@ -1693,7 +2045,7 @@ private final class TheaterCaptionLineNSView: NSView {
         )
     }
 
-    private func syncRows(width: CGFloat) {
+    private func syncRows(width: CGFloat, deferLayout: Bool = true) {
         guard !self.isSyncingRows else { return }
         self.isSyncingRows = true
         defer { self.isSyncingRows = false }
@@ -1735,8 +2087,10 @@ private final class TheaterCaptionLineNSView: NSView {
             field.isSelectable = !row.isSpoken && shown == full && !shown.isEmpty
             field.shadow = shown.isEmpty ? nil : self.captionShadow
         }
-        self.needsLayout = true
-        self.invalidateIntrinsicContentSize()
+        if deferLayout {
+            self.needsLayout = true
+            self.invalidateIntrinsicContentSize()
+        }
     }
 
     private func measuredHeight(width: CGFloat) -> CGFloat {
@@ -1752,13 +2106,27 @@ private final class TheaterCaptionLineNSView: NSView {
 
     override func layout() {
         super.layout()
-        self.layer?.isGeometryFlipped = true
+        self.placeInk()
+    }
+
+    /// A line created above the fold can keep a zero-width frame until it
+    /// scrolls in. Draw time is the first moment that frame is real.
+    override func viewWillDraw() {
+        self.placeInk()
+        super.viewWillDraw()
+    }
+
+    private var placedBoundsWidth: CGFloat = -1
+
+    private func placeInk() {
         let width = max(self.bounds.width, 1)
+        let widthChanged = abs(width - self.placedBoundsWidth) > 0.5
         if let wrap = TheaterBilingualWrap.layoutWrapWidth(proposed: width, locked: self.wrapWidth),
-           self.displayRows.isEmpty || abs(self.rowsLaidOutWidth - wrap) > 0.5
+           self.displayRows.isEmpty || widthChanged || abs(self.rowsLaidOutWidth - wrap) > 0.5
         {
-            self.syncRows(width: wrap)
+            self.syncRows(width: wrap, deferLayout: false)
         }
+        self.placedBoundsWidth = width
         let placed = TheaterBilingualWrap.placedFrames(
             rows: self.displayRows,
             spokenFont: self.spokenFont,
@@ -1850,6 +2218,7 @@ private final class TheaterCaptionLineNSView: NSView {
         label.lineBreakMode = .byClipping
         label.maximumNumberOfLines = 1
         label.usesSingleLineMode = true
+        label.wantsLayer = false
         label.clipsToBounds = false
         label.setContentHuggingPriority(.defaultLow, for: .horizontal)
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)

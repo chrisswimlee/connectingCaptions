@@ -14,6 +14,8 @@ final class PresenterCaptionModel: ObservableObject {
     @Published var pairLabel: String = ""
     @Published var status: String = ""
     @Published var statusKind: TheaterStatusKind = .idle
+    /// Heard lines that have not printed on the board yet.
+    @Published var inboxLines: [String] = []
     @Published var isListening: Bool = false
     @Published var isPaused: Bool = false
     @Published var canRetryTranslation: Bool = false
@@ -27,6 +29,16 @@ final class PresenterCaptionModel: ObservableObject {
     @Published var exportShowsSaved: Bool = false
     /// Session-only. Overlay starts unpinned (text only). Pop-up, minimize, and close clear it.
     @Published var overlayToolsPinned: Bool = false
+    /// True while Overlay is waiting for a caption rectangle. Clicks stay on the window.
+    @Published var isPlacingOverlay: Bool = false
+    /// The live frame would survive Overlay. Keep text here stays off until this is true.
+    @Published var canConfirmOverlayPlacement: Bool = false
+    /// Pointer is over the fading Overlay tool bar.
+    @Published var overlayDockEngaged: Bool = false
+    /// A menu, popover, or alert from that bar is open, so the bar stays up.
+    @Published var overlayDockHolding: Bool = false
+    /// Laid-out height of the Overlay tool bar, including its outer padding.
+    @Published var overlayDockHeight: CGFloat = 64
 }
 
 enum TheaterTypeface: String, CaseIterable, Identifiable {
@@ -99,6 +111,7 @@ struct TheaterFlowLine: Equatable, Identifiable {
     let source: String
     let isCurrent: Bool
     let isDraft: Bool
+    var failed: Bool = false
 }
 
 enum TheaterPresentationStyle: String, CaseIterable, Identifiable {

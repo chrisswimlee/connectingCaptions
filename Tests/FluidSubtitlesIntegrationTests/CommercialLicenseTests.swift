@@ -10,6 +10,8 @@ final class CommercialLicenseTests: XCTestCase {
         super.setUp()
         self.privateKey = Curve25519.Signing.PrivateKey()
         SettingsStore.licenseVerifyingKeyOverride = self.privateKey.publicKey
+        FleetManagedDirectory.machineRootOverride = nil
+        CommercialSeat.machineIDOverride = nil
         SettingsStore.shared.removeCommercialLicense()
     }
 

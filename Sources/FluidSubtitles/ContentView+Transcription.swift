@@ -39,7 +39,7 @@ extension ContentView {
                 timestamp: historyTimestamp,
                 rawText: transcribedText,
                 processedText: translated,
-                appName: kind == .insert ? appInfo.name : "",
+                appName: kind == .insert ? appInfo.name : "Theater",
                 windowTitle: kind == .insert ? appInfo.windowTitle : "",
                 wasAIProcessed: false,
                 processingModel: nil,
@@ -438,9 +438,9 @@ extension ContentView {
         }
 
         let frontmostApp = NSWorkspace.shared.frontmostApplication
-        let isFluidFrontmost = frontmostApp?.bundleIdentifier == Bundle.main.bundleIdentifier
+        let isThisAppFrontmost = frontmostApp?.bundleIdentifier == Bundle.main.bundleIdentifier
 
-        if SettingsStore.shared.copyTranscriptionToClipboard, !isFluidFrontmost {
+        if SettingsStore.shared.copyTranscriptionToClipboard, !isThisAppFrontmost {
             ClipboardService.copyToClipboard(finalText)
         }
 
@@ -448,7 +448,7 @@ extension ContentView {
             ?? NSWorkspace.shared.frontmostApplication?.processIdentifier
         NotchContentState.shared.recordingTargetPID = focusedPID
 
-        let shouldTypeExternally = !isFluidFrontmost
+        let shouldTypeExternally = !isThisAppFrontmost
         if shouldTypeExternally {
             let typingTarget = self.resolveTypingTargetPID()
             if typingTarget.shouldRestoreOriginalFocus {
@@ -570,8 +570,8 @@ extension ContentView {
         NotchContentState.shared.recordingTargetPID = focusedPID
 
         let frontmostApp = NSWorkspace.shared.frontmostApplication
-        let isFluidFrontmost = frontmostApp?.bundleIdentifier?.contains("fluid") == true
-        let shouldTypeExternally = !isFluidFrontmost || self.isTranscriptionFocused == false
+        let isThisAppFrontmost = frontmostApp?.bundleIdentifier == Bundle.main.bundleIdentifier
+        let shouldTypeExternally = !isThisAppFrontmost || self.isTranscriptionFocused == false
         if shouldTypeExternally {
             let typingTarget = self.resolveTypingTargetPID()
             if typingTarget.shouldRestoreOriginalFocus {

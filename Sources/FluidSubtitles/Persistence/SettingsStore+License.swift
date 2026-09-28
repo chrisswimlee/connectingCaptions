@@ -34,7 +34,8 @@ extension SettingsStore {
     }
 
     var isCommerciallyLicensed: Bool {
-        self.commercialLicenseRecord != nil
+        guard let record = self.commercialLicenseRecord else { return false }
+        return self.seatDecision(for: record).coversThisMac
     }
 
     var commercialLicenseFailure: CommercialLicense.Failure? {
@@ -59,6 +60,7 @@ extension SettingsStore {
             do {
                 try self.writeCommercialLicenseToken(trimmed)
                 self.objectWillChange.send()
+                self.noteCommercialLicenseActivated(record, via: "user")
                 return .success(record)
             } catch {
                 return .failure(.notSaved)
@@ -69,11 +71,17 @@ extension SettingsStore {
     }
 
     func removeCommercialLicense() {
+        if !self.commercialLicenseIsManaged, let org = self.commercialLicenseRecord?.org {
+            FleetAudit.record(.licenseRemoved, fields: ["org": org, "via": "user"])
+        }
         self.objectWillChange.send()
         try? self.writeCommercialLicenseToken(nil)
     }
 
     private func readCommercialLicenseToken() -> String? {
+        if let managed = FleetManagedDirectory.licenseToken() {
+            return managed
+        }
         if Self.isRunningTests {
             return self.defaults.string(forKey: LicenseDefaults.token)
         }

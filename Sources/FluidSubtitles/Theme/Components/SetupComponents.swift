@@ -21,7 +21,7 @@ struct SetupStepView: View {
     var showActionButton: Bool = true
 
     enum SetupStatus {
-        case pending, completed, inProgress
+        case pending, completed, inProgress, notNeeded
     }
 
     var body: some View {
@@ -50,6 +50,10 @@ struct SetupStepView: View {
                             .controlSize(.small)
                             .fixedSize()
                             .tint(self.statusColor)
+                    } else if self.status == .notNeeded {
+                        Image(systemName: "minus")
+                            .foregroundStyle(self.statusColor)
+                            .font(.caption.weight(.bold))
                     } else {
                         Text("\(self.step)")
                             .font(.caption.weight(.bold))
@@ -117,7 +121,7 @@ struct SetupStepView: View {
         switch self.status {
         case .completed: return Color.fluidGreen
         case .inProgress: return .blue
-        case .pending: return .secondary
+        case .pending, .notNeeded: return .secondary
         }
     }
 }

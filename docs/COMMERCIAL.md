@@ -18,32 +18,85 @@ This is not consulting. Consulting is [Engage](https://chrisswimlee.com/engage/)
 
 GPLv3 still lets a firm run the free zip. A commercial license does not forbid work use of that zip. It is the vendor paper and the signed key that shows **Licensed to** the organization in the app.
 
-## What a paid license includes today
+## What a paid license includes
 
 - A named organization license and an air-gapped activation key
-- The same security mailbox, with an optional written SLA
+- The same security mailbox, with an optional written SLA (`--sla` on the key)
 - A **Licensed to {org}** line in Settings, Getting Started, Feedback, and Theater Home so procurement can see the Mac is covered
+- Optional seat enforcement: a signed list of hardware UUIDs. A Mac outside that list does not show **Licensed to**
+- A Jamf or Fleet `.pkg` that installs the app, the key, the seat list, and a caption-policy file
+- Fleet settings backup and restore for caption policy only
+- An on-device audit log. It records license, seat, and Listen start or stop. It does not record captions
 
-The key does not lock Talk notes, the dictionary, export, or Listen. It only replaces the work notice.
-
-## Later (not in this tree)
-
-These are not built yet. Do not promise a date.
-
-- MDM `.pkg` for Jamf or Fleet
-- Cryptographic zero-retention audit logs
-- Fleet settings backup and restore
-- Seat enforcement
+The key does not lock Talk notes, the dictionary, export, or Listen. A refused seat still listens. Personal use of the free zip stays free.
 
 ## How a key works
 
 The token is `base64url(json).base64url(ed25519)`.
 
-JSON fields: `product` (`fluidSubtitles`), `org`, `seats`, `issued` (`YYYY-MM-DD`), `expires` (`YYYY-MM-DD`).
+JSON fields: `product` (`fluidSubtitles`), `org`, `seats`, `issued` (`YYYY-MM-DD`), `expires` (`YYYY-MM-DD`). Optional: `sla` (`true`), `enforceSeats` (`true`). Older keys omit those two and keep working.
 
 The app verifies the signature with the public key in `CommercialLicense.swift`. It does not phone home. Expired or tampered keys fail closed.
 
-Paste the token in **Settings → General**. Remove it from the same row.
+Paste the token in **Settings → General**. Remove it from the same row. **Seat ID** on that row is this Mac's hardware UUID.
+
+## Seat list
+
+When the key has `enforceSeats`, **Licensed to** appears only if this Mac's hardware UUID is on a signed seat list for the same organization, and the list is not longer than `seats`.
+
+```bash
+./scripts/issue-seat-roster.sh --org "Example LLP" --expires 2027-09-21 \
+  --seat "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
+```
+
+`--seats-file` is one UUID per line. Jamf and Fleet already inventory that UUID. The token is `seats.roster`.
+
+## Fleet settings
+
+Settings → General can export or restore `settings.fleet.json`. The file is caption policy: languages, spoken line, size, spacing, typeface, appearance, contrast, presentation, and Voice Engine. It rejects any other key, including transcripts, notes, and API keys.
+
+A pkg can drop the same file. The app applies it when the file bytes change. An edit on that Mac stays until IT ships a new file.
+
+```json
+{
+  "product": "fluidSubtitles",
+  "iSpeak": "en",
+  "showAs": "ko",
+  "spokenLine": "afterPause",
+  "captionSize": 42,
+  "captionSpacing": 14,
+  "voiceEngine": "apple-speech",
+  "presentation": "popup",
+  "appearance": "dark",
+  "highContrast": false,
+  "typeface": "system"
+}
+```
+
+## Audit log
+
+Each line is hashed and signed with a key that stays on that Mac. Export writes `audit.json` for IT. Clear deletes the local log. Nothing is uploaded. A line that names a caption, transcript, or audio path is refused.
+
+## MDM package
+
+```bash
+./scripts/build-mdm-pkg.sh \
+  --app dist/fluidSubtitles.app \
+  --license ./license.key \
+  --roster ./seats.roster \
+  --settings ./settings.fleet.json \
+  --output dist/fluidSubtitles-mdm.pkg
+```
+
+The pkg is unsigned. Sign it with a Developer ID Installer certificate before Jamf or Fleet ships it.
+
+It installs the app in `/Applications` and these root-owned files:
+
+- `/Library/Application Support/fluidSubtitles/license.key`
+- `/Library/Application Support/fluidSubtitles/seats.roster`
+- `/Library/Application Support/fluidSubtitles/settings.fleet.json`
+
+While `license.key` is present, it wins over a key pasted in Settings. The row says **Installed for this Mac.**
 
 ## Issue a key (maintainer)
 
@@ -55,6 +108,7 @@ The Ed25519 **private** key never belongs in git.
 
 ```bash
 ./scripts/issue-commercial-license.sh --org "Example LLP" --seats 25 --expires 2027-09-21
+./scripts/issue-commercial-license.sh --org "Example LLP" --seats 25 --expires 2027-09-21 --sla --enforce-seats
 ```
 
 `--issued` defaults to today (UTC). The script prints the token. Send that token to the buyer. Do not commit it.

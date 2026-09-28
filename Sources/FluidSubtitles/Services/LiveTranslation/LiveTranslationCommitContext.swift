@@ -6,8 +6,16 @@ enum LiveTranslationCommitContext {
     /// Interlinear annotation anchors, same family as glossary lock tokens.
     /// Lock tokens are `\u{FFF9}` plus digits plus `\u{FFFA}`. These use
     /// triangles so a term lock cannot collide with a clause boundary.
+    /// Apple Translation often drops the format characters and keeps the
+    /// triangles. A surviving triangle is still a mark: it is not caption text.
     static let contextClauseStart = "\u{FFF9}\u{25B9}\u{FFFA}"
     static let contextClauseEnd = "\u{FFF9}\u{25C3}\u{FFFA}"
+
+    /// Triangles we send, plus the sizes Apple normalizes them to.
+    private static let clauseMarkScalars: Set<UInt32> = [
+        0x25B6, 0x25B7, 0x25B8, 0x25B9,
+        0x25C0, 0x25C1, 0x25C2, 0x25C3,
+    ]
 
     /// Priors stay unmarked context. Only the new clause sits between the marks.
     static func markedContextPayload(
@@ -73,7 +81,10 @@ enum LiveTranslationCommitContext {
     }
 
     static func containsContextClauseMark(_ translated: String) -> Bool {
-        translated.contains(Self.contextClauseStart) || translated.contains(Self.contextClauseEnd)
+        if translated.contains(Self.contextClauseStart) || translated.contains(Self.contextClauseEnd) {
+            return true
+        }
+        return translated.unicodeScalars.contains { Self.clauseMarkScalars.contains($0.value) }
     }
 
     /// Only this Listen. A restored board or yesterday's talk must not prime MT.

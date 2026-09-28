@@ -14,11 +14,11 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROFILE="${1:-${BUILD_PROFILE:-public}}"
-DERIVED_DATA_PATH="${FLUIDSUBTITLES_DERIVED_DATA_PATH:-${FLUIDVOICE_DERIVED_DATA_PATH:-${PROJECT_DIR}/DerivedData}}"
+DERIVED_DATA_PATH="${FLUIDSUBTITLES_DERIVED_DATA_PATH:-${PROJECT_DIR}/DerivedData}"
 
 resolve_development_team() {
-    if [ -n "${FLUIDSUBTITLES_DEVELOPMENT_TEAM:-${FLUIDVOICE_DEVELOPMENT_TEAM:-}}" ]; then
-        printf '%s\n' "${FLUIDSUBTITLES_DEVELOPMENT_TEAM:-${FLUIDVOICE_DEVELOPMENT_TEAM}}"
+    if [ -n "${FLUIDSUBTITLES_DEVELOPMENT_TEAM:-}" ]; then
+        printf '%s\n' "${FLUIDSUBTITLES_DEVELOPMENT_TEAM}"
         return
     fi
 

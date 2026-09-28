@@ -248,7 +248,7 @@ final class TheaterMenuBarController: NSObject {
 
         // Overlay users can type captions without pinning the tools.
         let insert = NSMenuItem(
-            title: "Type into App",
+            title: "Type the Board",
             action: #selector(typeIntoApp),
             keyEquivalent: ""
         )
@@ -510,7 +510,7 @@ final class TheaterMenuBarController: NSObject {
     }
 
     @objc private func clearCaptions() {
-        LiveTranslationController.shared.clearBoard()
+        LiveTranslationController.shared.requestClearBoard()
         self.refresh()
     }
 

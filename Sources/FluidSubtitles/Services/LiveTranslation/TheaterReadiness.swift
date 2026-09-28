@@ -4,7 +4,7 @@ import Foundation
 /// First-run and stage-call checks. Listen still gates on engine + pack.
 enum TheaterReadiness {
     static let captionsPrintAfterSentence =
-        "Each sentence appears when it is ready. Pause and Stop drop a leftover. Listen and type still types that leftover."
+        "Each sentence appears when it is ready. What you are saying stays in the bar under the board. Pause and Stop drop a leftover. Listen, then type still types that leftover."
 
     static let listeningStatus =
         "Listening. Each sentence appears when it is ready."
@@ -23,20 +23,21 @@ enum TheaterReadiness {
 
     static let talkPackCarryOver = "These names stay for the next talk until you Remove."
 
-    static let screenShareTitle = "Screen share"
+    static let screenShareTitle = "Who sees this"
     static let screenShare =
-        "Share the slides window. Screenshots and a whole-screen Zoom or Meet share include these captions."
+        "Share the slides window when the room should see captions and the meeting should not. Share the Theater window when the meeting should see the board. Screenshots and a whole-screen share include these captions."
     static let screenShareIncluded = screenShare
 
-    /// Idle Overlay hides every control and lets clicks reach the slides.
+    /// Idle Overlay leaves a Tools bar that fades until the pointer comes back.
     static let overlayIdleCoach =
-        "Slides stay clickable. Control-Option-T shows tools. Control-Option-L starts Listen."
+        "Hover the Tools bar at the top for Listen and the other controls. It fades when you move away. Slides stay clickable."
 
-    static let overlayIdleHint = "Control-Option-L starts Listen. Control-Option-T shows tools."
+    static let overlayIdleHint =
+        "Hover the Tools bar at the top for Listen. It fades when you move away."
 
-    /// Presenter shortcuts are off, so the menu bar is the way back to the tools.
+    /// Presenter shortcuts are off. The faded bar and the menu bar both reach the tools.
     static let overlayIdleMenuBarHint =
-        "Slides stay clickable. Use the Theater item in the menu bar to show tools or Listen."
+        "Hover the Tools bar at the top for Listen and the other controls. It fades when you move away. The menu bar can also show tools or Listen."
 
     static let stopHelp =
         "Stops the microphone. A real leftover sentence appears once. Printed lines and talk notes stay."
@@ -85,6 +86,9 @@ enum TheaterReadiness {
     static let historyEmpty =
         "Open Theater and press Listen. Captions will appear here."
 
+    static let historyFromBoard =
+        "The board keeps the latest lines. History keeps the whole talk, including lines that scrolled off."
+
     static let gettingStartedReady = "Theater is ready"
 
     static let gettingStartedOpen = "Open Theater"
@@ -102,7 +106,7 @@ enum TheaterReadiness {
         "The microphone is allowed. Voice and Translate both use it."
 
     static let printedLinesStay =
-        "A line already on screen stays. Each sentence appears when it is ready. Pause and Stop drop a leftover. Listen and type still types that leftover into the other app."
+        "A line already on screen stays. Each sentence appears when it is ready, and what you are saying stays in the bar under the board. Pause and Stop drop a leftover. Listen, then type still types that leftover into the other app. Lines that scroll off stay in History."
 
     static let clearCaptions =
         "Removes every caption. The microphone stays on. Talk notes stay."
@@ -126,16 +130,19 @@ enum TheaterReadiness {
         "some keyboards paste it instead of typing each letter"
 
     static let insertHelp =
-        "Types this caption into the frontmost app, and \(insertIMECaveat)."
+        "Types the captions already on the board into the frontmost app, and \(insertIMECaveat). Listen, then type is the shortcut that starts a new Listen."
 
     static let typeIntoAppLocked =
-        "Listen and type unlocks after your first Theater caption."
+        "Listen, then type unlocks after your first Theater caption. Type the board stays on the Theater window."
+
+    static let speakAndTypeSubtitle =
+        "Speak in one language. A bar shows the line, then types it into the app you started in."
 
     static let typeIntoAppBody =
-        "Press this shortcut in another app and it types what you say next."
+        "Click into another app, then press the shortcut. The bar shows the line and leaves the keyboard in that app."
 
     static let typeIntoAppShortcutDetail =
-        "Starts Listen and types what you say next."
+        "Starts a new Listen and types what you say next. A bar shows the line. It does not type the board."
 
     static let typeIntoAppNeedsAccessibility =
         "This shortcut is saved, but macOS is blocking it. Allow Accessibility, click into another app, then press it."
@@ -176,7 +183,10 @@ enum TheaterReadiness {
         "On the Theater window, hide the tool bar. Move the pointer to show Listen and the other controls."
 
     static let captionsOnlyPopupOnly =
-        "Captions only is for Pop-up. Overlay is already text-only. Control-Option-T shows Overlay tools."
+        "Captions only is for Pop-up. Overlay fades its tool bar until you hover the top. Control-Option-T pins those tools."
+
+    static let overlayPlacementHint =
+        "Drag a corner or pick a spot. Keep text here, then slides stay clickable."
 
     static let captionSize =
         "Caption size — the number shown. A wide window grows this further; a short Overlay bar can shrink it to fit."
@@ -186,6 +196,8 @@ enum TheaterReadiness {
 
     static let downloadPack = "Download pack"
     static let downloadPackBusy = "Downloading…"
+    static let packUnsupported =
+        "Apple Translation cannot do this pair. Pick another Show as, or use Voice."
 
     static let allowMicrophone =
         "Press Listen to allow the microphone."
@@ -203,28 +215,33 @@ enum TheaterReadiness {
         "Clear these notes so their names do not carry into the next talk."
 
     static let presenterHotkeys =
-        "Control-Option-H hides or shows Theater, P pauses, K clears, T shows Overlay tools, L starts or stops Listen, R retries a failed translation, = and - change caption size. The menu-bar Theater item changes font, size, plate, and position. Your slides keep focus. A custom Listen shortcut with the same chord wins."
+        "Control-Option-H hides or shows Theater, P pauses, K clears, T pins Overlay tools, L starts or stops Listen, R retries a failed translation, = and - change caption size. "
+        + "Hover the Overlay Tools bar for the same controls. The menu-bar Theater item changes font, size, plate, and position. Your slides keep focus. A custom Listen shortcut with the same chord wins."
 
     static let popupStyle =
-        "Pop-up is a solid board that fills this display. Drag a corner to resize."
+        "Pop-up opens as a lower third so the slides stay visible. Drag a corner to resize, or choose Fill screen."
 
     static let transparentStyle =
-        "Overlay keeps the caption text and hides the board, so slides show through and stay clickable. Control-Option-T shows tools."
+        "Overlay opens along the bottom and shows the last few lines, like TV captions. Drag it, or pick another spot. "
+        + "A Tools label at the top fades until you hover it, and slides stay clickable."
 
     static let presentationStyle =
         "Choose Pop-up or Overlay. Open Theater to show it; Close Theater to hide it."
 
     static let alsoHearOtherLanguages =
-        "Whisper can auto-detect English, Korean, Japanese, and Thai questions. Apple Speech stays on I speak."
+        "Whisper can auto-detect a question in any setup language. Apple Speech stays on I speak."
 
-    /// Either way copy. The toggle is off until a later release.
+    static let speakCaptions =
+        "Speak each finished Show-as line on the output you pick. Same-language Listen stays quiet."
+
+    /// Either way copy. The Home toggle enables only when Whisper hears both sides.
     static let dynamicPairing =
         "Speak either language of this pair. Theater shows both. Whisper hears both; Apple Speech stays on I speak."
 
     static func dynamicPairingHint(isWhisper: Bool) -> String {
         isWhisper
             ? "Either way: speak either language of this pair. Captions stay both."
-            : "Either way can flip captions, but this Voice Engine stays on I speak. Whisper hears both languages."
+            : "Either way needs Whisper. This Voice Engine stays on I speak, so a question in Show as is not flipped."
     }
 
     static var macOSNote: String {

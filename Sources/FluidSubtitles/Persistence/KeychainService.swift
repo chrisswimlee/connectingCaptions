@@ -19,7 +19,7 @@ enum KeychainServiceError: Error, LocalizedError {
 }
 
 /// Lightweight helper for storing provider API keys in the system Keychain.
-/// New writes use the fluidSubtitles service; reads still accept older connectingCaptions and FluidVoice services.
+/// New writes use the fluidSubtitles service. Reads still accept this app's earlier connectingCaptions service.
 final class KeychainService {
     static let shared = KeychainService()
 
@@ -35,8 +35,6 @@ final class KeychainService {
 
     private let service = FluidProduct.keychainService
     private let account = FluidProduct.keychainAccount
-    private let legacyService = FluidProduct.legacyKeychainService
-    private let legacyAccount = FluidProduct.legacyKeychainAccount
     private let cacheLock = NSLock()
     private let ioLock = NSRecursiveLock()
     private var keyCache = KeyCache.unloaded

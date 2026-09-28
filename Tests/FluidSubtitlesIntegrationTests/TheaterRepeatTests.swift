@@ -121,6 +121,48 @@ final class TheaterRepeatTests: XCTestCase {
         )
     }
 
+    func testRepunctuatedGrowthUpdatesTheLineInsteadOfPrintingAgain() {
+        XCTAssertTrue(
+            TranslationClauseSegmenter.isInPlaceGrowth(
+                previous: "Why, won't you.",
+                incoming: "Why won't you print?"
+            )
+        )
+        let context = TheaterBoardAdmission.Context(
+            peelSources: ["Why, won't you."],
+            latestHypothesis: "Why won't you print?"
+        )
+        XCTAssertEqual(
+            TheaterBoardAdmission.decide(
+                "Why won't you print?",
+                languageID: "en",
+                phase: .propose,
+                context: context
+            ),
+            .skip(.revisesNewest)
+        )
+        XCTAssertFalse(
+            TranslationClauseSegmenter.isInPlaceGrowth(
+                previous: "Why, won't you.",
+                incoming: "Why won't you. Then we tested it."
+            )
+        )
+    }
+
+    func testLoneSentenceSettleOutlastsTheEngineUpdateCadence() {
+        let floor = LiveTranslationTiming.loneSentencePrintNanoseconds
+        XCTAssertEqual(LiveTranslationTiming.loneSentenceSettleNanoseconds(partialCadence: 0), floor)
+        XCTAssertEqual(LiveTranslationTiming.loneSentenceSettleNanoseconds(partialCadence: 0.05), floor)
+        XCTAssertGreaterThan(
+            LiveTranslationTiming.loneSentenceSettleNanoseconds(partialCadence: 0.6),
+            600_000_000
+        )
+        XCTAssertEqual(
+            LiveTranslationTiming.loneSentenceSettleNanoseconds(partialCadence: 1.9),
+            LiveTranslationTiming.loneSentenceMaxNanoseconds
+        )
+    }
+
     func testCompactWhitespaceRestitchIsTheSameClause() {
         XCTAssertTrue(
             TranslationClauseSegmenter.isSameClause(

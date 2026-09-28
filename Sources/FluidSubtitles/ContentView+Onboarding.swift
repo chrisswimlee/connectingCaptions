@@ -851,29 +851,24 @@ extension ContentView {
 struct TodayStatsToolbarButton: View {
     @ObservedObject private var historyStore = TranscriptionHistoryStore.shared
 
-    let typingWPM: Int
     let action: () -> Void
 
     var body: some View {
         let summary = self.historyStore.todaySummary
-        let timeSaved = summary.formattedTimeSaved(typingWPM: self.typingWPM)
         let hasActivity = summary.words > 0
 
         return Button(action: self.action) {
             HStack(spacing: 4) {
-                Image(systemName: hasActivity ? "waveform" : "chart.bar.fill")
+                Image(systemName: hasActivity ? "captions.bubble" : "clock.arrow.circlepath")
                 if hasActivity {
                     Text("\(summary.words) words")
-                    Text("·")
-                        .foregroundStyle(.secondary)
-                    Text(timeSaved)
                 } else {
-                    Text("Today")
+                    Text("History")
                 }
             }
             .font(.system(size: 12, weight: .medium))
         }
-        .help(hasActivity ? "Today: \(summary.words) words · \(timeSaved) saved - view stats" : "View your stats")
-        .accessibilityLabel("Today stats")
+        .help(hasActivity ? "Today: \(summary.words) words. Open History for the talk." : "Open History")
+        .accessibilityLabel("History")
     }
 }

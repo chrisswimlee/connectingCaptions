@@ -95,10 +95,10 @@ struct TranscriptionHistoryView: View {
         } message: {
             Text("This will permanently delete all \(self.historyStore.totalEntryCount) transcription entries. This action cannot be undone.")
         }
-        .alert("Report Sent", isPresented: self.$showReportConfirmation) {
+        .alert("Draft saved on this Mac", isPresented: self.$showReportConfirmation) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text("Thank you for helping improve \(FluidProduct.displayName).")
+            Text("The example stays on this Mac. Nothing was sent.")
         }
         .sheet(item: self.$selectedReportEntry) { entry in
             TranscriptionFeedbackReportSheet(entry: entry) {
@@ -154,6 +154,22 @@ struct TranscriptionHistoryView: View {
         }
     }
 
+    private func historySourceName(_ entry: TranscriptionHistoryEntry) -> String {
+        let name = entry.appName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasCaptions = entry.captionPairs?.isEmpty == false
+        if name.isEmpty || ((name == "Unknown" || name == "Unknown App") && hasCaptions) {
+            return "Theater"
+        }
+        return name
+    }
+
+    private func historyWindowName(_ entry: TranscriptionHistoryEntry) -> String {
+        let window = entry.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !window.isEmpty, window != "Unknown" { return window }
+        if self.historySourceName(entry) == "Theater" { return "Captions" }
+        return window.isEmpty ? "Unknown" : window
+    }
+
     private func entryRow(_ entry: TranscriptionHistoryEntry) -> some View {
         let isSelected = self.selectedEntryID == entry.id
 
@@ -165,7 +181,7 @@ struct TranscriptionHistoryView: View {
             VStack(alignment: .leading, spacing: 4) {
                 // Top row: App name and time
                 HStack(spacing: 6) {
-                    Text(entry.appName.isEmpty ? "Unknown App" : entry.appName)
+                    Text(self.historySourceName(entry))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(isSelected ? .white : .secondary)
                         .lineLimit(1)
@@ -492,6 +508,10 @@ struct TranscriptionHistoryView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                    Text(TheaterReadiness.timedExportHonesty)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 // Final Text Section
@@ -594,8 +614,8 @@ struct TranscriptionHistoryView: View {
                 GridItem(.flexible(), spacing: 16),
                 GridItem(.flexible(), spacing: 16),
             ], spacing: 12) {
-                self.metadataItem(icon: "app.fill", label: "Application", value: entry.appName.isEmpty ? "Unknown" : entry.appName)
-                self.metadataItem(icon: "macwindow", label: "Window", value: entry.windowTitle.isEmpty ? "Unknown" : entry.windowTitle)
+                self.metadataItem(icon: "app.fill", label: "Application", value: self.historySourceName(entry))
+                self.metadataItem(icon: "macwindow", label: "Window", value: self.historyWindowName(entry))
                 self.metadataItem(icon: "character.cursor.ibeam", label: "Characters", value: "\(entry.characterCount)")
                 self.metadataItem(icon: "sparkles", label: "AI Processed", value: entry.wasAIProcessed ? "Yes" : "No")
                 if self.settings.showHistoryPerformanceMetrics,

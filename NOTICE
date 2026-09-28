@@ -1,11 +1,9 @@
 fluidSubtitles
 Copyright (C) 2026 Chris Swim Lee
 
-This product is a GPLv3 branch of FluidVoice by altic-dev
+Speech recognition comes from FluidVoice by altic-dev
 https://github.com/altic-dev/FluidVoice
-
-Speech recognition, live engines, and the core macOS app remain their work.
-Live translation and Theater captions were added in this branch.
+under GPLv3. Theater captions and insert are this product.
 
 ------------------------------------------------------------------------
 

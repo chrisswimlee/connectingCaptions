@@ -8,14 +8,15 @@ struct TheaterModeSection: View {
     @ObservedObject private var controller = LiveTranslationController.shared
 
     var accessibilityIdentifier: String?
+    var title = "Theater mode"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Theater mode")
+            Text(self.title)
                 .font(self.theme.typography.bodyStrong)
                 .foregroundStyle(self.theme.palette.primaryText)
             TheaterWordPicker(
-                accessibilityLabel: "Theater mode",
+                accessibilityLabel: self.title,
                 accessibilityIdentifier: self.accessibilityIdentifier,
                 options: Array(TheaterSessionMode.allCases),
                 title: { $0.displayName },

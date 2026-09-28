@@ -81,7 +81,7 @@ enum TheaterPresenterHotkey {
                 controller.pauseListening()
             }
         case .clear:
-            controller.clearBoard()
+            controller.requestClearBoard()
         case .copy:
             controller.copyCaptionText()
         case .undo:

@@ -86,6 +86,13 @@ struct LiveTranslationHomeView: View {
                 }
                 self.sectionRule
                 TheaterAudienceCard(showsCard: false)
+                if self.settings.theaterSessionMode.showsTranslation {
+                    Text(TheaterReadiness.oneSpeakerCloseMic)
+                        .font(self.theme.typography.bodySmall)
+                        .foregroundStyle(self.theme.palette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("theater.stage.closeMic")
+                }
                 DisclosureGroup("Adjust") {
                     self.linePrintRow
                         .padding(.top, 12)
@@ -198,6 +205,16 @@ struct LiveTranslationHomeView: View {
             return TheaterReadiness.pausedStatus
         }
         if self.controller.isSessionActive, self.controller.listenKind == .captions {
+            if self.controller.subscriber.statusKind.usesWarningColor {
+                let failure = self.controller.subscriber.statusText
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !failure.isEmpty,
+                   failure != "Listening…",
+                   failure != SpokenLanguageResolver.voiceEngineMismatchMessage()
+                {
+                    return failure
+                }
+            }
             return TheaterReadiness.listeningStatus
         }
         let failure = self.controller.subscriber.statusText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -241,14 +258,11 @@ struct LiveTranslationSettingsView: View {
     @ObservedObject private var controller = LiveTranslationController.shared
     @ObservedObject private var subscriber = LiveTranslationController.shared.subscriber
     @State private var showClearConfirmation = false
+    @State private var speakOutputDevices: [AudioDevice.Device] = []
 
-    var recordTranslateShortcut: (() -> Void)?
-    var isRecordingTranslateShortcut = false
     var recordListenShortcut: (() -> Void)?
     var isRecordingListenShortcut = false
     var shortcutRecordingMessage: String?
-    var accessibilityTrusted = true
-    var openAccessibility: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -262,15 +276,6 @@ struct LiveTranslationSettingsView: View {
                 shortcutRecordingMessage: self.shortcutRecordingMessage
             )
             .settingsSearchTarget(.captionListenShortcut)
-
-            TranslateInsertShortcutCard(
-                recordTranslateShortcut: self.recordTranslateShortcut,
-                isRecordingTranslateShortcut: self.isRecordingTranslateShortcut,
-                shortcutRecordingMessage: self.shortcutRecordingMessage,
-                accessibilityTrusted: self.accessibilityTrusted,
-                openAccessibility: self.openAccessibility
-            )
-            .settingsSearchTarget(.translateInsertShortcut)
 
             ThemedCard(style: .standard, hoverEffect: false) {
                 VStack(alignment: .leading, spacing: 8) {
@@ -348,7 +353,7 @@ struct LiveTranslationSettingsView: View {
                         Text("Each sentence appears when it is ready.")
                             .font(self.theme.typography.bodyStrong)
                             .foregroundStyle(self.settingsTitleText)
-                        Text("Nothing shows while it is still being heard.")
+                        Text("What you are saying stays in the bar under the board until that sentence prints.")
                             .font(self.theme.typography.bodySmall)
                             .foregroundStyle(self.settingsSecondaryText)
                     }
@@ -409,20 +414,60 @@ struct LiveTranslationSettingsView: View {
                         .accessibilityIdentifier("theater.settings.presenterHotkeys")
                 }
 
-                self.settingsToggleRow(
-                    title: "Also hear English, Korean, Japanese, and Thai questions",
-                    description: TheaterReadiness.alsoHearOtherLanguages
-                ) {
-                    Toggle(
-                        "Also hear English, Korean, Japanese, and Thai questions",
-                        isOn: self.$settings.theaterAlsoHearOtherLanguages
-                    )
-                    .toggleStyle(.switch)
-                    .tint(self.theme.palette.accent)
-                    .labelsHidden()
-                    .disabled(!self.settings.selectedSpeechModel.isWhisperModel)
-                    .accessibilityLabel("Also hear English, Korean, Japanese, and Thai questions")
+                if self.settings.selectedSpeechModel.isWhisperModel {
+                    self.settingsToggleRow(
+                        title: "Also hear questions",
+                        description: TheaterReadiness.alsoHearOtherLanguages
+                    ) {
+                        Toggle(
+                            "Also hear questions",
+                            isOn: self.$settings.theaterAlsoHearOtherLanguages
+                        )
+                        .toggleStyle(.switch)
+                        .tint(self.theme.palette.accent)
+                        .labelsHidden()
+                        .accessibilityLabel("Also hear questions")
+                    }
+
+                    self.settingsToggleRow(
+                        title: "Either way",
+                        description: SpokenLanguageResolver.dynamicPairingControlCopy()
+                    ) {
+                        Toggle(
+                            "Either way",
+                            isOn: Binding(
+                                get: { SpokenLanguageResolver.isDynamicPairingEnabled() },
+                                set: { self.controller.applyDynamicPairing($0) }
+                            )
+                        )
+                        .toggleStyle(.switch)
+                        .tint(self.theme.palette.accent)
+                        .labelsHidden()
+                        .disabled(!SpokenLanguageResolver.dynamicPairingAvailable())
+                        .accessibilityLabel("Either way")
+                        .accessibilityIdentifier("theater.settings.eitherWay")
+                    }
+                } else if self.settings.theaterSessionMode.showsTranslation {
+                    Text(TheaterReadiness.dynamicPairingHint(isWhisper: false))
+                        .font(self.theme.typography.bodySmall)
+                        .foregroundStyle(self.settingsSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("theater.settings.eitherWayNeedsWhisper")
                 }
+
+                self.settingsToggleRow(
+                    title: "Speak captions",
+                    description: TheaterReadiness.speakCaptions
+                ) {
+                    Toggle("Speak captions", isOn: self.$settings.theaterSpeakCaptions)
+                        .toggleStyle(.switch)
+                        .tint(self.theme.palette.accent)
+                        .labelsHidden()
+                        .accessibilityLabel("Speak captions")
+                        .accessibilityIdentifier("theater.settings.speakCaptions")
+                }
+
+                self.speakOutputPicker
 
                 HStack(alignment: .center) {
                     VStack(alignment: .leading, spacing: 2) {
@@ -585,6 +630,31 @@ struct LiveTranslationSettingsView: View {
                     .foregroundStyle(self.settingsSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
+        }
+    }
+
+    private var speakOutputPicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Speak on")
+                .font(self.theme.typography.bodyStrong)
+                .foregroundStyle(self.settingsTitleText)
+            Picker("Speak on", selection: Binding<String>(
+                get: { self.settings.preferredOutputDeviceUID ?? "" },
+                set: { uid in
+                    self.settings.preferredOutputDeviceUID = uid.isEmpty ? nil : uid
+                }
+            )) {
+                Text("System output").tag(String(""))
+                ForEach(self.speakOutputDevices, id: \.uid) { device in
+                    Text(device.name).tag(String(device.uid))
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .accessibilityIdentifier("theater.settings.speakOutput")
+        }
+        .onAppear {
+            self.speakOutputDevices = AudioDevice.listOutputDevices()
         }
     }
 
@@ -936,7 +1006,12 @@ struct TranslationLanguagePairCard: View {
 
     @ViewBuilder
     private var packAction: some View {
-        if self.showsPackAction {
+        if self.packUnsupported {
+            Text(TheaterReadiness.packUnsupported)
+                .font(self.theme.typography.caption)
+                .foregroundStyle(self.theme.palette.warning)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if self.showsPackDownload {
             Text(self.availabilityText)
                 .font(self.theme.typography.caption)
                 .foregroundStyle(self.theme.palette.warning)
@@ -956,12 +1031,17 @@ struct TranslationLanguagePairCard: View {
         }
     }
 
-    private var showsPackAction: Bool {
+    private var packUnsupported: Bool {
         guard !SpokenLanguageResolver.isSameLanguagePair() else { return false }
+        return self.controller.packAvailability == .unsupported
+            || self.availabilityText.lowercased().contains("not supported")
+    }
+
+    private var showsPackDownload: Bool {
+        guard !SpokenLanguageResolver.isSameLanguagePair(), !self.packUnsupported else { return false }
+        if self.controller.packAvailability == .supported { return true }
         let text = self.availabilityText.lowercased()
-        return text.contains("download")
-            || text.contains("not supported")
-            || text.contains("not ready")
+        return text.contains("download") || text.contains("not ready")
     }
 
     private var sourceLanguageID: Binding<String> {
@@ -1101,7 +1181,7 @@ struct TranslateInsertShortcutCard: View {
     var body: some View {
         ThemedCard(style: .standard, hoverEffect: false) {
             VStack(alignment: .leading, spacing: 14) {
-                FluidSectionHeader(title: "Listen and Type", systemImage: "text.cursor")
+                FluidSectionHeader(title: "Shortcut", systemImage: "text.cursor")
 
                 Text(TheaterReadiness.typeIntoAppBody)
                     .font(self.theme.typography.bodySmall)
@@ -1130,7 +1210,7 @@ struct TranslateInsertShortcutCard: View {
                 }
 
                 TheaterSettingRow(
-                    title: "Listen and type shortcut",
+                    title: "Listen, then type shortcut",
                     detail: TheaterReadiness.typeIntoAppShortcutDetail
                 ) {
                     Toggle("Enable listen and type shortcut", isOn: Binding(
@@ -1153,7 +1233,7 @@ struct TranslateInsertShortcutCard: View {
                             || (self.settings.translationInsertHotkeyShortcut == nil
                                 && !self.settings.translationInsertHotkeyEnabled)
                     )
-                    .accessibilityLabel("Enable listen and type shortcut")
+                    .accessibilityLabel("Enable Listen, then type shortcut")
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -1186,7 +1266,7 @@ struct TranslateInsertShortcutCard: View {
     }
 }
 
-/// One instruction: share the slides window. A whole-screen share includes the captions.
+/// Who sees the captions: the room, the meeting, or both.
 struct TheaterAudienceCard: View {
     @Environment(\.theme) private var theme
     var showsCard = true

@@ -28,6 +28,9 @@ extension ContentView {
                 self.sidebarSectionHeader("Board")
                 self.sidebarNavigationLink(.liveTranslation, title: "Theater", systemImage: "captions.bubble")
 
+                self.sidebarSectionHeader("Insert")
+                self.sidebarNavigationLink(.speakAndType, title: "Speak and type", systemImage: "text.cursor")
+
                 self.sidebarSectionHeader("Setup")
                 Button {
                     self.settings.startSetupWizard()
@@ -49,7 +52,6 @@ extension ContentView {
 
                 self.sidebarSectionHeader("Activity")
                 self.sidebarNavigationLink(.history, title: "History", systemImage: "clock.arrow.circlepath")
-                self.sidebarNavigationLink(.stats, title: "Stats", systemImage: "chart.bar.fill")
 
                 self.sidebarSectionHeader("Help")
                 self.sidebarNavigationLink(.welcome, title: "Getting Started", systemImage: "book.closed")
@@ -218,6 +220,7 @@ extension ContentView {
     func selectSettingsSection(_ section: SettingsSection) {
         if self.settingsNavigation.isLeaving(.dictation, for: section)
             || self.settingsNavigation.isLeaving(.translation, for: section)
+            || self.settingsNavigation.isLeaving(.speakAndType, for: section)
             || self.settingsNavigation.isLeaving(.aiProviders, for: section)
         {
             self.clearShortcutRecordingMode()
@@ -280,8 +283,8 @@ extension ContentView {
     }
 
     var todayStatsButton: some View {
-        TodayStatsToolbarButton(typingWPM: self.settings.userTypingWPM) {
-            self.navigateToApp(.stats)
+        TodayStatsToolbarButton {
+            self.navigateToApp(.history)
         }
     }
 
@@ -323,6 +326,13 @@ extension ContentView {
                     self.navigateToApp(.translationEngine)
                 }
             ))
+        case .speakAndType:
+            return AnyView(
+                ScrollView {
+                    self.speakAndTypePage
+                        .fluidPageContent()
+                }
+            )
         case .welcome:
             return AnyView(self.welcomeView)
         case .voiceEngine:
@@ -353,4 +363,24 @@ extension ContentView {
         }
     }
 
+    var speakAndTypePage: some View {
+        SpeakAndTypeView(
+            recordShortcut: { self.toggleSpeakAndTypeRecording() },
+            isRecordingShortcut: self.activeShortcutRecordingTarget == .translateInsert,
+            shortcutRecordingMessage: self.activeShortcutRecordingTarget == .translateInsert
+                ? self.shortcutRecordingMessage
+                : nil,
+            accessibilityTrusted: self.accessibilityEnabled,
+            openAccessibility: self.openAccessibilitySettings
+        )
+    }
+
+    func toggleSpeakAndTypeRecording() {
+        self.shortcutRecordingMessage = nil
+        if self.activeShortcutRecordingTarget == .translateInsert {
+            self.activeShortcutRecordingTarget = nil
+        } else {
+            self.activeShortcutRecordingTarget = .translateInsert
+        }
+    }
 }

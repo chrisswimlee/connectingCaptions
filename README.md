@@ -25,7 +25,7 @@ By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 1. Use **macOS 15** or later on Apple Silicon. First run uses Apple Speech (Analyzer on macOS 26). Same-language captions need no translation pack.
 2. First run is Welcome, your languages, one Voice Engine, the microphone, then **Listen**. It ends when a sentence appears. **Setup Wizard** stays in the sidebar until you open it. **Spoken line** is Off or On the board. On the board prints the original under Show-as when the sentence is ready. Line print defaults to at once. **Voice Engine** and **Translation Engine** are Setup tabs. Voice Engine sharpens speech into text. Translation Engine is Apple Translation on this Mac (not a chat model). An experimental local LLM can sharpen the first print. A language pack downloads only when I speak and Show as differ.
 3. Allow the microphone. **Listen** stays off until Voice Engine and (for Translate) the pack are green.
-4. Optional: import notes or a deck on Theater Home for this talk. Names stay on this Mac. Speak one sentence. **Type into app** unlocks after that first caption. **Copy** always takes everything on screen. **Clear** wipes the board. Talk notes stay. Listen can keep going.
+4. Optional: import notes or a deck on Theater Home for this talk. Names stay on this Mac. Speak one sentence. **Listen, then type** unlocks after that first caption. **Type the board** types captions already printed. **Copy** always takes everything on screen. **Clear** wipes the board. Talk notes stay. Listen can keep going.
 
 Accessibility permission is only required if you want a translation typed into other apps. Theater captions on your screen do not need it.
 
@@ -37,7 +37,7 @@ Theater is a measured on-device pipeline, not a cloud caption API.
 
 1. **Capture** — The microphone is a first-party Core Audio HAL path, not `AVAudioEngine` on the live path. Voice and Translate both use it.
 2. **Speech edges** — Live PCM stays in a 30-second ring. The first ASR tick is immediate. After 400 ms of RMS silence, later ticks are skipped so a long pause does not keep the Neural Engine hot. There is no neural VAD in front of first words.
-3. **Appear when ready** — The board stays quiet while a sentence is still being heard. A real clause (finished sentence, or silence/Stop confirmation of a leftover clause) is accepted and appears once. Caption Pause and Stop drop a fragment that is not a real clause. Listen and type Stop is the only path that still types a trailing fragment. Apple Translation may warm the clause before it appears. Same-language pairs skip the pack. Korean, Japanese, and Thai send the last 4 source clauses from this Listen, then peel the new caption.
+3. **Appear when ready** — What you are saying stays in the bar under the board until the sentence prints. A real clause (finished sentence, or silence/Stop confirmation of a leftover clause) is accepted and appears once. Caption Pause and Stop drop a fragment that is not a real clause. Listen, then type Stop is the only path that still types a trailing fragment. Apple Translation may warm the clause before it appears. Same-language pairs skip the pack. Korean, Japanese, and Thai send the last 4 source clauses from this Listen, then peel the new caption.
 4. **Stage window** — A nonactivating panel over Keynote. Screenshots and a whole-screen Zoom or Meet share include Theater. Share the slides window when remote viewers should not see captions. The Show-as title sits above a smaller spoken undertone. Wrap fills left to right. YouTube boilerplate is dropped before print.
 5. **Bounded memory** — 30 s of 16 kHz float, unread leftover speech, and the latest 48 board lines. The window shows what fits and can scroll back through those 48. Older lines leave the board and stay in this listen for History and export.
 6. **Measured clock** — Theater shows `mic · e2e · ASR · MT` from Core Audio host time. Those values come from a real Listen. Hosted CI cannot prove a live Theater listen.
@@ -86,7 +86,7 @@ I speak and Show as are the setup list: every language both Apple Translation an
 
 The app is unsandboxed (Hardened Runtime on). Theater needs microphone access. Insert-into-another-app needs Accessibility. Voice models and Apple Translation packs download on first use; they are not inside the zip.
 
-Maintainers: push a tag like `preview-1.6.11-1` (`git tag preview-1.6.11-1 && git push origin preview-1.6.11-1`) and the Preview workflow publishes that commit as a pre-release (`./build.sh preview`). A signed release needs a Developer ID: `./build.sh release` with `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD`, then a `v*` tag runs `.github/workflows/release.yml`. Hosted CI cannot prove a live Theater listen.
+Maintainers: push a tag like `preview-1.6.12-1` (`git tag preview-1.6.12-1 && git push origin preview-1.6.12-1`) and the Preview workflow publishes that commit as a pre-release (`./build.sh preview`). A signed release needs a Developer ID: `./build.sh release` with `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD`, then a `v*` tag such as `v1.6.12` runs `.github/workflows/release.yml`. Hosted CI cannot prove a live Theater listen.
 
 ---
 
@@ -124,7 +124,7 @@ You need an Apple Silicon Mac on macOS 15 or later, **Xcode 26** (CI uses 26.3),
 
 3. **Launch** `DerivedData/Build/Products/Debug/fluidSubtitles Debug.app`. Always launch this same path after rebuilding so macOS keeps its permissions.
 
-4. **First run.** Open **Theater**, allow the microphone, pick **Voice** or **Translate**, and press **Listen**. For Translate, download the Apple Translation pack when asked. Allow Accessibility only if you use Type into app.
+4. **First run.** Open **Theater**, allow the microphone, pick **Voice** or **Translate**, and press **Listen**. For Translate, download the Apple Translation pack when asked. Allow Accessibility only if you use Type the board or Listen, then type.
 
 5. **Update later:**
 
@@ -165,7 +165,7 @@ xcodebuild test -project fluidSubtitles.xcodeproj -scheme fluidSubtitles -destin
 
 fluidSubtitles is **local-first**. Your voice, audio, and transcribed text never leave your machine unless you explicitly opt in to a cloud AI provider.
 
-This release does not send analytics, feedback, or update checks to a third-party analytics host.
+This release does not send analytics, feedback, or update checks to a third-party analytics host. A FluidVoice install on the same Mac is left alone: this app does not read or delete that app's Keychain or Application Support folder.
 
 **Not collected:**
 
@@ -184,13 +184,13 @@ Firms that need a vendor they can sanction — a named license, a security conta
 - [chrisswimlee.com/fluidSubtitles/license](https://chrisswimlee.com/fluidSubtitles/license/)
 - Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=fluidSubtitles%20commercial%20license) with the organization, seat count, and whether you need an SLA
 
-A paid key is air-gapped. It replaces the in-app work notice with **Licensed to** your organization. It does not phone home. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
+A paid key is air-gapped. It replaces the in-app work notice with **Licensed to** your organization. It does not phone home. A written SLA and a signed seat list are optional. A Jamf or Fleet package can install the key, the seat list, and caption settings. The on-device audit log stores no captions. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
 
 This is not consulting. Consulting is [Engage](https://chrisswimlee.com/engage/).
 
 ## Credits
 
-fluidSubtitles is built on [FluidVoice](https://github.com/altic-dev/FluidVoice) by altic-dev, which provides speech recognition, the live engines, and the core macOS app. Live translation and Theater captions are added here. If you find it useful, consider starring FluidVoice too.
+Speech recognition comes from [FluidVoice](https://github.com/altic-dev/FluidVoice) by altic-dev under GPLv3. Theater captions and insert are this product.
 
 ---
 

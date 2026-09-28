@@ -38,6 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
 
         // Initialize app settings (dock visibility, etc.)
         SettingsStore.shared.initializeAppSettings()
+        SettingsStore.shared.applyManagedFleetIfNeeded()
 
         let firstOpenKey = "AnalyticsFirstOpenAt"
         let isTrueFirstOpen = UserDefaults.standard.object(forKey: firstOpenKey) == nil

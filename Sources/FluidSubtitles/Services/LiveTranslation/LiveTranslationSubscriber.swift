@@ -9,16 +9,22 @@ private struct PendingCaptionGrowth: Equatable {
 }
 
 // Session owner. Heard speech becomes a board row only through `advance`.
-// A partial uses the two-update rule. Pause, an open tail, and Stop confirm,
-// then commit the leftover. `enqueueCommit` is the only new-row publisher.
-// LectureCaptionLog.commit peels a leftover after the newest line once.
+// A partial prints a sentence once speech continues past its ending. A lone
+// finished sentence prints after a brief settle if it is still the whole draft.
+// A new partial cancels that settle. Silence and end of utterance confirm a
+// finished leftover. Pause, an open tail, and Stop
+// confirm, then commit the leftover. `enqueueCommit` is the only new-row
+// publisher. LectureCaptionLog.commit peels a leftover after the newest line once.
 
 @MainActor
 final class LiveTranslationSubscriber: ObservableObject {
-    /// Unread speech. Not published: the board only changes when a line lands.
+    /// Unread speech. The board only changes when a line lands. The task bar
+    /// reads `inboxLines` until that print.
     private(set) var sourceDraft: String = ""
     private(set) var translatedDraft: String = ""
     @Published private(set) var boardState = TheaterBoardState()
+    /// Last few heard lines that are not on the board yet.
+    @Published private(set) var inboxLines: [String] = []
     var committedLines: [String] { self.boardState.translatedLines }
     @Published private(set) var lastLatencyMilliseconds: Int?
     @Published private(set) var lastLatencySample = LiveTranslationLatencySample()
@@ -43,9 +49,16 @@ final class LiveTranslationSubscriber: ObservableObject {
     private var tailSettleTask: Task<Void, Never>?
     private var eouHoldTask: Task<Void, Never>?
     private var pauseRevisionTask: Task<Void, Never>?
-    /// `commitOrder` indexes whose translation failed after the one automatic
-    /// retry. The publish walker steps over these so a later sentence can print.
+    /// Prints a lone finished sentence that stays the whole draft for a brief settle.
+    private var settledPrintTask: Task<Void, Never>?
+    private var settledPrintSentence = ""
+    /// Smoothed gap between partials while talking. Sizes the lone-sentence settle.
+    private var partialCadence: TimeInterval = 0
+    private var lastPartialUptime: TimeInterval?
+    /// `commitOrder` indexes left unpublished. The walker steps over these.
     private var skippedCommitIndexes: Set<Int> = []
+    /// Printed failure rows, keyed by clause identity, so Retry can replace that line.
+    private var failedPrintedRowIDs: [String: UInt64] = [:]
     /// Voice only. Prints the next leftover sentence after a pause flush so
     /// a lagged restitch does not land every finished line in one tick.
     private var voiceCatchUpTask: Task<Void, Never>?
@@ -480,11 +493,13 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.lastHeardText = ""
         self.status = .empty
         self.lastFailedSource = nil
+        self.failedPrintedRowIDs = [:]
         self.didPauseReviseThisUtterance = false
         self.didAutoRetryFailure = false
         self.lastVoicedUptime = nil
         self.heldLiveSpoken = ""
         self.llmEngine.resetListenEchoTally()
+        self.refreshInbox()
     }
 
     /// Stop settling new speech. Keep captions already committed this session.
@@ -500,6 +515,8 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.sourceDraft = ""
         self.translatedDraft = self.captionLog.translatedLines.last ?? ""
         self.heldLiveSpoken = ""
+        TheaterSpokenDelivery.shared.dropPending()
+        self.refreshInbox()
     }
 
     /// Start another listen without wiping captions already on Theater.
@@ -518,6 +535,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.translatedDraft = self.captionLog.translatedLines.last ?? ""
         self.status = .listening()
         self.lastFailedSource = nil
+        self.failedPrintedRowIDs = [:]
         self.didPauseReviseThisUtterance = false
         self.didAutoRetryFailure = false
         self.lastVoicedUptime = nil
@@ -527,6 +545,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.listenHistory = []
         self.latencyTracker.resetUtterance()
         self.latencyTracker.markListenStart(ProcessInfo.processInfo.systemUptime)
+        self.refreshInbox()
         self.objectWillChange.send()
     }
 
@@ -542,10 +561,12 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.translatedDraft = self.captionLog.translatedLines.last ?? ""
         self.status = .empty
         self.lastFailedSource = nil
+        self.failedPrintedRowIDs = [:]
         self.heldLiveSpoken = ""
         self.llmEngine.resetListenEchoTally()
         self.listenBatchStart = self.captionLog.sourceLines.count
         self.listenHistory = []
+        self.refreshInbox()
         self.objectWillChange.send()
     }
 
@@ -589,6 +610,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.translatedDraftSource = ""
         self.lastHeardText = ""
         self.heldLiveSpoken = ""
+        self.refreshInbox()
     }
 
     func releasePauseHold() {
@@ -612,6 +634,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.translatedDraftSource = ""
         self.lastHeardText = ""
         self.heldLiveSpoken = ""
+        self.refreshInbox()
     }
 
     func noteSilenceHold() {
@@ -646,13 +669,17 @@ final class LiveTranslationSubscriber: ObservableObject {
     func handleEndOfUtterance() {
         guard !self.liveSpeechHeld else { return }
         // A natural pause. Hold so the last ASR tick can land, then commit a
-        // real leftover clause. Thin leftovers stay open.
+        // real leftover clause. A thin leftover stays open through the pause
+        // confirm in case the thought continues, but the later open-tail
+        // settle still prints it once the room stays quiet — it is the
+        // speaker's last word, not ASR noise, once nothing more arrives.
         let token = self.generation
         self.pauseRevisionTask?.cancel()
         self.pauseRevisionTask = nil
         self.didPauseReviseThisUtterance = true
         self.tailSettleTask?.cancel()
         self.eouHoldTask?.cancel()
+        self.cancelSettledPrint()
         self.voiceCatchUpTask?.cancel()
         self.tailSettleTask = nil
         self.voiceCatchUpTask = nil
@@ -674,6 +701,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         for _ in 0..<8 {
             await self.eouHoldTask?.value
             await self.pauseRevisionTask?.value
+            await self.settledPrintTask?.value
             await self.voiceCatchUpTask?.value
             await self.tailSettleTask?.value
             await self.prefetchTask?.value
@@ -688,6 +716,7 @@ final class LiveTranslationSubscriber: ObservableObject {
             }
             if self.eouHoldTask == nil,
                self.pauseRevisionTask == nil,
+               self.settledPrintTask == nil,
                self.voiceCatchUpTask == nil,
                self.tailSettleTask == nil,
                self.inFlightTranslations.isEmpty,
@@ -724,6 +753,11 @@ final class LiveTranslationSubscriber: ObservableObject {
             self.restartFailedCommit(source, generation: self.generation)
             return
         }
+        let key = TranslationClauseSegmenter.clauseIdentity(source)
+        if let id = self.failedPrintedRowIDs[key] {
+            self.retranslatePrintedFailure(id: id, source: source, generation: self.generation)
+            return
+        }
         self.enqueueCommit(source)
     }
 
@@ -747,7 +781,9 @@ final class LiveTranslationSubscriber: ObservableObject {
     func pendingInsertDocument() -> String {
         let start = min(self.committedLines.count, max(self.postedLineCount, self.listenBatchStart))
         return PresenterCaptionController.captionDocument(
-            committed: Array(self.committedLines.dropFirst(start)),
+            committed: Array(self.committedLines.dropFirst(start)).filter {
+                !TheaterCaptionFailure.isLine($0)
+            },
             draft: ""
         )
     }
@@ -756,7 +792,8 @@ final class LiveTranslationSubscriber: ObservableObject {
     var hasPendingInsertText: Bool {
         let start = min(self.committedLines.count, max(self.postedLineCount, self.listenBatchStart))
         return self.committedLines.dropFirst(start).contains {
-            !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let trimmed = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !trimmed.isEmpty && !TheaterCaptionFailure.isLine(trimmed)
         }
     }
 
@@ -808,6 +845,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.latestHypothesis = cleaned
         let languageID = SpokenLanguageResolver.listenLanguageID(for: cleaned)
         let now = ProcessInfo.processInfo.systemUptime
+        self.notePartialCadence(at: now)
         if self.latencyTracker.speechStart == nil {
             self.latencyTracker.markSpeechStart(now)
         }
@@ -907,13 +945,15 @@ final class LiveTranslationSubscriber: ObservableObject {
             self.sourceDraft = ""
             self.translatedDraft = self.captionLog.translatedLines.last ?? ""
             self.translatedDraftSource = self.captionLog.sourceLines.last ?? ""
+            self.refreshInbox()
         }
     }
 
-    /// Mid-talk print peels each finished sentence the confirmed prefix already
-    /// contains, ending included. Two recognition updates have to agree on that
-    /// sentence. An open tail after it stays invisible and does not hold the
-    /// sentence back. Pause, end of utterance, and Stop use `commitNextSettledUnit`.
+    /// Mid-talk print peels a finished sentence once speech continues past its
+    /// ending. That following speech is the confirmation, so the first sentence
+    /// does not wait for the next sentence to arrive again. A lone period still
+    /// waits for a second update or for silence. An unpunctuated tail stays
+    /// invisible. Pause, end of utterance, and Stop use `commitNextSettledUnit`.
     private func commitCompletedSentencesWhileTalking(
         remaining initial: String,
         confirmed: String,
@@ -927,9 +967,12 @@ final class LiveTranslationSubscriber: ObservableObject {
             languageID: languageID
         )
         var horizon = self.leftoverSpeech(confirmed, languageID: languageID)
-        let isVoice = SpokenLanguageResolver.isSameLanguagePair()
+        // A lagged restitch can dump several sentences in one tick with no
+        // prior history at all. "Speech continues past the ending" only
+        // means something once a second tick has confirmed *something*
+        // this utterance — otherwise the whole blob is unverified.
+        let hasConfirmedBaseline = !confirmed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         var didCommit = false
-        var blockedOnUnconfirmed = false
         var steps = 0
         while steps < 32, !remaining.isEmpty {
             steps += 1
@@ -943,8 +986,11 @@ final class LiveTranslationSubscriber: ObservableObject {
                 unit: next.unit,
                 confirmed: horizon,
                 languageID: languageID
-            ) else {
-                blockedOnUnconfirmed = true
+            ) || (hasConfirmedBaseline && Self.followingSpeechConfirms(
+                unit: next.unit,
+                rest: next.rest,
+                languageID: languageID
+            )) else {
                 break
             }
             horizon = TranslationClauseSegmenter.leftoverTail(
@@ -953,37 +999,23 @@ final class LiveTranslationSubscriber: ObservableObject {
                 languageID: languageID
             )
             if self.shouldSkipSettledUnit(next.unit) {
-                remaining = self.remainderAfterSkippedUnit(
+                let skipped = self.remainderAfterSkippedUnit(
                     next.unit,
                     rest: next.rest,
                     languageID: languageID
                 )
+                if skipped != remaining {
+                    remaining = skipped
+                    continue
+                }
+                let rest = next.rest.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !rest.isEmpty, rest.count < remaining.count else { break }
+                remaining = rest
                 continue
             }
             self.enqueueCommit(next.unit)
             remaining = next.rest
             didCommit = true
-        }
-        if !blockedOnUnconfirmed,
-           isVoice,
-           self.midTalkLeftoverReady(
-               remaining: remaining,
-               confirmed: horizon,
-               languageID: languageID
-           ),
-           let cut = self.voiceFollowAlongCut(remaining, languageID: languageID)
-        {
-            if self.shouldSkipSettledUnit(cut.unit) {
-                remaining = self.remainderAfterSkippedUnit(
-                    cut.unit,
-                    rest: cut.rest,
-                    languageID: languageID
-                )
-            } else {
-                self.enqueueCommit(cut.unit)
-                remaining = cut.rest
-                didCommit = true
-            }
         }
         if didCommit {
             self.sourceDraft = remaining
@@ -995,6 +1027,82 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
         self.heldLiveSpoken = self.sourceDraft
         self.lastHeardText = self.sourceDraft
+        self.scheduleSettledPrint(languageID: languageID)
+    }
+
+    /// The draft is one finished sentence and nothing follows it. Print it
+    /// after a brief settle so the line does not wait for the next sentence.
+    /// Any change cancels this. A lowercase continuation never arms it.
+    private func scheduleSettledPrint(languageID: String) {
+        let open = self.sourceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let next = TranslationClauseSegmenter.nextCompletedSentence(open, languageID: languageID),
+              next.rest.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              TranslationClauseSegmenter.looksComplete(next.unit, languageID: languageID),
+              TranslationClauseSegmenter.isSameClause(next.unit, open)
+        else {
+            self.cancelSettledPrint()
+            return
+        }
+        let sentence = next.unit.trimmingCharacters(in: .whitespacesAndNewlines)
+        if TranslationClauseSegmenter.isSameClause(self.settledPrintSentence, sentence),
+           self.settledPrintTask != nil
+        {
+            return
+        }
+        self.settledPrintTask?.cancel()
+        self.settledPrintSentence = sentence
+        let token = self.generation
+        let settle = LiveTranslationTiming.loneSentenceSettleNanoseconds(partialCadence: self.partialCadence)
+        self.settledPrintTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: settle)
+            guard !Task.isCancelled, let self else { return }
+            self.settledPrintTask = nil
+            guard token == self.generation else { return }
+            let heard = self.lastHeardText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard TranslationClauseSegmenter.isSameClause(heard, sentence),
+                  let still = TranslationClauseSegmenter.nextCompletedSentence(heard, languageID: languageID),
+                  still.rest.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  TranslationClauseSegmenter.looksComplete(still.unit, languageID: languageID)
+            else { return }
+            let pendingBefore = self.inFlightSources.count
+            let committedBefore = self.committedLines.count
+            self.enqueueCommit(sentence)
+            guard self.inFlightSources.count > pendingBefore
+                    || self.committedLines.count > committedBefore
+            else { return }
+            self.settledPrintSentence = ""
+            self.sourceDraft = ""
+            self.lastHeardText = ""
+            self.heldLiveSpoken = ""
+        }
+    }
+
+    private func notePartialCadence(at now: TimeInterval) {
+        defer { self.lastPartialUptime = now }
+        guard let last = self.lastPartialUptime else { return }
+        let gap = now - last
+        guard gap > 0, gap <= LiveTranslationTiming.partialCadenceMaxSeconds else { return }
+        self.partialCadence = self.partialCadence > 0 ? self.partialCadence * 0.7 + gap * 0.3 : gap
+    }
+
+    private func cancelSettledPrint() {
+        self.settledPrintTask?.cancel()
+        self.settledPrintTask = nil
+        self.settledPrintSentence = ""
+    }
+
+    /// Words that start the next sentence mean this one is done. A lowercase
+    /// continuation, or "and" / "but" / "so", stays on this line. A period with
+    /// nothing after it can still be taken back.
+    private static func followingSpeechConfirms(
+        unit: String,
+        rest: String,
+        languageID: String
+    ) -> Bool {
+        guard TranslationClauseSegmenter.looksComplete(unit, languageID: languageID) else {
+            return false
+        }
+        return TranslationClauseSegmenter.continuesAsNewSentence(rest, languageID: languageID)
     }
 
     /// The confirmed prefix already includes this sentence, ending included.
@@ -1020,25 +1128,6 @@ final class LiveTranslationSubscriber: ObservableObject {
         let after = confirmed.dropFirst(stripped.count)
         guard let first = after.first else { return false }
         return ".?!。！？…".contains(first)
-    }
-
-    /// The whole unread leftover looks finished in the listen language, and
-    /// the confirmed unread text contains that leftover, ending included.
-    /// Voice run-on backstop only. Finished sentences use `confirmedSentenceAgreed`.
-    private func midTalkLeftoverReady(
-        remaining: String,
-        confirmed: String,
-        languageID: String
-    ) -> Bool {
-        let remaining = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard TranslationClauseSegmenter.looksComplete(remaining, languageID: languageID) else {
-            return false
-        }
-        return StreamingTranscriptStitcher.confirmedClauseContains(
-            unit: remaining,
-            confirmed: confirmed,
-            languageID: languageID
-        )
     }
 
     /// The newest caption grew in place ("the model." → "the model on new
@@ -1158,43 +1247,6 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.readyTranslations.removeValue(forKey: old)
     }
 
-    /// Voice mid-talk backstop for a run-on that never finds a period.
-    /// Comma / and / but cuts were jumping to the next line mid-thought.
-    /// A finished sentence plus more speech still peels via
-    /// `nextCompletedSentence`. Pause / Stop flush leftover.
-    private func voiceFollowAlongCut(_ text: String, languageID: String) -> (unit: String, rest: String)? {
-        // Apple Speech marks an unfinished partial with "…". That is not a
-        // sentence end, and it would make the whole run-on one finished unit.
-        var remaining = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        while remaining.hasSuffix("...") || remaining.hasSuffix("…") {
-            remaining = remaining.hasSuffix("...") ? String(remaining.dropLast(3)) : String(remaining.dropLast())
-            remaining = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        guard TranslationClauseSegmenter.shouldFollowAlong(remaining, languageID: languageID) else { return nil }
-        guard let cut = TranslationClauseSegmenter.nextCommitUnit(
-            remaining,
-            languageID: languageID,
-            allowPauseFinalize: false
-        ) else { return nil }
-        let unit = cut.unit.trimmingCharacters(in: .whitespacesAndNewlines)
-        let rest = cut.rest.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !unit.isEmpty, !rest.isEmpty else { return nil }
-        // A 24-word comma cut still jumped mid-thought ("a day," / "and").
-        // Hold until the leftover is a true run-on dump, or a period peels it.
-        guard remaining.count >= LiveTranslationTiming.maxDraftCharacters else { return nil }
-        if TranslationClauseSegmenter.isCompactScript(languageID) {
-            guard rest.count >= 8 else { return nil }
-            return (unit, rest)
-        }
-        func words(_ text: String) -> [String] {
-            text.split(whereSeparator: \.isWhitespace).map(String.init)
-        }
-        guard words(rest).count >= Self.voiceFollowAlongSettleWords else { return nil }
-        return (unit, rest)
-    }
-
-    private static let voiceFollowAlongSettleWords = 4
-
     private func commitSettled(
         generation token: UInt64,
         isFinal: Bool,
@@ -1279,6 +1331,14 @@ final class LiveTranslationSubscriber: ObservableObject {
             }
             let unit: String
             var rest: String
+            // The open-tail settle's last-resort cut: no clause boundary is
+            // left to find, and the room has stayed quiet through the whole
+            // pause settle. A thin word here ("the", "so", "it") is the real
+            // last word, not ASR noise — unlike mid-talk, nothing more is
+            // coming to grow it. Treat it like Stop's trailing fragment so
+            // it prints instead of waiting, hidden, for the next utterance
+            // to absorb it.
+            var isForcedTrailingFragment = false
             if let next {
                 unit = next.unit
                 rest = next.rest
@@ -1297,6 +1357,7 @@ final class LiveTranslationSubscriber: ObservableObject {
                 } else {
                     unit = split.tail.isEmpty ? remaining : split.tail
                     rest = ""
+                    isForcedTrailingFragment = true
                 }
             } else {
                 self.sourceDraft = remaining
@@ -1304,12 +1365,14 @@ final class LiveTranslationSubscriber: ObservableObject {
             }
 
             if rest == remaining { break }
-            if self.shouldSkipSettledUnit(unit) {
-                remaining = self.remainderAfterSkippedUnit(unit, rest: rest, languageID: languageID)
+            if !isForcedTrailingFragment, self.shouldSkipSettledUnit(unit) {
+                let skipped = self.remainderAfterSkippedUnit(unit, rest: rest, languageID: languageID)
+                if skipped == remaining { break }
+                remaining = skipped
                 continue
             }
 
-            self.enqueueCommit(unit)
+            self.enqueueCommit(unit, allowTrailingFragment: isForcedTrailingFragment)
             remaining = rest
         }
 
@@ -1355,7 +1418,20 @@ final class LiveTranslationSubscriber: ObservableObject {
     private func commitTrailingFragment() {
         let heard = self.lastHeardText.trimmingCharacters(in: .whitespacesAndNewlines)
         let languageID = SpokenLanguageResolver.listenLanguageID(for: heard)
-        let leftover = self.leftoverSpeech(heard, languageID: languageID)
+        var leftover = self.leftoverSpeech(heard, languageID: languageID)
+        // A sentence already sent through the commit pipeline this Stop —
+        // in flight, already published, or failed and holding its one
+        // retry — is not a *new* trailing fragment. `lastHeardText` is not
+        // cleared on failure, so without this peel a failed sentence gets
+        // resubmitted here immediately, burning its one retry right away
+        // and printing an extra "Couldn't translate." row.
+        if !self.commitOrder.isEmpty {
+            leftover = TranslationClauseSegmenter.leftoverTail(
+                leftover,
+                already: self.commitOrder,
+                languageID: languageID
+            )
+        }
         guard !leftover.isEmpty else { return }
         let unit: String
         if leftover.count >= LiveTranslationTiming.maxDraftCharacters {
@@ -1468,13 +1544,14 @@ final class LiveTranslationSubscriber: ObservableObject {
         // monotonic guard compares the next clause against the printed one,
         // keeps the printed text, and the next sentence never appears.
         self.heldLiveSpoken = leftover
+        let shown = TheaterCaptionFailure.isLine(translated) ? "" : translated
         if leftover.isEmpty {
-            self.translatedDraft = translated
-            self.translatedDraftSource = source
+            self.translatedDraft = shown
+            self.translatedDraftSource = shown.isEmpty ? "" : source
         } else if TranslationClauseSegmenter.isSameClause(leftover, source) {
             self.sourceDraft = ""
-            self.translatedDraft = translated
-            self.translatedDraftSource = source
+            self.translatedDraft = shown
+            self.translatedDraftSource = shown.isEmpty ? "" : source
         } else {
             if TranslationClauseSegmenter.isSameClause(self.translatedDraftSource, source)
                 || !TranslationClauseSegmenter.isGrowingClause(self.translatedDraftSource, toward: leftover)
@@ -1507,6 +1584,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     /// the sentence in flight, then open speech, then a failed sentence only
     /// when nothing else is moving.
     private func showActivityStatus() {
+        self.refreshInbox()
         if let source = self.inFlightSources.first(where: {
             !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         }) {
@@ -1523,6 +1601,19 @@ final class LiveTranslationSubscriber: ObservableObject {
             return
         }
         self.status = .empty
+    }
+
+    /// Heard lines still waiting to print. A source already on the board is omitted.
+    private func refreshInbox() {
+        let languageID = SpokenLanguageResolver.listenLanguageID(for: self.sourceDraft)
+        let next = TheaterInbox.lines(
+            waiting: self.inFlightSources,
+            open: self.sourceDraft,
+            printed: self.boardState.sourceLines,
+            languageID: languageID
+        )
+        guard next != self.inboxLines else { return }
+        self.inboxLines = next
     }
 
     private static func translatingStatus(for source: String) -> String {
@@ -1618,11 +1709,24 @@ final class LiveTranslationSubscriber: ObservableObject {
             }
             self.forgetTrailingFragment(source)
             self.recordSessionEntries()
-            if let entry = self.captionLog.entries.first(where: { $0.id == committed.id }) {
+            let failed = TheaterCaptionFailure.isLine(translated)
+            if let entry = self.captionLog.entries.first(where: { $0.id == committed.id }), !failed {
                 self.rememberListenEntry(entry)
+            }
+            if failed {
+                let key = TranslationClauseSegmenter.clauseIdentity(source)
+                if !key.isEmpty { self.failedPrintedRowIDs[key] = committed.id }
             }
             self.adjustIndexes(trimmedCount: committed.overflow.count)
             self.syncBoardState()
+            if !failed {
+                let pair = SpokenLanguageResolver.pairForSpokenText(source)
+                TheaterSpokenDelivery.shared.notePublished(
+                    id: committed.id,
+                    text: translated,
+                    languageID: pair.target.id
+                )
+            }
             return committed.id
         case .grow(let id, let source, let translated):
             guard self.captionLog.applyGrowth(id: id, source: source, translated: translated) else {
@@ -1631,9 +1735,23 @@ final class LiveTranslationSubscriber: ObservableObject {
             if let index = self.listenHistory.lastIndex(where: { $0.id == id }) {
                 self.listenHistory[index].source = source
                 self.listenHistory[index].translated = translated
+            } else if let entry = self.captionLog.entries.first(where: { $0.id == id }),
+                      !TheaterCaptionFailure.isLine(entry.translated)
+            {
+                self.rememberListenEntry(entry)
+            }
+            if !TheaterCaptionFailure.isLine(translated) {
+                let key = TranslationClauseSegmenter.clauseIdentity(source)
+                self.failedPrintedRowIDs[key] = nil
             }
             self.recordSessionEntries()
             self.syncBoardState()
+            let pair = SpokenLanguageResolver.pairForSpokenText(source)
+            TheaterSpokenDelivery.shared.noteRevised(
+                id: id,
+                text: translated,
+                languageID: pair.target.id
+            )
             return id
         case .restore(let snapshot):
             self.captionLog.restore(snapshot)
@@ -1657,6 +1775,7 @@ final class LiveTranslationSubscriber: ObservableObject {
             self.listenBatchStart = min(self.listenBatchStart, count)
             self.postedLineCount = min(self.postedLineCount, count)
             self.syncBoardState()
+            TheaterSpokenDelivery.shared.noteRemoved(id: removed.id)
             return removed.id
         }
     }
@@ -1683,7 +1802,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     }
 
     /// Print sentences in spoken order. A later translation waits until the
-    /// sentence before it has landed or been skipped after a failed retry.
+    /// sentence before it has landed. A failed retry lands as a short failure.
     private func publishReadyCommits(generation: UInt64) {
         guard generation == self.generation else { return }
         while self.nextCommitToPublish < self.commitOrder.count {
@@ -1807,6 +1926,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     private func sameClauseDraft(_ source: String) -> String? {
         let cached = self.translatedDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cached.isEmpty,
+              !TheaterCaptionFailure.isLine(cached),
               TranslationClauseSegmenter.isSameClause(self.translatedDraftSource, source)
         else { return nil }
         return cached
@@ -1830,6 +1950,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         let cleaned = source.trimmingCharacters(in: .whitespacesAndNewlines)
         let cached = self.translatedDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         if !cleaned.isEmpty, !cached.isEmpty,
+           !TheaterCaptionFailure.isLine(cached),
            TranslationClauseSegmenter.isSameClause(self.translatedDraftSource, cleaned)
         {
             return cached
@@ -2188,9 +2309,12 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     private func cancelSettles() {
         self.latestHypothesis = ""
+        self.partialCadence = 0
+        self.lastPartialUptime = nil
         self.tailSettleTask?.cancel()
         self.eouHoldTask?.cancel()
         self.pauseRevisionTask?.cancel()
+        self.cancelSettledPrint()
         self.voiceCatchUpTask?.cancel()
         self.failedRetryTask?.cancel()
         self.tailSettleTask = nil
@@ -2266,9 +2390,25 @@ final class LiveTranslationSubscriber: ObservableObject {
             try? await Task.sleep(nanoseconds: delay)
             guard !Task.isCancelled, let self else { return }
             self.tailSettleTask = nil
-            // New speech since the pause means the thought went on.
+            // A genuinely new sentence since the pause means the thought
+            // went on — do not force-print this stale tail over it. But a
+            // skipped "silence" tick can still land here with the same
+            // leftover re-decoded a word differently (breath, mic noise);
+            // an exact string match would drop the flush over nothing and
+            // strand this fragment until the next utterance, same as a
+            // dropped growth tick must not cancel the pause hold above.
+            // A genuinely new sentence since the pause means the thought
+            // went on — do not force-print this stale tail over it. But a
+            // skipped "silence" tick can still land here with the same
+            // leftover re-decoded a word differently (breath, mic noise);
+            // an exact string match would drop the flush over nothing and
+            // strand this fragment until the next utterance, same as a
+            // dropped growth tick must not cancel the pause hold above.
+            let current = self.sourceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
             guard token == self.generation,
-                  self.sourceDraft.trimmingCharacters(in: .whitespacesAndNewlines) == tail
+                  current == tail
+                    || TranslationClauseSegmenter.isSameClause(current, tail)
+                    || TranslationClauseSegmenter.isGrowingClause(tail, toward: current)
             else { return }
             await self.advance(.openTail, generation: token)
         }
@@ -2300,18 +2440,59 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.commitTasks.append(task)
     }
 
-    /// The one automatic retry is spent. Drop this slot and print later sentences.
+    /// The one automatic retry is spent. Print a short failure in this slot
+    /// and let the sentences behind it land.
     private func skipFailedCommitSlot(_ source: String, generation: UInt64) {
         guard generation == self.generation else { return }
         let cleaned = source.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let index = self.commitOrder.indices.first(where: {
+        let waiting = self.commitOrder.indices.contains {
             $0 >= self.nextCommitToPublish
                 && !self.skippedCommitIndexes.contains($0)
                 && self.commitOrder[$0] == cleaned
-        }) {
-            self.skippedCommitIndexes.insert(index)
+        }
+        if waiting, !cleaned.isEmpty {
+            self.readyTranslations[cleaned] = TheaterCaptionFailure.line
         }
         self.publishReadyCommits(generation: generation)
+    }
+
+    /// Retry replaces the short failure already on the board.
+    private func retranslatePrintedFailure(id: UInt64, source: String, generation: UInt64) {
+        guard generation == self.generation else { return }
+        let cleaned = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+        self.inFlightSources.append(cleaned)
+        self.inFlightStartedAt[cleaned] = Date()
+        self.syncBoardState()
+        self.showActivityStatus()
+        let task = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if generation == self.generation {
+                    self.inFlightSources.removeAll { $0 == cleaned }
+                    self.inFlightStartedAt[cleaned] = nil
+                    self.syncBoardState()
+                    self.showActivityStatus()
+                }
+            }
+            do {
+                let resolved = try await self.resolvedCommitTranslation(cleaned, generation: generation)
+                guard generation == self.generation else { return }
+                guard self.publish(.grow(id: id, source: cleaned, translated: resolved)) != nil else {
+                    self.lastFailedSource = cleaned
+                    return
+                }
+            } catch {
+                guard generation == self.generation else { return }
+                if error is CancellationError { return }
+                self.lastFailedSource = cleaned
+                DebugLogger.shared.error(
+                    "Lecture translation failed: \(error.localizedDescription)",
+                    source: "LiveTranslation"
+                )
+            }
+        }
+        self.commitTasks.append(task)
     }
 
     private func scheduleFailedRetry(_ source: String, generation: UInt64) {
@@ -2319,9 +2500,27 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.failedRetryTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled, let self else { return }
-            guard generation == self.generation, self.lastFailedSource == source else { return }
+            // `lastFailedSource` is one slot for the whole Listen. A second
+            // sentence that fails in the meantime overwrites it, and this
+            // retry's own source stops matching — that must not cancel a
+            // retry it never used. Check this source's own commit slot
+            // instead: still pending and not already resolved either way.
+            guard generation == self.generation,
+                  self.isAwaitingItsOwnRetry(source)
+            else { return }
             self.restartFailedCommit(source, generation: generation)
         }
+    }
+
+    /// `source` has not published, has not been given up on, and has no
+    /// translation (success or failure marker) already waiting to publish.
+    private func isAwaitingItsOwnRetry(_ source: String) -> Bool {
+        self.readyTranslations[source] == nil
+            && self.commitOrder.indices.contains {
+                $0 >= self.nextCommitToPublish
+                    && !self.skippedCommitIndexes.contains($0)
+                    && self.commitOrder[$0] == source
+            }
     }
 
     private func cancelDelayedSpeechTasks() {
@@ -2329,6 +2528,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.eouHoldTask = nil
         self.pauseRevisionTask?.cancel()
         self.pauseRevisionTask = nil
+        self.cancelSettledPrint()
         self.voiceCatchUpTask?.cancel()
         self.voiceCatchUpTask = nil
         self.tailSettleTask?.cancel()

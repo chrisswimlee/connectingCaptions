@@ -14,6 +14,7 @@ extension SettingsStore {
         static let presentationStyle = "TheaterPresentationStyle"
         static let alsoHearOtherLanguages = "TheaterAlsoHearOtherLanguages"
         static let dynamicPairing = "TheaterDynamicPairing"
+        static let speakCaptions = "TheaterSpeakCaptions"
         static let sessionMode = "TheaterSessionMode"
         static let minimized = "TheaterMinimized"
         static let expandedWindowFrame = "TheaterExpandedWindowFrame"
@@ -24,6 +25,7 @@ extension SettingsStore {
         static let lastTranslateTarget = "TheaterLastTranslateTargetLanguageID"
         static let backingBar = "TheaterBackingBar"
         static let positionPreset = "TheaterPositionPreset"
+        static let overlayFrame = "TheaterOverlayFrame"
         static let presenterHotkeys = "TheaterPresenterHotkeys"
         static let overlayCoachSeen = "TheaterOverlayCoachSeen"
         static let setupWizardCompleted = "TheaterSetupWizardCompleted"
@@ -141,7 +143,7 @@ extension SettingsStore {
         }
     }
 
-    /// Whisper auto-detects English, Korean, Japanese, and Thai for Q&A. Apple Speech stays on I speak.
+    /// Whisper auto-detects a question in the setup languages. Apple Speech stays on I speak.
     var theaterAlsoHearOtherLanguages: Bool {
         get { self.defaults.bool(forKey: TheaterDefaults.alsoHearOtherLanguages) }
         set {
@@ -150,13 +152,22 @@ extension SettingsStore {
         }
     }
 
-    /// Either way: translate whichever language of the pair you speak. Kept
-    /// for a later release; Listen ignores this until `dynamicPairingAvailable`.
+    /// Either way: translate whichever language of the pair was heard.
+    /// Listen uses it only when `dynamicPairingAvailable` is true.
     var theaterDynamicPairing: Bool {
         get { self.defaults.bool(forKey: TheaterDefaults.dynamicPairing) }
         set {
             objectWillChange.send()
             self.defaults.set(newValue, forKey: TheaterDefaults.dynamicPairing)
+        }
+    }
+
+    /// Speak each published Show-as line on the chosen output. Off until turned on.
+    var theaterSpeakCaptions: Bool {
+        get { self.defaults.bool(forKey: TheaterDefaults.speakCaptions) }
+        set {
+            objectWillChange.send()
+            self.defaults.set(newValue, forKey: TheaterDefaults.speakCaptions)
         }
     }
 
@@ -167,6 +178,13 @@ extension SettingsStore {
             objectWillChange.send()
             self.defaults.set(newValue, forKey: TheaterDefaults.backingBar)
         }
+    }
+
+    /// Rectangle committed for Overlay. Pop-up does not overwrite it, so the next
+    /// Overlay visit uses this spot instead of snapping to the caption bar.
+    var theaterOverlayFrame: String {
+        get { self.defaults.string(forKey: TheaterDefaults.overlayFrame) ?? "" }
+        set { self.defaults.set(newValue, forKey: TheaterDefaults.overlayFrame) }
     }
 
     /// Last position preset. Nil once the presenter drags the board somewhere else.

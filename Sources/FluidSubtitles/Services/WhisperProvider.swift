@@ -327,7 +327,16 @@ final class WhisperProvider: TranscriptionProvider {
         let languageCode = self.resolvedLanguageCode()
         let transcript = try await session.run(samples, options: Self.runOptions(languageCode: languageCode))
         let fullText = transcript.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return ASRTranscriptionResult(text: fullText, confidence: 1.0)
+        return ASRTranscriptionResult(
+            text: fullText,
+            confidence: 1.0,
+            detectedLanguageID: Self.catalogLanguageID(transcript.language)
+        )
+    }
+
+    private static func catalogLanguageID(_ code: String?) -> String? {
+        guard let code else { return nil }
+        return TranslationLanguageCatalog.language(id: code)?.id
     }
 
     static func runOptions(languageCode: String?) -> RunOptions {

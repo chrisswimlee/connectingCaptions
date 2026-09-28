@@ -101,6 +101,14 @@ final class LiveTranslationCommitContextTests: XCTestCase {
         )
     }
 
+    func testStrippedTrianglesStillCountAsClauseMarks() {
+        let leaked = "\u{25B9} Tejun, do you understand even if I speak Korean? \u{25C3} Tejun"
+        XCTAssertTrue(LiveTranslationCommitContext.containsContextClauseMark(leaked))
+        XCTAssertTrue(LiveTranslationCommitContext.containsContextClauseMark("\u{25B7} hello \u{25C1}"))
+        XCTAssertFalse(LiveTranslationCommitContext.containsContextClauseMark("Do you understand even if I speak Korean?"))
+        XCTAssertNil(LiveTranslationCommitContext.markedNewTranslation(leaked))
+    }
+
     func testMarkedNewTranslationRejectsMissingDoubledAndEmptySpans() {
         let start = LiveTranslationCommitContext.contextClauseStart
         let end = LiveTranslationCommitContext.contextClauseEnd

@@ -153,24 +153,15 @@ final class TheaterShellOwnershipTests: XCTestCase {
         XCTAssertFalse(MicrophoneChangeOverlayController.supportsAlerts(bundleIdentifier: nil))
     }
 
-    func testLegacySupportFolderIsNotStolenFromFluidVoice() {
-        XCTAssertTrue(
-            AppSupportDirectory.shouldRenameLegacyFolder(
-                named: "connectingCaptions",
-                fluidVoiceInstalled: true
-            )
-        )
+    func testSupportFolderAndKeychainLeaveFluidVoiceAlone() {
+        XCTAssertEqual(FluidProduct.priorSupportFolderNames, ["connectingCaptions"])
+        XCTAssertTrue(AppSupportDirectory.shouldRenameLegacyFolder(named: "connectingCaptions"))
+        XCTAssertFalse(AppSupportDirectory.shouldRenameLegacyFolder(named: "FluidVoice"))
         XCTAssertFalse(
-            AppSupportDirectory.shouldRenameLegacyFolder(
-                named: FluidProduct.legacySupportFolderName,
-                fluidVoiceInstalled: true
-            )
-        )
-        XCTAssertFalse(
-            AppSupportDirectory.shouldRenameLegacyFolder(
-                named: FluidProduct.legacySupportFolderName,
-                fluidVoiceInstalled: false
-            )
+            FluidProduct.keychainLookupIdentities.contains {
+                $0.service.localizedCaseInsensitiveContains("fluidvoice")
+                    || $0.account.localizedCaseInsensitiveContains("fluidApiKeys")
+            }
         )
     }
 

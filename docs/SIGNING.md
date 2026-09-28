@@ -57,4 +57,4 @@ Theater’s default path (Apple Speech, Parakeet) does not need that exception. 
 
 ## First run
 
-Listen stays disabled until the Voice Engine matches I speak, the Apple Translation pack is installed (or the pair is same-language), and the microphone is not denied. Pressing Listen asks for the microphone when the grant is still undetermined. Type into app stays hidden until the first Theater caption.
+Listen stays disabled until the Voice Engine matches I speak, the Apple Translation pack is installed (or the pair is same-language), and the microphone is not denied. Pressing Listen asks for the microphone when the grant is still undetermined. Listen, then type stays locked until the first Theater caption. Type the board stays on the Theater window.

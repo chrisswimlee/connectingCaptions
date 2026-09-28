@@ -106,6 +106,53 @@ final class TheaterOverlayPolicyTests: XCTestCase {
         )
     }
 
+    func testIdleOverlayHoverDockWakesWithoutCoveringCaptions() {
+        let window = CGRect(x: 40, y: 80, width: 1200, height: 180)
+        let resting = TheaterOverlayPolicy.hoverDockRect(windowFrame: window, contentHeight: 0)
+        XCTAssertEqual(resting.height, TheaterOverlayPolicy.hoverDockWakeHeight)
+        XCTAssertTrue(resting.contains(CGPoint(x: 100, y: window.maxY - 4)))
+        XCTAssertFalse(resting.contains(CGPoint(x: 100, y: window.minY + 30)))
+        XCTAssertFalse(
+            TheaterOverlayPolicy.ignoresMouseEvents(
+                presentation: .transparent,
+                toolsPinned: false,
+                minimized: false,
+                pointerInHoverDock: true
+            )
+        )
+        XCTAssertTrue(
+            TheaterOverlayPolicy.ignoresMouseEvents(
+                presentation: .transparent,
+                toolsPinned: false,
+                minimized: false
+            )
+        )
+        let open = TheaterOverlayPolicy.hoverDockRect(windowFrame: window, contentHeight: 72)
+        XCTAssertEqual(open.height, 72)
+        XCTAssertTrue(open.contains(CGPoint(x: 100, y: window.maxY - 60)))
+        XCTAssertFalse(open.contains(CGPoint(x: 100, y: window.minY + 20)))
+        XCTAssertFalse(
+            TheaterOverlayPolicy.ignoresMouseEvents(
+                presentation: .popup,
+                toolsPinned: false,
+                minimized: false,
+                pointerInHoverDock: true
+            )
+        )
+        XCTAssertTrue(TheaterOverlayPolicy.showsHoverDock(engaged: true, holding: false))
+        XCTAssertTrue(TheaterOverlayPolicy.showsHoverDock(engaged: false, holding: true))
+        XCTAssertFalse(TheaterOverlayPolicy.showsHoverDock(engaged: false, holding: false))
+        let board = TheaterBoardState.make(
+            translated: ["one", "two", "three", "four", "five"],
+            ids: [1, 2, 3, 4, 5]
+        )
+        let review = TheaterCaptionFlow.lines(board: board, limit: TheaterOverlayPolicy.reviewLineCount)
+        XCTAssertEqual(review.map(\.text), ["three", "four", "five"])
+        XCTAssertEqual(review.last?.isCurrent, true)
+        XCTAssertEqual(review.first?.isCurrent, false)
+        XCTAssertEqual(TheaterCaptionFlow.lines(board: board).count, 5)
+    }
+
     func testPinnedOverlayShowsToolsAndStopsClickThrough() {
         XCTAssertFalse(
             TheaterOverlayPolicy.hidesAllChrome(presentation: .transparent, toolsPinned: true)
@@ -230,7 +277,7 @@ final class TheaterOverlayPolicyTests: XCTestCase {
         )
         let thin = CGRect(x: 100, y: 80, width: 1600, height: 180)
         XCTAssertFalse(
-            TheaterWindowPlacement.shouldFillScreen(
+            TheaterWindowPlacement.shouldUseLowerThird(
                 stored: thin,
                 visible: self.visible,
                 presentation: .transparent
@@ -252,13 +299,14 @@ final class TheaterOverlayPolicyTests: XCTestCase {
         XCTAssertEqual(filled, bar)
     }
 
-    func testPopupStillFillsTheVisibleScreen() {
+    func testPopupOpensLowerThirdAndKeepsASavedBoard() {
+        let lower = TheaterPositionPreset.lowerThird.frame(in: self.visible)
         XCTAssertEqual(
             TheaterWindowPlacement.resolvedFrame(stored: nil, visible: self.visible, presentation: .popup),
-            self.visible
+            lower
         )
         XCTAssertTrue(
-            TheaterWindowPlacement.shouldFillScreen(
+            TheaterWindowPlacement.shouldUseLowerThird(
                 stored: CGRect(x: 80, y: 80, width: 1100, height: 440),
                 visible: self.visible,
                 presentation: .popup
@@ -271,7 +319,7 @@ final class TheaterOverlayPolicyTests: XCTestCase {
                 visible: self.visible,
                 presentation: .popup
             ),
-            self.visible
+            custom
         )
         XCTAssertEqual(
             TheaterWindowPlacement.resolvedFrame(
@@ -284,7 +332,7 @@ final class TheaterOverlayPolicyTests: XCTestCase {
         )
     }
 
-    func testOverlayCaptionBarBecomesAFullScreenPopup() {
+    func testOverlayCaptionBarBecomesALowerThirdPopup() {
         let bar = TheaterPositionPreset.captionBar.frame(in: self.visible)
         XCTAssertTrue(TheaterWindowPlacement.isOverlayCaptionBar(bar, visible: self.visible))
         XCTAssertFalse(
@@ -293,15 +341,15 @@ final class TheaterOverlayPolicyTests: XCTestCase {
                 visible: self.visible
             )
         )
+        let lower = TheaterPositionPreset.lowerThird.frame(in: self.visible)
         XCTAssertEqual(
             TheaterWindowPlacement.resolvedFrame(
                 stored: bar,
                 visible: self.visible,
                 presentation: .popup
             ),
-            self.visible
+            lower
         )
-        let lower = TheaterPositionPreset.lowerThird.frame(in: self.visible)
         XCTAssertTrue(TheaterWindowPlacement.isLowerThirdLeftover(lower, visible: self.visible))
         XCTAssertEqual(
             TheaterWindowPlacement.resolvedFrame(
@@ -309,9 +357,9 @@ final class TheaterOverlayPolicyTests: XCTestCase {
                 visible: self.visible,
                 presentation: .popup
             ),
-            self.visible
+            lower
         )
-        XCTAssertEqual(TheaterPositionPreset.captionBar.resolved(for: .popup), .fillScreen)
+        XCTAssertEqual(TheaterPositionPreset.captionBar.resolved(for: .popup), .lowerThird)
         XCTAssertEqual(TheaterPositionPreset.fillScreen.resolved(for: .transparent), .captionBar)
         XCTAssertEqual(TheaterPositionPreset.fillScreen.frame(in: self.visible), self.visible)
         XCTAssertTrue(TheaterPositionPreset.fillScreen.isAvailable(for: .popup))
@@ -336,6 +384,124 @@ final class TheaterOverlayPolicyTests: XCTestCase {
         )
         XCTAssertEqual(TheaterOverlayPolicy.minSize(for: .transparent), TheaterOverlayPolicy.overlayMinSize)
         XCTAssertEqual(TheaterOverlayPolicy.minSize(for: .popup), TheaterOverlayPolicy.popupMinSize)
+    }
+
+    func testOverlayPlacementWhenTheFrameWouldBecomeTheCaptionBar() {
+        let visible = self.visible
+        XCTAssertTrue(TheaterWindowPlacement.needsOverlayPlacement(stored: nil, visible: visible))
+        XCTAssertTrue(TheaterWindowPlacement.needsOverlayPlacement(stored: visible, visible: visible))
+        XCTAssertTrue(
+            TheaterWindowPlacement.needsOverlayPlacement(
+                stored: CGRect(x: 80, y: 80, width: 1100, height: 440),
+                visible: visible
+            )
+        )
+        let bar = TheaterPositionPreset.captionBar.frame(in: visible)
+        XCTAssertFalse(TheaterWindowPlacement.needsOverlayPlacement(stored: bar, visible: visible))
+        let lower = TheaterPositionPreset.lowerThird.frame(in: visible)
+        XCTAssertFalse(TheaterWindowPlacement.needsOverlayPlacement(stored: lower, visible: visible))
+        let thin = CGRect(x: 100, y: 80, width: 1600, height: 180)
+        XCTAssertFalse(TheaterWindowPlacement.needsOverlayPlacement(stored: thin, visible: visible))
+    }
+
+    func testFullScreenOverlayKeepsTheLiveFrameUntilItIsKept() {
+        let visible = self.visible
+        let bar = TheaterPositionPreset.captionBar.frame(in: visible)
+        let legacy = CGRect(x: 80, y: 80, width: 1100, height: 440)
+        let full = TheaterWindowPlacement.overlayFrameDecision(
+            stored: visible,
+            saved: nil,
+            visible: visible,
+            preset: .fillScreen,
+            placing: false
+        )
+        XCTAssertTrue(full.needsPlacement)
+        XCTAssertEqual(full.frame, visible)
+        XCTAssertFalse(TheaterWindowPlacement.isClose(full.frame, bar))
+        let oldDefault = TheaterWindowPlacement.overlayFrameDecision(
+            stored: legacy,
+            saved: nil,
+            visible: visible,
+            preset: nil,
+            placing: false
+        )
+        XCTAssertTrue(oldDefault.needsPlacement)
+        XCTAssertEqual(oldDefault.frame, legacy)
+    }
+
+    func testSavedOverlaySpotSkipsPlacement() {
+        let visible = self.visible
+        let bar = TheaterPositionPreset.captionBar.frame(in: visible)
+        let saved = TheaterWindowPlacement.overlayFrameDecision(
+            stored: visible,
+            saved: bar,
+            visible: visible,
+            preset: nil,
+            placing: false
+        )
+        XCTAssertFalse(saved.needsPlacement)
+        XCTAssertEqual(saved.frame, bar)
+        let lower = TheaterPositionPreset.lowerThird.frame(in: visible)
+        let preset = TheaterWindowPlacement.overlayFrameDecision(
+            stored: visible,
+            saved: nil,
+            visible: visible,
+            preset: .lowerThird,
+            placing: false
+        )
+        XCTAssertFalse(preset.needsPlacement)
+        XCTAssertTrue(TheaterWindowPlacement.isClose(preset.frame, lower))
+        let live = CGRect(x: 40, y: 40, width: 900, height: 300)
+        let placing = TheaterWindowPlacement.overlayFrameDecision(
+            stored: live,
+            saved: bar,
+            visible: visible,
+            preset: .captionBar,
+            placing: true
+        )
+        XCTAssertTrue(placing.needsPlacement)
+        XCTAssertEqual(placing.frame, live)
+    }
+
+    func testPlacementPassStaysInteractive() {
+        XCTAssertFalse(
+            TheaterOverlayPolicy.hidesAllChrome(
+                presentation: .transparent,
+                toolsPinned: false,
+                placing: true
+            )
+        )
+        XCTAssertFalse(
+            TheaterOverlayPolicy.ignoresMouseEvents(
+                presentation: .transparent,
+                toolsPinned: false,
+                minimized: false,
+                placing: true
+            )
+        )
+        XCTAssertTrue(
+            TheaterOverlayPolicy.movableByBackground(
+                presentation: .transparent,
+                toolsPinned: false,
+                minimized: false,
+                placing: true
+            )
+        )
+        XCTAssertFalse(
+            TheaterOverlayPolicy.hidesTitlebarButtons(
+                presentation: .transparent,
+                toolsPinned: false,
+                placing: true
+            )
+        )
+        XCTAssertTrue(
+            TheaterOverlayPolicy.reservesToolBarSlot(
+                presentation: .transparent,
+                hideChrome: false,
+                toolsPinned: false,
+                placing: true
+            )
+        )
     }
 
     func testHoverTagsNameTheControl() {
@@ -437,6 +603,7 @@ final class TheaterMenuBarTests: XCTestCase {
         let menu = self.overlayMenu()
         XCTAssertNil(menu.items.first { $0.title == "Hide from Screen Share" })
         XCTAssertEqual(TheaterReadiness.screenShare.contains("Share the slides window"), true)
+        XCTAssertEqual(TheaterReadiness.screenShare.contains("Share the Theater window"), true)
         XCTAssertEqual(TheaterReadiness.screenShare.contains("include these captions"), true)
     }
 

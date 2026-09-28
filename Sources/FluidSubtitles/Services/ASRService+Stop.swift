@@ -583,6 +583,7 @@ extension ASRService {
         self.recordingBufferHandoffGate.complete(bufferHandoffToken)
         completedBufferHandoff = true
         self.partialTranscription.removeAll()
+        SpokenLanguageResolver.noteDetectedLanguage(nil)
         self.previousFullTranscription.removeAll()
         self.lastBoostHitTerm = nil
         self.lastProcessedSampleCount = 0

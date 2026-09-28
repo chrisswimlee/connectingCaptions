@@ -1,10 +1,16 @@
 import AppKit
 
 /// Overlay is text on slides. Pop-up is a boxed board.
-/// Idle Overlay hides chrome and click-through; pinned Overlay shows tools.
+/// Idle Overlay hides the in-flow shelf and clicks through, except a top
+/// strip. A Tools bar stays in that strip, fades, and returns under the pointer.
+/// Pinned Overlay shows the shelf. Placement stays interactive until the rectangle is kept.
 enum TheaterOverlayPolicy {
     static let overlayMinSize = NSSize(width: 480, height: 140)
     static let popupMinSize = NSSize(width: 640, height: 260)
+    /// Top of an idle Overlay window that wakes the tool bar before it has faded in.
+    static let hoverDockWakeHeight: CGFloat = 44
+    /// On-screen review. Older lines stay in History. Pop-up still shows the board.
+    static let reviewLineCount = 3
     static let plateHorizontalInset: CGFloat = 10
     static let plateVerticalInset: CGFloat = 3
     static let plateCornerRadius: CGFloat = 8
@@ -16,9 +22,36 @@ enum TheaterOverlayPolicy {
 
     static func hidesAllChrome(
         presentation: TheaterPresentationStyle,
-        toolsPinned: Bool
+        toolsPinned: Bool,
+        placing: Bool = false
     ) -> Bool {
-        Self.isOverlay(presentation) && !toolsPinned
+        if placing { return false }
+        return Self.isOverlay(presentation) && !toolsPinned
+    }
+
+    /// The tool bar is up while the pointer is on it, or a menu from it is open.
+    static func showsHoverDock(engaged: Bool, holding: Bool) -> Bool {
+        engaged || holding
+    }
+
+    /// Screen rect of the Overlay tool bar. A zero content height is the resting
+    /// wake strip, so a faded bar does not eat clicks on the captions under it.
+    static func hoverDockRect(windowFrame: CGRect, contentHeight: CGFloat) -> CGRect {
+        let height = min(windowFrame.height, max(contentHeight, Self.hoverDockWakeHeight))
+        return CGRect(
+            x: windowFrame.minX,
+            y: windowFrame.maxY - height,
+            width: windowFrame.width,
+            height: height
+        )
+    }
+
+    static func hoverDockContains(
+        _ point: CGPoint,
+        windowFrame: CGRect,
+        contentHeight: CGFloat
+    ) -> Bool {
+        Self.hoverDockRect(windowFrame: windowFrame, contentHeight: contentHeight).contains(point)
     }
 
     static func usesCaptionsOnlyChrome(
@@ -35,8 +68,10 @@ enum TheaterOverlayPolicy {
     static func reservesToolBarSlot(
         presentation: TheaterPresentationStyle,
         hideChrome: Bool,
-        toolsPinned: Bool = false
+        toolsPinned: Bool = false,
+        placing: Bool = false
     ) -> Bool {
+        if placing { return true }
         if presentation == .transparent {
             return toolsPinned
         }
@@ -46,9 +81,15 @@ enum TheaterOverlayPolicy {
     static func ignoresMouseEvents(
         presentation: TheaterPresentationStyle,
         toolsPinned: Bool,
-        minimized: Bool
+        minimized: Bool,
+        placing: Bool = false,
+        pointerInHoverDock: Bool = false
     ) -> Bool {
-        !minimized && Self.hidesAllChrome(presentation: presentation, toolsPinned: toolsPinned)
+        if placing || minimized { return false }
+        if Self.hidesAllChrome(presentation: presentation, toolsPinned: toolsPinned) {
+            return !pointerInHoverDock
+        }
+        return false
     }
 
     /// Pop-up keeps a window shadow. Overlay is text on the slide, so it does not.
@@ -59,8 +100,10 @@ enum TheaterOverlayPolicy {
     static func hidesTitlebarButtons(
         presentation: TheaterPresentationStyle,
         toolsPinned: Bool,
-        hideChrome: Bool = false
+        hideChrome: Bool = false,
+        placing: Bool = false
     ) -> Bool {
+        if placing { return false }
         if Self.hidesAllChrome(presentation: presentation, toolsPinned: toolsPinned) {
             return true
         }
@@ -70,10 +113,11 @@ enum TheaterOverlayPolicy {
     static func movableByBackground(
         presentation: TheaterPresentationStyle,
         toolsPinned: Bool,
-        minimized: Bool
+        minimized: Bool,
+        placing: Bool = false
     ) -> Bool {
         if minimized { return false }
-        if presentation == .popup { return true }
+        if placing || presentation == .popup { return true }
         return toolsPinned
     }
 

@@ -195,20 +195,11 @@ struct OnboardingFlowView: View {
     }
 
     var playgroundContinueTitle: String {
-        if self.isPlaygroundReady {
-            return "Done"
-        }
-        if self.playgroundListenIsActive {
-            return "Listening"
-        }
-        return "Continue"
+        "Done"
     }
 
     var playgroundContinueEnabled: Bool {
-        if self.playgroundListenIsActive, !self.isPlaygroundReady {
-            return false
-        }
-        return self.canContinue
+        self.canContinue
     }
 
     var showsSetupBlock: Bool {

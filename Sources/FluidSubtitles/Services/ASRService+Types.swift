@@ -372,8 +372,9 @@ enum ASRStopOutcome: Equatable {
 /// robust error handling and performance optimization.
 ///
 /// ## Language Support
-/// fluidSubtitles only hears Korean, English, Thai, and Japanese. Parakeet Flash and TDT stay on English.
-/// Apple Speech and Whisper cover Korean, English, Thai, and Japanese. Nemotron Thai is experimental.
+/// I speak and Show as are every language both Apple Translation and a Voice Engine can use.
+/// Parakeet Flash and TDT stay on English. Apple Speech and Whisper hear that list.
+/// Nemotron Thai is experimental.
 /// ## Thread Safety
 /// All public methods are marked with @MainActor to ensure thread safety.
 /// Audio processing happens on background threads for optimal performance.

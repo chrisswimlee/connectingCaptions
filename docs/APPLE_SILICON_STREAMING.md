@@ -1,6 +1,6 @@
 # Optimizing Local Streaming Translation on Apple Silicon: Speech Edges, Context Windows, and CoreAudio Latency
 
-fluidSubtitles is a local Theater caption app. I speak and Show as are every language both Apple Translation and a Voice Engine can use. Theater runs on macOS 15 and later. Apple Speech Analyzer stays macOS 26+. Speech recognition and the macOS shell come from [FluidVoice](https://github.com/altic-dev/FluidVoice). fluidSubtitles adds clause-level Apple Translation, a measured latency clock, and a bounded 3-hour caption budget.
+fluidSubtitles is a local Theater caption app. I speak and Show as are every language both Apple Translation and a Voice Engine can use. Theater runs on macOS 15 and later. Apple Speech Analyzer stays macOS 26+. Speech recognition comes from [FluidVoice](https://github.com/altic-dev/FluidVoice). fluidSubtitles adds clause-level Apple Translation, a measured latency clock, and a bounded 3-hour caption budget.
 
 This note is the systems story, not a pitch. Numbers in the Theater HUD are measured. Numbers in tables below are budgets until you fill them from a recording.
 
@@ -41,7 +41,7 @@ Word-by-word Apple Translation stays out. The Neural Engine translates one finis
 
 ## Context windows
 
-The live Apple path still has no prompt. On commit, Theater sends the last 4 source clauses from this Listen with the new clause marked, then takes that span. If the marks are gone and the prior caption is still a prefix, it peels. Otherwise it translates the clause alone. Those four live in a short sliding window; older clauses drop as new ones commit. A clause-boundary approximation may prefetch that same payload so the print is already warm. Pronoun and zero-subject Korean or Japanese can still drift. Do not describe this as a streaming context window on the Neural Engine.
+The live Apple path still has no prompt. On commit, Theater sends the last 4 source clauses from this Listen with the new clause marked, then takes that span. If a mark character is still in the translation, Theater translates the clause alone. If the marks are fully gone and the prior caption is still a prefix, it peels. Otherwise it translates the clause alone. Those four live in a short sliding window; older clauses drop as new ones commit. A clause-boundary approximation may prefetch that same payload so the print is already warm. Pronoun and zero-subject Korean or Japanese can still drift. Do not describe this as a streaming context window on the Neural Engine.
 
 ## CoreAudio
 

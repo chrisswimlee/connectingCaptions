@@ -110,17 +110,21 @@ struct ASRTranscriptionResult {
     let confidence: Float
     let pronunciationEnrollment: PronunciationEnrollmentCapture?
     let endOfUtterance: Bool
+    /// Whisper language for this chunk. Nil when the model did not name one.
+    let detectedLanguageID: String?
 
     init(
         text: String,
         confidence: Float = 1.0,
         pronunciationEnrollment: PronunciationEnrollmentCapture? = nil,
-        endOfUtterance: Bool = false
+        endOfUtterance: Bool = false,
+        detectedLanguageID: String? = nil
     ) {
         self.text = text
         self.confidence = confidence
         self.pronunciationEnrollment = pronunciationEnrollment
         self.endOfUtterance = endOfUtterance
+        self.detectedLanguageID = detectedLanguageID
     }
 }
 

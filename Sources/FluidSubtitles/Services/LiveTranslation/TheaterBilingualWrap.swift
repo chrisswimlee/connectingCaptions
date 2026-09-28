@@ -51,9 +51,13 @@ enum TheaterBilingualWrap {
     /// Room inside the line box so a descender is not clipped by the field edge.
     static let linePad: CGFloat = 2
 
-    /// Empty space above the glyph box. The caption cell clips to its title
-    /// rect, and Thai marks sit on that edge when the rect starts at the top.
+    /// Empty space above the glyph box at ordinary sizes. Larger type adds to
+    /// this so the opening marks move down with the point size.
     static let lineTopSlack: CGFloat = 6
+
+    static func lineTopSlack(for font: NSFont) -> CGFloat {
+        max(Self.lineTopSlack, ceil(max(font.pointSize, 1) * 0.12))
+    }
 
     /// First-line halo / shadow sits above the ink. Keep it in the board height
     /// so ScrollView does not clip the opening title.
@@ -205,7 +209,7 @@ enum TheaterBilingualWrap {
     static func lineHeight(for font: NSFont) -> CGFloat {
         let typographic = ceil(font.ascender - font.descender + max(0, font.leading))
         let ink = ceil(font.boundingRectForFont.height)
-        return max(typographic, ink) + Self.linePad + Self.lineTopSlack
+        return max(typographic, ink) + Self.linePad + Self.lineTopSlack(for: font)
     }
 
     /// Line height for a specific string. `font`'s own metrics (ascender,
@@ -217,7 +221,7 @@ enum TheaterBilingualWrap {
     static func lineHeight(for text: String, font: NSFont) -> CGFloat {
         let typographic = ceil(font.ascender - font.descender + max(0, font.leading))
         let ink = Self.inkHeight(for: text, font: font)
-        return max(typographic, ink) + Self.linePad + Self.lineTopSlack
+        return max(typographic, ink) + Self.linePad + Self.lineTopSlack(for: font)
     }
 
     /// Real rendered glyph height for `text` in `font`, after CoreText resolves
@@ -776,14 +780,32 @@ enum TheaterBilingualWrap {
 
 /// Single-line caption cell. Glyphs sit at the top of the measured slot, so a
 /// taller line box cannot slide them. Wrap uses this cell's title width.
+///
+/// `titleRect` alone does not move the ink. The field draws from the top of
+/// the bounds, so the opening marks were sliced off the first line. The draw
+/// uses the same top slack the line box already reserved.
 final class TheaterCaptionInkCell: NSTextFieldCell {
     override func titleRect(forBounds rect: NSRect) -> NSRect {
         var title = super.titleRect(forBounds: rect)
         guard let font = self.font else { return title }
         let textHeight = TheaterBilingualWrap.inkHeight(for: self.stringValue, font: font)
-        let slack = min(TheaterBilingualWrap.lineTopSlack, max(rect.height - 1, 0))
+        let slack = Self.topSlack(in: rect, font: self.font)
         title.origin.y = rect.minY + slack
         title.size.height = min(rect.height - slack, max(textHeight, 1))
         return title
+    }
+
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        let slack = Self.topSlack(in: cellFrame, font: self.font)
+        var shifted = cellFrame
+        shifted.origin.y += slack
+        shifted.size.height = max(1, cellFrame.height - slack)
+        super.drawInterior(withFrame: shifted, in: controlView)
+    }
+
+    private static func topSlack(in rect: NSRect, font: NSFont?) -> CGFloat {
+        let room = max(rect.height - 1, 0)
+        let slack = font.map { TheaterBilingualWrap.lineTopSlack(for: $0) } ?? TheaterBilingualWrap.lineTopSlack
+        return min(slack, room)
     }
 }

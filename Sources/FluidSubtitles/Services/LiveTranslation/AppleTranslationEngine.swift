@@ -395,7 +395,7 @@ enum TranslationPackAvailability: Equatable {
     }
 }
 
-/// Either way (later) needs both directions. The download sheet attaches to the
+/// Either way needs both directions. The download sheet attaches to the
 /// missing pack, not always I speak → Show as.
 enum TheaterPairPacks {
     static func combined(

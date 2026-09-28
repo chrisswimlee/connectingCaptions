@@ -46,16 +46,6 @@ struct WelcomeView: View {
                         FluidSectionHeader(title: "Checklist", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(self.theme.palette.accent)
 
-                        Button {
-                            self.selectedSidebarItem = .liveTranslation
-                            PresenterCaptionController.shared.setVisible(true)
-                        } label: {
-                            Text(TheaterReadiness.gettingStartedOpen)
-                                .font(self.theme.typography.bodyStrong)
-                        }
-                        .buttonStyle(.theaterTextProminent)
-                        .accessibilityIdentifier("getting-started-open-theater")
-
                         VStack(alignment: .leading, spacing: 8) {
                             SetupStepView(
                                 step: 1,
@@ -136,12 +126,12 @@ struct WelcomeView: View {
                             SetupStepView(
                                 step: self.needsTranslationPack ? 5 : 4,
                                 title: self.accessibilityEnabled
-                                    ? "Type into app is ready"
+                                    ? "Typing into another app is ready"
                                     : "Optional: type into another app",
                                 description: self.accessibilityEnabled
-                                    ? "A caption can be typed into other apps. Theater captions do not need this."
-                                    : "Only if you want a caption typed into another app. Theater captions work without it.",
-                                status: self.accessibilityEnabled ? .completed : .pending,
+                                    ? "Type the board types captions already printed. Listen, then type starts a new Listen. Theater captions do not need this."
+                                    : "Only for Type the board or Listen, then type. Theater captions work without it.",
+                                status: self.accessibilityEnabled ? .completed : .notNeeded,
                                 action: {
                                     self.openAccessibilitySettings()
                                 },

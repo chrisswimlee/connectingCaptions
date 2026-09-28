@@ -4,7 +4,7 @@ import Foundation
 /// Fluid becoming frontmost on Stop must not drop that text.
 enum TheaterInsertDelivery {
     static let needsAnotherAppCopy =
-        "Click into another app, then use Listen and type."
+        "Click into another app, then use Listen, then type."
 
     static func shouldTypeCurrentListen(
         text: String,

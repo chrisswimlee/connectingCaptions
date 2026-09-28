@@ -39,3 +39,12 @@ struct TheaterStatus: Equatable, Sendable {
         TheaterStatus(text: text, kind: .failure)
     }
 }
+
+/// The line printed in a sentence's slot after its one automatic retry fails.
+enum TheaterCaptionFailure {
+    static let line = "Couldn't translate."
+
+    static func isLine(_ text: String) -> Bool {
+        text.trimmingCharacters(in: .whitespacesAndNewlines) == Self.line
+    }
+}

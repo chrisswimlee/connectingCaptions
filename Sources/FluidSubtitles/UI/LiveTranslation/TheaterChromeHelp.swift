@@ -101,7 +101,7 @@ enum TheaterChromeHelp {
     )
     static let captionSize = tag(
         "Size",
-        does: "Caption size. Smaller and larger change spoken and Show-as."
+        does: "Caption size. Type a point size, or use smaller and larger. Both change spoken and Show-as."
     )
     static let copyAll = tag(
         "Copy all",
@@ -109,8 +109,8 @@ enum TheaterChromeHelp {
         shortcut: "Control-Option-C"
     )
     static let insert = tag(
-        "Type into app",
-        does: "Type this Listen into the frontmost app. Copy takes the whole board. Needs Accessibility. Some languages paste instead of typing each letter."
+        "Type the board",
+        does: TheaterReadiness.insertHelp
     )
     static let undo = tag(
         "Undo last caption",
@@ -132,8 +132,8 @@ enum TheaterChromeHelp {
     )
     static let overlay = tag(
         "Overlay",
-        does: "Only the caption text. Slides stay clickable.",
-        shortcut: "Control-Option-T shows tools"
+        does: "Only the caption text, in the rectangle you keep. Hover the Tools bar for Listen and the other controls. It fades when you move away. Slides stay clickable.",
+        shortcut: "Control-Option-T pins the tools"
     )
     static let screenShare = tag(
         TheaterReadiness.screenShareTitle,
@@ -179,10 +179,18 @@ enum TheaterChromeHelp {
         "Status",
         does: "Listen, pack, or engine messages for this board."
     )
+    static let inbox = tag(
+        "Incoming",
+        does: "The last few things you said. Each line leaves this bar when it prints on the board once."
+    )
     static let overlayTools = tag(
         "Overlay tools",
         does: "Show Overlay Listen and board tools.",
         shortcut: "Control-Option-T"
+    )
+    static let keepOverlayText = tag(
+        "Keep text here",
+        does: "Save this rectangle. The Tools bar fades until you hover the top, and slides stay clickable."
     )
     static let fillScreen = tag(
         "Fill screen",
@@ -202,7 +210,7 @@ enum TheaterChromeHelp {
     )
     static let captionBar = tag(
         "Caption bar",
-        does: "Thin strip at the bottom for Overlay captions on slides."
+        does: "Last few lines along the bottom, like TV captions. Drag the bar to put it somewhere else."
     )
 
     static func position(_ preset: TheaterPositionPreset) -> String {

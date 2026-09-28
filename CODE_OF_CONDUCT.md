@@ -47,7 +47,7 @@ an individual is officially representing the project in public spaces.
 
 ## Enforcement
 
-Report incidents to [chris.suyoung.lee@gmail.com](mailto:chris.suyoung.lee@gmail.com).
+Report incidents to [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com).
 All complaints will be reviewed and investigated promptly and fairly.
 
 ## Enforcement Guidelines

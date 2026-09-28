@@ -116,8 +116,16 @@ enum TranslationGlossary {
 }
 
 enum SpokenLanguageResolver {
-    /// Either-way pairing is off. Translate stays I speak → Show as.
-    static var dynamicPairingAvailable: Bool { false }
+    /// Latest Whisper language for this Listen. Nil when the model did not name one.
+    private(set) static var detectedLanguageID: String?
+
+    static func noteDetectedLanguage(_ code: String?) {
+        guard let code else {
+            self.detectedLanguageID = nil
+            return
+        }
+        self.detectedLanguageID = TranslationLanguageCatalog.language(id: code)?.id
+    }
 
     static func spokenLanguageID(settings: SettingsStore = .shared) -> String {
         if let heard = self.heardLanguage(settings: settings) {
@@ -126,7 +134,7 @@ enum SpokenLanguageResolver {
         return self.rawSpokenLanguageID(settings: settings)
     }
 
-    /// What the Voice Engine is actually set to hear, mapped to I speak (en, ko, ja, th).
+    /// What the Voice Engine is actually set to hear, mapped onto the setup list.
     /// `en-US` and `en` are the same language.
     static func heardLanguage(settings: SettingsStore = .shared) -> TranslationLanguage? {
         TranslationLanguageCatalog.language(id: self.rawSpokenLanguageID(settings: settings))
@@ -327,8 +335,7 @@ enum SpokenLanguageResolver {
     }
 
     /// Theater Listen refuses Whisper automatic detection unless Q&A extras
-    /// are on. Either way is a later product. Auto-detect can flip language
-    /// mid-talk or silently translate a bilingual clause.
+    /// or Either way are on. Auto-detect can name the language of this clause.
     static func pinWhisperToSpokenSource(settings: SettingsStore = .shared) {
         if self.shouldAutoDetectWhisper(settings: settings) { return }
         let sourceID = self.sourceLanguage(settings: settings).id
@@ -385,62 +392,162 @@ enum SpokenLanguageResolver {
         settings.theaterAlsoHearOtherLanguages || self.isDynamicPairingEnabled(settings: settings)
     }
 
-    /// Auto-detecting the spoken language and swapping source/target based on
-    /// what was heard is removed: translation always runs in the one fixed
-    /// direction the user configured (I speak -> Show as), never "either way".
-    static func isDynamicPairingEnabled(settings _: SettingsStore = .shared) -> Bool {
-        false
+    /// Either way is on only when this Voice Engine can hear both sides.
+    /// Whisper can. Apple Speech stays on I speak. Parakeet stays English-only.
+    static func dynamicPairingAvailable(settings: SettingsStore = .shared) -> Bool {
+        guard settings.theaterSessionMode == .translation else { return false }
+        let source = self.sourceLanguage(settings: settings)
+        let target = self.targetLanguage(settings: settings)
+        guard source.id != target.id else { return false }
+        let model = settings.selectedSpeechModel
+        guard model.isWhisperModel else { return false }
+        return VoiceEngineLanguageCatalog.supports(model, languageID: source.id)
+            && VoiceEngineLanguageCatalog.supports(model, languageID: target.id)
     }
 
-    /// I speak / Show as. Always the fixed configured direction.
+    static func isDynamicPairingEnabled(settings: SettingsStore = .shared) -> Bool {
+        settings.theaterDynamicPairing && self.dynamicPairingAvailable(settings: settings)
+    }
+
+    /// I speak → Show as, unless Either way heard the Show-as language.
     static func pairForSpokenText(
-        _: String,
+        _ text: String,
         settings: SettingsStore = .shared
     ) -> (source: TranslationLanguage, target: TranslationLanguage) {
-        (self.sourceLanguage(settings: settings), self.targetLanguage(settings: settings))
+        let source = self.sourceLanguage(settings: settings)
+        let target = self.targetLanguage(settings: settings)
+        guard self.isDynamicPairingEnabled(settings: settings), source.id != target.id else {
+            return (source, target)
+        }
+        let heard = self.listenLanguageID(for: text, settings: settings)
+        if heard == target.id, let heardLanguage = TranslationLanguageCatalog.language(id: heard) {
+            return (heardLanguage, source)
+        }
+        return (source, target)
     }
 
     static func listenLanguageID(for text: String, settings: SettingsStore = .shared) -> String {
         let configured = self.sourceLanguage(settings: settings).id
-        guard settings.theaterAlsoHearOtherLanguages else { return configured }
-        let allowed = TranslationLanguageCatalog.all.map(\.id)
-        return SpokenScriptDetector.languageID(in: text, among: allowed) ?? configured
+        let pairing = self.isDynamicPairingEnabled(settings: settings)
+        guard settings.theaterAlsoHearOtherLanguages || pairing else { return configured }
+        let target = self.targetLanguage(settings: settings).id
+        let allowed = [configured, target]
+        if let script = SpokenScriptDetector.languageID(in: text, among: allowed) {
+            return script
+        }
+        if pairing, let detected = self.detectedLanguageID, allowed.contains(detected) {
+            return detected
+        }
+        return configured
+    }
+
+    static func dynamicPairingControlCopy(settings: SettingsStore = .shared) -> String {
+        let source = self.sourceLanguage(settings: settings)
+        let target = self.targetLanguage(settings: settings)
+        if source.id == target.id {
+            return "Pick a Show as language that differs from I speak."
+        }
+        if !settings.selectedSpeechModel.isWhisperModel {
+            return TheaterReadiness.dynamicPairingHint(isWhisper: false)
+        }
+        if !self.dynamicPairingAvailable(settings: settings) {
+            return "Either way needs Whisper to hear both \(source.displayName) and \(target.displayName)."
+        }
+        if SpokenScriptDetector.pairSharesOneScript(source.id, target.id) {
+            return "Speak either language. Whisper names which one. If it does not, captions stay \(source.displayName) → \(target.displayName)."
+        }
+        return TheaterReadiness.dynamicPairingHint(isWhisper: true)
     }
 }
 
 enum SpokenScriptDetector {
+    private enum Family: Hashable {
+        case hangul, kana, han, thai, arabic, hebrew, devanagari, cyrillic, latin
+    }
+
     static func languageID(in text: String, among allowed: [String]) -> String? {
-        let allowedIDs = Set(allowed)
+        let allowedIDs = Set(allowed.compactMap { Self.normalized($0) })
         guard !allowedIDs.isEmpty else { return nil }
-        var scores: [String: Int] = [:]
-        let countHanForJapanese = allowedIDs.contains(TranslationLanguageCatalog.japanese.id)
-            && !allowedIDs.contains(TranslationLanguageCatalog.korean.id)
-
+        var scores: [Family: Int] = [:]
         for scalar in text.unicodeScalars {
-            if Self.isHangul(scalar) {
-                Self.add("ko", to: &scores, allowed: allowedIDs)
-            } else if Self.isThai(scalar) {
-                Self.add("th", to: &scores, allowed: allowedIDs)
-            } else if Self.isKana(scalar) {
-                Self.add("ja", to: &scores, allowed: allowedIDs)
-            } else if countHanForJapanese, Self.isHan(scalar) {
-                Self.add("ja", to: &scores, allowed: allowedIDs)
-            } else if Self.isLatinLetter(scalar) {
-                Self.add("en", to: &scores, allowed: allowedIDs)
-            }
+            guard let family = Self.family(of: scalar) else { continue }
+            scores[family, default: 0] += 1
         }
-
-        let ranked = scores.filter { $0.value > 0 }.sorted { $0.value > $1.value }
-        guard let top = ranked.first, top.value >= 2 else { return nil }
+        let ranked = scores.filter { $0.value >= 2 }.sorted { $0.value > $1.value }
+        guard let top = ranked.first else { return nil }
         if let second = ranked.dropFirst().first, second.value * 2 >= top.value {
             return nil
         }
-        return top.key
+        if top.key == .han, (scores[.kana] ?? 0) >= 2, allowedIDs.contains("ja") {
+            return "ja"
+        }
+        let matches = Self.languages(in: top.key, allowed: allowedIDs)
+        guard matches.count == 1 else { return nil }
+        return matches[0]
     }
 
-    private static func add(_ id: String, to scores: inout [String: Int], allowed: Set<String>) {
-        guard allowed.contains(id) else { return }
-        scores[id, default: 0] += 1
+    /// English–French and Russian–Ukrainian cannot be told apart by script.
+    static func pairSharesOneScript(_ left: String, _ right: String) -> Bool {
+        guard let a = Self.primaryFamily(left), let b = Self.primaryFamily(right), a == b else {
+            return false
+        }
+        return a == .latin || a == .cyrillic || a == .han
+    }
+
+    private static func normalized(_ id: String) -> String? {
+        let trimmed = id.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return TranslationLanguageCatalog.language(id: trimmed)?.id ?? trimmed.lowercased()
+    }
+
+    private static func primaryFamily(_ languageID: String) -> Family? {
+        switch Self.normalized(languageID) {
+        case "ko": return .hangul
+        case "th": return .thai
+        case "ja", "zh": return .han
+        case "ar": return .arabic
+        case "he": return .hebrew
+        case "hi": return .devanagari
+        case "ru", "uk": return .cyrillic
+        case .some: return .latin
+        case .none: return nil
+        }
+    }
+
+    private static func languages(in family: Family, allowed: Set<String>) -> [String] {
+        switch family {
+        case .hangul:
+            return allowed.contains("ko") ? ["ko"] : []
+        case .thai:
+            return allowed.contains("th") ? ["th"] : []
+        case .kana:
+            return allowed.contains("ja") ? ["ja"] : []
+        case .han:
+            return ["zh", "ja"].filter { allowed.contains($0) }
+        case .arabic:
+            return allowed.contains("ar") ? ["ar"] : []
+        case .hebrew:
+            return allowed.contains("he") ? ["he"] : []
+        case .devanagari:
+            return allowed.contains("hi") ? ["hi"] : []
+        case .cyrillic:
+            return ["ru", "uk"].filter { allowed.contains($0) }
+        case .latin:
+            return allowed.filter { Self.primaryFamily($0) == .latin }.sorted()
+        }
+    }
+
+    private static func family(of scalar: Unicode.Scalar) -> Family? {
+        if Self.isHangul(scalar) { return .hangul }
+        if Self.isThai(scalar) { return .thai }
+        if Self.isKana(scalar) { return .kana }
+        if Self.isHan(scalar) { return .han }
+        if (0x0600 ... 0x06FF).contains(scalar.value) { return .arabic }
+        if (0x0590 ... 0x05FF).contains(scalar.value) { return .hebrew }
+        if (0x0900 ... 0x097F).contains(scalar.value) { return .devanagari }
+        if (0x0400 ... 0x04FF).contains(scalar.value) { return .cyrillic }
+        if Self.isLatinLetter(scalar) { return .latin }
+        return nil
     }
 
     private static func isLatinLetter(_ scalar: Unicode.Scalar) -> Bool {
@@ -480,6 +587,22 @@ nonisolated enum LiveTranslationTiming {
     static let firstPrintSharpenNanoseconds: UInt64 = 700_000_000
     /// Brief hold after end-of-utterance so the last ASR tick can land.
     static let eouHoldNanoseconds: UInt64 = 400_000_000
+    /// A lone finished sentence prints once it has stayed the whole draft this long.
+    /// A new partial cancels it. Shorter than the silence hold, so the line arrives
+    /// during the pause instead of after the next sentence.
+    static let loneSentencePrintNanoseconds: UInt64 = 220_000_000
+    /// Partials are de-duplicated, so a quiet gap only means the engine re-heard
+    /// the same text once it outlasts that engine's own update cadence (0.2–1 s).
+    static let loneSentenceCadenceFactor = 1.5
+    static let loneSentenceMaxNanoseconds: UInt64 = 1_500_000_000
+    /// A gap longer than this is a pause, not the engine's update cadence.
+    static let partialCadenceMaxSeconds: TimeInterval = 2.0
+
+    static func loneSentenceSettleNanoseconds(partialCadence: TimeInterval) -> UInt64 {
+        guard partialCadence > 0 else { return self.loneSentencePrintNanoseconds }
+        let scaled = UInt64(partialCadence * self.loneSentenceCadenceFactor * 1_000_000_000)
+        return min(max(scaled, self.loneSentencePrintNanoseconds), self.loneSentenceMaxNanoseconds)
+    }
     static let minPauseFinalizeCharacters = 22
     static let minPauseFinalizeWords = 4
     /// Thai needs a real clause, not a few syllables.

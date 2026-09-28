@@ -1,7 +1,7 @@
 import ApplicationServices
 import Foundation
 
-/// What the old FluidVoice dictation shortcut may do when it fires.
+/// What the old dictation shortcut may do when it fires.
 /// A missing callback leaves the microphone idle. It must not call `ASRService.start`.
 enum DictationHotkeyCaptureStart: Equatable {
     case invokeCallback

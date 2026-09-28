@@ -169,9 +169,7 @@ struct SettingsView: View {
                 FluidPageHeader(
                     systemImage: self.selectedSection.systemImage,
                     title: self.selectedSection.title,
-                    subtitle: self.selectedSection == .translation
-                        ? FluidProduct.tagline
-                        : nil
+                    subtitle: self.settingsSectionSubtitle
                 ) {
                     if self.selectedSection == .translation {
                         HStack(spacing: 8) {
@@ -184,16 +182,6 @@ struct SettingsView: View {
                 .settingsSearchTarget(self.selectedSection.searchTarget)
 
                 LiveTranslationSettingsView(
-                    recordTranslateShortcut: {
-                        if self.isRecording(.translateInsert) {
-                            self.shortcutRecordingMessage = nil
-                            self.activeShortcutRecordingTarget = nil
-                        } else {
-                            self.shortcutRecordingMessage = nil
-                            self.activeShortcutRecordingTarget = .translateInsert
-                        }
-                    },
-                    isRecordingTranslateShortcut: self.isRecording(.translateInsert),
                     recordListenShortcut: {
                         if self.isRecording(.captionListen) {
                             self.shortcutRecordingMessage = nil
@@ -204,13 +192,14 @@ struct SettingsView: View {
                         }
                     },
                     isRecordingListenShortcut: self.isRecording(.captionListen),
-                    shortcutRecordingMessage: (self.isRecording(.translateInsert) || self.isRecording(.captionListen))
+                    shortcutRecordingMessage: self.isRecording(.captionListen)
                         ? self.shortcutRecordingMessage
-                        : nil,
-                    accessibilityTrusted: self.accessibilityEnabled,
-                    openAccessibility: self.openAccessibilitySettings
+                        : nil
                 )
                     .shownInSettingsSection(.translation, selectedSection: self.selectedSection)
+
+                self.speakAndTypeSettings
+                    .shownInSettingsSection(.speakAndType, selectedSection: self.selectedSection)
 
                 // Startup Card
                 ThemedCard(style: .standard) {

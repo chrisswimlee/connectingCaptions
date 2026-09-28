@@ -304,7 +304,9 @@ nonisolated enum TranslationClauseSegmenter {
         let prev = previous.trimmingCharacters(in: .whitespacesAndNewlines)
         let next = incoming.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prev.isEmpty, !next.isEmpty, !self.isSameClause(prev, next) else { return false }
-        guard self.isGrowingClause(prev, toward: next) else { return false }
+        guard self.isGrowingClause(prev, toward: next)
+            || self.isGrowingIgnoringPunctuation(prev, toward: next)
+        else { return false }
         let leftover = self.leftoverTail(next, already: [prev])
         if leftover.isEmpty || leftover == next || self.isSameClause(leftover, next) {
             return true
@@ -327,6 +329,15 @@ nonisolated enum TranslationClauseSegmenter {
         let coreA = self.stripTerminalPunctuation(a)
         let coreB = self.stripTerminalPunctuation(b)
         return !coreA.isEmpty && (b.hasPrefix(coreA) || coreB.hasPrefix(coreA))
+    }
+
+    /// ASR re-punctuates while it grows a line ("Why, won't you." →
+    /// "Why won't you print?"). Same words in the same order, plus more.
+    fileprivate static func isGrowingIgnoringPunctuation(_ earlier: String, toward later: String) -> Bool {
+        let a = self.normalized(earlier)
+        let b = self.normalized(later)
+        guard !a.isEmpty, b.count > a.count else { return false }
+        return b.hasPrefix(a + " ")
     }
 
     /// Live prefetch may paint only while `unit` is this leftover, not an
@@ -817,8 +828,10 @@ nonisolated enum TranslationClauseSegmenter {
                 starters: Self.thaiSentenceStarters,
                 languageID: languageID
             )
-        default:
+        case "en":
             return self.englishSentenceBreak(trimmed, languageID: languageID)
+        default:
+            return nil
         }
     }
 
@@ -958,11 +971,11 @@ nonisolated enum TranslationClauseSegmenter {
         if already.contains(where: { self.shouldIgnoreAsStalePrefix(previous: $0, incoming: cleaned) }) {
             return true
         }
-        if already.dropLast().contains(where: {
-            self.shouldReviseCommitted(previous: $0, incoming: cleaned, languageID: languageID)
-        }) {
-            return true
-        }
+        // A close paraphrase of an *older*, already-superseded line (not the
+        // newest one) is the next caption, not a correction — the newest
+        // line already proved the room moved on. Only an exact repeat of an
+        // older line (checked above) counts as a duplicate; a fuzzy revision
+        // match is left to the newest-line checks in TheaterBoardAdmission.
         return self.leftoverTail(cleaned, already: already, languageID: languageID).isEmpty
     }
 
@@ -1052,8 +1065,10 @@ extension TranslationClauseSegmenter {
 
     /// ASR often restitches "Hello.Then we" with no space after the period.
     /// Treat that as a sentence break so leftover cannot dump as one line.
+    /// "and" / "but" / "so" stay in the sentence. A capital And is still this
+    /// caption; only a real period, or Then / Next, opens the next line.
     fileprivate static let englishSentenceStarters: Set<String> = [
-        "then", "and", "but", "so", "now", "next", "also", "after",
+        "then", "now", "next", "also", "after",
         "later", "still", "however", "therefore", "meanwhile", "finally",
         "first", "second", "plus", "afterward", "afterwards",
     ]
@@ -1764,10 +1779,12 @@ extension TranslationClauseSegmenter {
         return needle.count >= 6 && haystack.contains(needle)
     }
 
-    /// Prefer a comma or connective so a follow-along line does not end on "the".
+    /// A sentence that fits stays whole. A long run-on may break at a comma.
+    /// It does not break at and / but / so, or the rest of the sentence prints
+    /// on the next line with whatever is said after it.
     fileprivate static func followAlongCut(_ text: String, languageID: String) -> (head: String, rest: String) {
         let hard = self.lineCut(text, languageID: languageID)
-        guard !hard.head.isEmpty else { return hard }
+        guard !hard.head.isEmpty, !hard.rest.isEmpty else { return hard }
         if let breath = self.breathHead(in: hard.head, languageID: languageID) {
             let leftoverHead = String(hard.head.dropFirst(breath.count))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1785,10 +1802,7 @@ extension TranslationClauseSegmenter {
             }
             return nil
         }
-        if let comma = self.lastPunctuationBreath(in: head) {
-            return comma
-        }
-        return self.lastConjunctionBreath(in: head)
+        return self.lastPunctuationBreath(in: head)
     }
 
     fileprivate static func lastPunctuationBreath(in head: String) -> String? {
@@ -1803,24 +1817,6 @@ extension TranslationClauseSegmenter {
             return nil
         }
         return left
-    }
-
-    fileprivate static func lastConjunctionBreath(in head: String) -> String? {
-        let words = self.tokens(head)
-        guard words.count >= LiveTranslationTiming.minPauseFinalizeWords + 1 else { return nil }
-        let connectives: Set<String> = ["and", "but", "so", "then", "or"]
-        for index in stride(from: words.count - 1, through: 1, by: -1) {
-            guard connectives.contains(self.tokenKey(words[index])) else { continue }
-            var cut = index
-            while cut > 1, connectives.contains(self.tokenKey(words[cut - 1])) {
-                cut -= 1
-            }
-            guard cut >= LiveTranslationTiming.minPauseFinalizeWords else { continue }
-            let left = words.prefix(cut).joined(separator: " ")
-            guard !self.isTooThinToCommit(left, languageID: "en") else { continue }
-            return left
-        }
-        return nil
     }
 
     fileprivate static func retractTrailingThin(
@@ -1987,6 +1983,22 @@ extension TranslationClauseSegmenter {
             return leftover
         }
         return nil
+    }
+
+    /// Speech after a period starts another sentence when it opens like one.
+    /// A lowercase continuation ("on the other hand") stays on this line.
+    /// "and" / "but" / "so" stay on this line too. "Then" / "Next" open the next one.
+    static func continuesAsNewSentence(_ rest: String, languageID: String) -> Bool {
+        let rest = rest.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rest.isEmpty else { return false }
+        if self.isCompactScript(languageID) { return true }
+        let words = self.tokens(rest)
+        guard words.count >= 2, let first = words.first else { return false }
+        let key = self.tokenKey(first)
+        if Self.englishSoftSentenceStarters.contains(key) { return true }
+        if Self.englishConnectives.contains(key) { return false }
+        if first.first?.isUppercase == true { return true }
+        return self.looksLikeClauseBoundaryStart(first)
     }
 
     fileprivate static func looksLikeClauseBoundaryStart(_ token: String) -> Bool {
@@ -2296,9 +2308,10 @@ enum LiveTranslationConfirm {
     static func shouldReDecode(
         isFinal: Bool,
         isPause: Bool = false,
-        languageID _: String = ""
+        languageID: String = ""
     ) -> Bool {
-        isFinal || isPause
+        guard isFinal || isPause else { return false }
+        return self.requiresConfirmBeforePrint(languageID: languageID)
     }
 
     /// First print: keep a short greeting ("OK", "네", "ขอบคุณ") when confirm heard it.

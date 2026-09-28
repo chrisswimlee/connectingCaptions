@@ -996,6 +996,7 @@ extension ASRService {
                 "Streaming chunk transcription finished in \(String(format: "%.2f", duration))s",
                 source: "ASRService"
             )
+            SpokenLanguageResolver.noteDetectedLanguage(result.detectedLanguageID)
             let rawText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
             let newText = self.cleanedLiveTranscript(rawText)
             self.recordWordBoostHitIfAny(transcribedText: newText)
@@ -1521,6 +1522,7 @@ extension ASRService {
             self.committedStreamingText.removeAll()
             self.streamingWorkState.endSession(sessionID)
             self.partialTranscription = ""
+            SpokenLanguageResolver.noteDetectedLanguage(nil)
             self.previousFullTranscription = ""
             self.isProcessingChunk = false
             self.skipNextChunk = false

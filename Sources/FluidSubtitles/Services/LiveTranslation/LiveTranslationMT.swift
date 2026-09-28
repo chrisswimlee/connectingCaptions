@@ -86,6 +86,7 @@ enum LiveTranslationMT {
                 translator: translator
             )
             if let marked = LiveTranslationCommitContext.markedNewTranslation(contextual),
+               LiveTranslationCommitContext.containsContextClauseMark(marked) == false,
                LiveTranslationCommitContext.isSanePeeledCaption(
                    marked,
                    isolatedSource: text,

@@ -61,21 +61,33 @@ extension ContentView {
 
     func startInsertTranslationListening() {
         guard !self.asr.isRunningOrStarting else {
+            let message = "Still stopping the last Listen. Try again."
             LiveTranslationController.shared.listenStartFailed()
-            LiveTranslationController.shared.reportListenFailure("Still stopping the last Listen. Try again.")
+            LiveTranslationController.shared.reportListenFailure(message)
+            QuickTranslateInsertController.presentNotice(message)
             return
         }
         // Capture before Listen can move focus. First PCM is too late.
+        // The bar comes up after that capture so it cannot steal the target app.
         self.captureRecordingTargetContext()
+        QuickTranslateInsertController.arm()
         Task {
             let prepared = await TheaterSpeechSession.shared.prepareListen(kind: .insert, asr: self.asr)
             guard prepared else {
+                let status = LiveTranslationController.shared.subscriber
+                let message = status.statusKind == .failure ? status.statusText : ""
+                QuickTranslateInsertController.presentNotice(message)
                 return
             }
             let startOutcome = await self.asr.start()
             if startOutcome == .failed {
+                let message = MicrophoneAccess.isAuthorized(self.asr.micStatus)
+                    ? "Could not start listening. Check the microphone and Voice Engine."
+                    : MicrophoneAccess.deniedCopy
                 TheaterSpeechSession.shared.clear(asr: self.asr)
                 LiveTranslationController.shared.cancelSession()
+                LiveTranslationController.shared.reportListenFailure(message)
+                QuickTranslateInsertController.presentNotice(message)
                 self.menuBarManager.hideRecordingOverlayImmediately(reason: "asr_start_failed")
             }
         }

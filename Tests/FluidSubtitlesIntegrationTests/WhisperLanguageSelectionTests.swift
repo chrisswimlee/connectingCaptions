@@ -141,7 +141,7 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         XCTAssertEqual(SpokenLanguageHints.whisperLanguageCode(stored: "ko", alsoHearOthers: false), "ko")
     }
 
-    func testDeferredEitherWayPinsWhisperToSpokenSource() {
+    func testEitherWayLeavesWhisperOnAutoDetect() {
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalSource = settings.translationSourceLanguageID
@@ -170,9 +170,9 @@ final class WhisperLanguageSelectionTests: XCTestCase {
 
         SpokenLanguageResolver.pinWhisperToSpokenSource(settings: settings)
 
-        XCTAssertFalse(SpokenLanguageResolver.dynamicPairingAvailable)
-        XCTAssertEqual(settings.selectedWhisperLanguageCode, "en")
-        XCTAssertFalse(SpokenLanguageResolver.shouldAutoDetectWhisper(settings: settings))
+        XCTAssertTrue(SpokenLanguageResolver.dynamicPairingAvailable(settings: settings))
+        XCTAssertNil(settings.selectedWhisperLanguageCode)
+        XCTAssertTrue(SpokenLanguageResolver.shouldAutoDetectWhisper(settings: settings))
         XCTAssertTrue(SpokenLanguageResolver.voiceEngineSupportsSource(settings: settings))
     }
 

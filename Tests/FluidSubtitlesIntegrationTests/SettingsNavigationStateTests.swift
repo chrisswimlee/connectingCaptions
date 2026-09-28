@@ -113,7 +113,7 @@ final class SettingsNavigationStateTests: XCTestCase {
     func testSettingsSectionsHaveStableTitlesAndIcons() {
         XCTAssertEqual(
             SettingsSection.allCases.map(\.title),
-            ["Theater", "General", "Dictation", "AI Providers", "Notifications", "Audio", "Data & Diagnostics", "Experimental"]
+            ["Theater", "Speak and type", "General", "Dictation", "AI Providers", "Notifications", "Audio", "Data & Diagnostics", "Experimental"]
         )
         XCTAssertTrue(SettingsSection.allCases.allSatisfy { !$0.systemImage.isEmpty })
         XCTAssertEqual(SettingsSection.translation.systemImage, "captions.bubble")
@@ -121,7 +121,7 @@ final class SettingsNavigationStateTests: XCTestCase {
         XCTAssertFalse(SettingsSection.productSections.contains(.dictation))
         XCTAssertEqual(
             SettingsSection.productSections.map(\.title),
-            ["Theater", "General", "Notifications", "Audio", "Data & Diagnostics", "Experimental"]
+            ["Theater", "Speak and type", "General", "Notifications", "Audio", "Data & Diagnostics", "Experimental"]
         )
     }
 
@@ -139,7 +139,9 @@ final class SettingsNavigationStateTests: XCTestCase {
         let results = SettingsSearchIndex.results(for: "Copy to Clipboard")
 
         XCTAssertEqual(results.first?.target, .copyToClipboard)
+        XCTAssertEqual(results.first?.section, .general)
         XCTAssertTrue(results.contains { $0.target == .textInsertionMode })
+        XCTAssertEqual(SettingsSearchIndex.results(for: "Spoken Send").first?.section, .general)
     }
 
     func testSettingsSearchNormalizesCaseAndDiacritics() {
@@ -167,7 +169,7 @@ final class SettingsNavigationStateTests: XCTestCase {
     func testSettingsSearchKeepsSectionsInNavigationOrder() {
         XCTAssertEqual(
             SettingsSearchIndex.matchingSections(for: "mic"),
-            [.dictation, .notifications, .audio]
+            [.general, .notifications, .audio]
         )
     }
 
@@ -180,7 +182,7 @@ final class SettingsNavigationStateTests: XCTestCase {
         )
         XCTAssertEqual(
             SettingsSearchIndex.preferredSection(current: .general, results: results),
-            results.first?.section
+            .general
         )
         XCTAssertEqual(SettingsSearchIndex.preferredSection(current: .audio, results: []), .audio)
     }

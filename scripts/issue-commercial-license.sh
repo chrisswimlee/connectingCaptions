@@ -10,6 +10,7 @@ usage() {
     cat <<'EOF'
 Usage:
   ./scripts/issue-commercial-license.sh --org "Example LLP" --seats 25 --expires 2027-09-21
+  ./scripts/issue-commercial-license.sh --org "Example LLP" --seats 25 --expires 2027-09-21 --sla --enforce-seats
   ./scripts/issue-commercial-license.sh --generate-key
 
 Private key, standard Base64 of 32 raw bytes:
@@ -17,6 +18,8 @@ Private key, standard Base64 of 32 raw bytes:
   or ~/.config/fluidsubtitles/commercial-license.ed25519 (mode 600)
 
 Optional: --issued YYYY-MM-DD (UTC, default today)
+          --sla              written SLA
+          --enforce-seats    Licensed to requires a signed seat list
 EOF
 }
 
@@ -25,6 +28,8 @@ SEATS=""
 EXPIRES=""
 ISSUED=""
 GENERATE=0
+SLA=0
+ENFORCE=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -32,6 +37,8 @@ while [[ $# -gt 0 ]]; do
         --seats) SEATS="${2:-}"; shift 2 ;;
         --expires) EXPIRES="${2:-}"; shift 2 ;;
         --issued) ISSUED="${2:-}"; shift 2 ;;
+        --sla) SLA=1; shift ;;
+        --enforce-seats) ENFORCE=1; shift ;;
         --generate-key) GENERATE=1; shift ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown argument: $1" >&2; usage >&2; exit 1 ;;
@@ -43,7 +50,7 @@ if [[ -z "${PRIVATE_KEY}" && -f "${DEFAULT_KEY}" ]]; then
     PRIVATE_KEY="$(tr -d '[:space:]' < "${DEFAULT_KEY}")"
 fi
 
-swift - "$ROOT" "$GENERATE" "$ORG" "$SEATS" "$EXPIRES" "$ISSUED" "$PRIVATE_KEY" "$DEFAULT_KEY" <<'SWIFT'
+swift - "$ROOT" "$GENERATE" "$ORG" "$SEATS" "$EXPIRES" "$ISSUED" "$PRIVATE_KEY" "$DEFAULT_KEY" "$SLA" "$ENFORCE" <<'SWIFT'
 import CryptoKit
 import Foundation
 
@@ -55,6 +62,8 @@ let expires = args[5]
 let issuedArg = args[6]
 let privateKeyBase64 = args[7]
 let defaultKeyPath = args[8]
+let includeSLA = args[9] == "1"
+let enforceSeats = args[10] == "1"
 
 func dayFormatter() -> ISO8601DateFormatter {
     let formatter = ISO8601DateFormatter()
@@ -119,12 +128,37 @@ struct Wire: Encodable {
     var seats: Int
     var issued: String
     var expires: String
+    var sla: Bool?
+    var enforceSeats: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case product, org, seats, issued, expires, sla, enforceSeats
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(product, forKey: .product)
+        try container.encode(org, forKey: .org)
+        try container.encode(seats, forKey: .seats)
+        try container.encode(issued, forKey: .issued)
+        try container.encode(expires, forKey: .expires)
+        try container.encodeIfPresent(sla, forKey: .sla)
+        try container.encodeIfPresent(enforceSeats, forKey: .enforceSeats)
+    }
 }
 
 let encoder = JSONEncoder()
 encoder.outputFormatting = [.sortedKeys]
 let data = try encoder.encode(
-    Wire(product: "fluidSubtitles", org: org, seats: seats, issued: issued, expires: expires)
+    Wire(
+        product: "fluidSubtitles",
+        org: org,
+        seats: seats,
+        issued: issued,
+        expires: expires,
+        sla: includeSLA ? true : nil,
+        enforceSeats: enforceSeats ? true : nil
+    )
 )
 let signature = try privateKey.signature(for: data)
 print("\(base64URL(data)).\(base64URL(signature))")

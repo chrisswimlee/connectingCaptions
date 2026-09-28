@@ -13,7 +13,7 @@ Theater shows a measured clock: `mic · e2e · ASR · MT · thermal`. Those HUD 
 
 End-to-end is speech-start to the committed caption, which is the first time the audience sees that clause. `MT` is Apple Translation only.
 
-The HUD stays visible when chrome is hidden.
+Pop-up keeps the clock on the tool shelf. Overlay hides it with the tools, so the audience sees the interpretation alone.
 
 Apple Translation uses a warm `TranslationSession`. Hosted CI builds with the Xcode 26.3 SDK, so the later `preferredStrategy` API is not linked. Theater translates a clause when it is accepted, not on every ASR partial. A speculative Apple-only prefetch may start at a clause-boundary approximation and stay off the board. The commit reuses that prefetch only when the unit is the same clause. The HUD `MT` value is the commit-path wait: 0 on an Apple cache hit that was not sharpened, otherwise Apple plus optional first-print polish. Prefetch does not use local MLX and must not starve a queued commit. A later commit submits as soon as its clause is known. A running experimental local LLM may sharpen the Apple line before it appears; a miss or timeout keeps the Apple line.
 
@@ -37,7 +37,7 @@ Korean, Japanese, and Thai Listen must not use Flash or TDT v2. Theater refuses 
 
 English mid-listen confirmation re-decode is skipped so preview ticks keep the Neural Engine. Korean, Japanese, and Thai confirmation still runs on Stop and on the first silence hold, and only for leftover speech that is not yet painted. A caption already on the board stays.
 
-Speech edges: the first ASR tick is immediate. After 400 ms of RMS silence, one last tick still runs, then later ticks are skipped so a long keynote pause does not keep the Neural Engine hot. Parakeet end-of-utterance holds 400 ms, then commits leftover speech that is a real clause. A mid-talk period commits only when more speech already follows that finished sentence. A twelve-word timer stays pause-only. Same-language pairs skip Apple Translation and print the spoken sentence. There is no neural VAD on this path.
+Speech edges: the first ASR tick is immediate. After 400 ms of RMS silence, one last tick still runs, then later ticks are skipped so a long keynote pause does not keep the Neural Engine hot. Parakeet end-of-utterance holds 400 ms, then commits leftover speech that is a real clause. A mid-talk period commits on the tick speech continues past that ending. A lone finished sentence commits after a brief settle if it is still the whole draft. Silence or end of utterance prints a finished leftover, and an unpunctuated tail stays open. A twelve-word timer stays pause-only. Same-language pairs skip Apple Translation and print the spoken sentence. There is no neural VAD on this path.
 
 Memory: live PCM is 30 seconds of 16 kHz float. The live Theater transcript keeps unread speech only. The board keeps the latest 48 captions and scrolls through what fits. Rows past that leave the on-screen log. History and bilingual export use this listen’s session record. SRT/VTT use commit times when every cue has a date; otherwise they fall back to 4-second slots.
 

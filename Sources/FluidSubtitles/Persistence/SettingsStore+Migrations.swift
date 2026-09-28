@@ -28,6 +28,9 @@ extension SettingsStore {
     }
 
     func migrateProviderAPIKeysIfNeeded() {
+        // Keychain I/O waits on the login keychain. The test host calls this
+        // from `SettingsStore.init` on the main thread, before XCTest connects.
+        guard !Self.isRunningTests else { return }
         self.defaults.removeObject(forKey: Keys.providerAPIKeyIdentifiers)
 
         var merged = (try? self.keychain.fetchAllKeys()) ?? [:]

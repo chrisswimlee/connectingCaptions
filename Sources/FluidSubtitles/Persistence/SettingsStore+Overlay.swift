@@ -261,7 +261,7 @@ extension SettingsStore {
         }
     }
 
-    /// One-time: the inherited teal default is FluidVoice. Caption gold is this product.
+    /// One-time: the inherited teal default becomes caption gold.
     /// A later choice of Teal stays put.
     func migrateCaptionAccentIfNeeded() {
         guard self.defaults.object(forKey: Keys.captionAccentMigration) == nil else { return }

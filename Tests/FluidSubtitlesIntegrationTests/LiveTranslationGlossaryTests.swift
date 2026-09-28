@@ -660,8 +660,12 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertEqual(SpokenScriptDetector.languageID(in: "안녕하세요 여러분", among: ["en", "ko"]), "ko")
         XCTAssertEqual(SpokenScriptDetector.languageID(in: "こんにちは皆さん", among: ["en", "ja"]), "ja")
         XCTAssertEqual(SpokenScriptDetector.languageID(in: "สวัสดีครับ", among: ["en", "th"]), "th")
+        XCTAssertEqual(SpokenScriptDetector.languageID(in: "你好大家好", among: ["en", "zh"]), "zh")
+        XCTAssertNil(SpokenScriptDetector.languageID(in: "Bonjour tout le monde", among: ["en", "fr"]))
         XCTAssertNil(SpokenScriptDetector.languageID(in: "Hi 안녕", among: ["en", "ko"]))
         XCTAssertNil(SpokenScriptDetector.languageID(in: "A", among: ["en", "ko"]))
+        XCTAssertTrue(SpokenScriptDetector.pairSharesOneScript("en", "fr"))
+        XCTAssertFalse(SpokenScriptDetector.pairSharesOneScript("en", "ko"))
     }
 
     func testAlsoHearOthersSegmentsExtrasByScriptWithoutFlippingThePair() {
@@ -669,14 +673,17 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         let originalSource = settings.translationSourceLanguageID
         let originalTarget = settings.translationTargetLanguageID
         let originalAlsoHear = settings.theaterAlsoHearOtherLanguages
+        let originalDynamic = settings.theaterDynamicPairing
         defer {
             settings.translationSourceLanguageID = originalSource
             settings.translationTargetLanguageID = originalTarget
             settings.theaterAlsoHearOtherLanguages = originalAlsoHear
+            settings.theaterDynamicPairing = originalDynamic
         }
 
         settings.translationSourceLanguageID = "en"
         settings.translationTargetLanguageID = "ko"
+        settings.theaterDynamicPairing = false
         settings.theaterAlsoHearOtherLanguages = false
         XCTAssertEqual(
             SpokenLanguageResolver.listenLanguageID(for: "안녕하세요 여러분", settings: settings),
@@ -690,8 +697,14 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         )
         XCTAssertEqual(
             SpokenLanguageResolver.listenLanguageID(for: "สวัสดีครับ", settings: settings),
+            "en"
+        )
+        settings.translationTargetLanguageID = "th"
+        XCTAssertEqual(
+            SpokenLanguageResolver.listenLanguageID(for: "สวัสดีครับ", settings: settings),
             "th"
         )
+        settings.translationTargetLanguageID = "ko"
         XCTAssertEqual(
             SpokenLanguageResolver.listenLanguageID(for: "Hello there", settings: settings),
             "en"
@@ -710,33 +723,265 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertTrue(TranslationEngineError.timeout.isTimeout)
     }
 
-    func testDynamicPairingStaysPinnedWhileEitherWayIsDeferred() {
+    func testEitherWayStaysOffUnlessWhisperHearsBothSides() {
         let settings = SettingsStore.shared
         let originalSource = settings.translationSourceLanguageID
         let originalTarget = settings.translationTargetLanguageID
         let originalMode = settings.theaterSessionMode
         let originalDynamic = settings.theaterDynamicPairing
+        let originalModel = settings.selectedSpeechModel
         defer {
             settings.translationSourceLanguageID = originalSource
             settings.translationTargetLanguageID = originalTarget
             settings.theaterSessionMode = originalMode
             settings.theaterDynamicPairing = originalDynamic
+            settings.selectedSpeechModel = originalModel
+            SpokenLanguageResolver.noteDetectedLanguage(nil)
         }
 
         settings.theaterSessionMode = .translation
         settings.translationSourceLanguageID = "en"
         settings.translationTargetLanguageID = "ko"
         settings.theaterDynamicPairing = true
+        settings.selectedSpeechModel = .appleSpeech
 
-        XCTAssertFalse(SpokenLanguageResolver.dynamicPairingAvailable)
+        XCTAssertFalse(SpokenLanguageResolver.dynamicPairingAvailable(settings: settings))
         XCTAssertFalse(SpokenLanguageResolver.isDynamicPairingEnabled(settings: settings))
+        let pinned = SpokenLanguageResolver.pairForSpokenText("안녕하세요 여러분", settings: settings)
+        XCTAssertEqual(pinned.source.id, "en")
+        XCTAssertEqual(pinned.target.id, "ko")
+
+        settings.selectedSpeechModel = .whisperSmall
+        XCTAssertTrue(SpokenLanguageResolver.dynamicPairingAvailable(settings: settings))
+        XCTAssertTrue(SpokenLanguageResolver.isDynamicPairingEnabled(settings: settings))
         let korean = SpokenLanguageResolver.pairForSpokenText("안녕하세요 여러분", settings: settings)
-        XCTAssertEqual(korean.source.id, "en")
-        XCTAssertEqual(korean.target.id, "ko")
+        XCTAssertEqual(korean.source.id, "ko")
+        XCTAssertEqual(korean.target.id, "en")
         let english = SpokenLanguageResolver.pairForSpokenText("Hello everyone", settings: settings)
         XCTAssertEqual(english.source.id, "en")
         XCTAssertEqual(english.target.id, "ko")
-        XCTAssertEqual(SpokenLanguageResolver.pairLabel(settings: settings), "English → Korean")
+        XCTAssertEqual(SpokenLanguageResolver.pairLabel(settings: settings), "English ↔ Korean")
+
+        settings.translationTargetLanguageID = "fr"
+        SpokenLanguageResolver.noteDetectedLanguage(nil)
+        let unlabeled = SpokenLanguageResolver.pairForSpokenText("Bonjour tout le monde", settings: settings)
+        XCTAssertEqual(unlabeled.source.id, "en")
+        XCTAssertEqual(unlabeled.target.id, "fr")
+        SpokenLanguageResolver.noteDetectedLanguage("fr")
+        let french = SpokenLanguageResolver.pairForSpokenText("Bonjour tout le monde", settings: settings)
+        XCTAssertEqual(french.source.id, "fr")
+        XCTAssertEqual(french.target.id, "en")
+    }
+
+    func testSpeakCaptionsStaysOffForInsertAndSameLanguage() {
+        XCTAssertFalse(
+            TheaterSpokenDelivery.shouldSpeak(
+                enabled: false,
+                listenKind: .captions,
+                sameLanguage: false,
+                text: "Hello",
+                voiceInstalled: true
+            )
+        )
+        XCTAssertFalse(
+            TheaterSpokenDelivery.shouldSpeak(
+                enabled: true,
+                listenKind: .insert,
+                sameLanguage: false,
+                text: "Hello",
+                voiceInstalled: true
+            )
+        )
+        XCTAssertFalse(
+            TheaterSpokenDelivery.shouldSpeak(
+                enabled: true,
+                listenKind: .captions,
+                sameLanguage: true,
+                text: "Hello",
+                voiceInstalled: true
+            )
+        )
+        XCTAssertFalse(
+            TheaterSpokenDelivery.shouldSpeak(
+                enabled: true,
+                listenKind: .captions,
+                sameLanguage: false,
+                text: "   ",
+                voiceInstalled: true
+            )
+        )
+        XCTAssertTrue(
+            TheaterSpokenDelivery.shouldSpeak(
+                enabled: true,
+                listenKind: .captions,
+                sameLanguage: false,
+                text: "Hello",
+                voiceInstalled: true
+            )
+        )
+    }
+
+    func testSpeakCaptionsReplacesPendingTextAndRestartsARender() {
+        let pending = [
+            TheaterSpokenLine(id: 1, text: "Hello", languageID: "en"),
+            TheaterSpokenLine(id: 2, text: "Next", languageID: "en")
+        ]
+        let replaced = TheaterSpokenDelivery.revise(
+            id: 1,
+            text: "Hello there",
+            languageID: "ko",
+            pending: pending,
+            currentID: nil,
+            phase: .idle
+        )
+        XCTAssertFalse(replaced.cancelInFlight)
+        XCTAssertEqual(replaced.pending.map(\.text), ["Hello there", "Next"])
+        XCTAssertEqual(replaced.pending.map(\.languageID), ["ko", "en"])
+
+        let playing = TheaterSpokenDelivery.revise(
+            id: 4,
+            text: "Updated",
+            languageID: "en",
+            pending: [TheaterSpokenLine(id: 5, text: "Waiting", languageID: "en")],
+            currentID: 4,
+            phase: .playing
+        )
+        XCTAssertFalse(playing.cancelInFlight)
+        XCTAssertEqual(playing.pending.map(\.id), [5])
+
+        let rendering = TheaterSpokenDelivery.revise(
+            id: 4,
+            text: "Updated",
+            languageID: "ja",
+            pending: [TheaterSpokenLine(id: 5, text: "Waiting", languageID: "en")],
+            currentID: 4,
+            phase: .rendering
+        )
+        XCTAssertTrue(rendering.cancelInFlight)
+        XCTAssertEqual(rendering.pending.map(\.id), [4, 5])
+        XCTAssertEqual(rendering.pending.first?.text, "Updated")
+        XCTAssertEqual(rendering.pending.first?.languageID, "ja")
+
+        let unknown = TheaterSpokenDelivery.revise(
+            id: 9,
+            text: "Nope",
+            languageID: "en",
+            pending: pending,
+            currentID: nil,
+            phase: .idle
+        )
+        XCTAssertFalse(unknown.cancelInFlight)
+        XCTAssertEqual(unknown.pending, pending)
+    }
+
+    func testSpeakCaptionsPlaybackLimits() {
+        XCTAssertEqual(TheaterSpokenDelivery.synthesisNanoseconds, 8_000_000_000)
+        XCTAssertEqual(
+            TheaterSpokenDelivery.playbackNanoseconds(durationSeconds: 1),
+            2_000_000_000
+        )
+        XCTAssertEqual(
+            TheaterSpokenDelivery.playbackNanoseconds(frameCount: 16_000, sampleRate: 16_000),
+            2_000_000_000
+        )
+        XCTAssertEqual(TheaterSpokenDelivery.drainNanoseconds, 1_000_000_000)
+        XCTAssertEqual(TheaterSpokenDelivery.engineStartNanoseconds, 2_000_000_000)
+    }
+
+    func testSpeakCaptionsQueueKeepsTheLatestLines() {
+        var pending: [TheaterSpokenLine] = []
+        for index in 1...6 {
+            pending = TheaterSpokenDelivery.enqueue(
+                id: UInt64(index),
+                text: "Line \(index)",
+                languageID: "en",
+                pending: pending,
+                currentID: nil,
+                maxLines: 4
+            )
+        }
+        XCTAssertEqual(pending.map(\.id), [3, 4, 5, 6])
+        let replaced = TheaterSpokenDelivery.enqueue(
+            id: 5,
+            text: "Line 5 revised",
+            languageID: "ko",
+            pending: pending,
+            currentID: 6
+        )
+        XCTAssertEqual(replaced.map(\.text), ["Line 3", "Line 4", "Line 5 revised", "Line 6"])
+        XCTAssertEqual(replaced.map(\.languageID), ["en", "en", "ko", "en"])
+        let inFlight = TheaterSpokenDelivery.enqueue(
+            id: 6,
+            text: "Should not queue twice",
+            languageID: "en",
+            pending: replaced,
+            currentID: 6
+        )
+        XCTAssertEqual(inFlight, replaced)
+    }
+
+    func testSpeakCaptionsReusesARunningEngine() {
+        XCTAssertEqual(
+            TheaterSpokenDelivery.enginePlan(running: true, formatMatches: true, outputMatches: true),
+            .reuse
+        )
+        XCTAssertEqual(
+            TheaterSpokenDelivery.enginePlan(running: false, formatMatches: true, outputMatches: true),
+            .rebuild
+        )
+        XCTAssertEqual(
+            TheaterSpokenDelivery.enginePlan(running: true, formatMatches: false, outputMatches: true),
+            .rebuild
+        )
+        XCTAssertEqual(
+            TheaterSpokenDelivery.enginePlan(running: true, formatMatches: true, outputMatches: false),
+            .rebuild
+        )
+    }
+
+    func testSpeakCaptionsDrainWaitReturnsWhenTheTaskStaysSilent() async {
+        let stuck = Task<Void, Never> {
+            do {
+                try await Task.sleep(nanoseconds: 30_000_000_000)
+            } catch {}
+        }
+        defer { stuck.cancel() }
+        let start = ContinuousClock.now
+        await TheaterSpokenDelivery.waitForTask(stuck, nanoseconds: 50_000_000)
+        let elapsed = start.duration(to: .now)
+        XCTAssertLessThan(elapsed, .seconds(2))
+    }
+
+    func testSpeakCaptionsSkipsAMissingOutput() {
+        XCTAssertEqual(
+            TheaterSpokenDelivery.outputChoice(preferredUID: nil, deviceFound: false, deviceSet: false),
+            .play
+        )
+        XCTAssertEqual(
+            TheaterSpokenDelivery.outputChoice(preferredUID: "   ", deviceFound: false, deviceSet: false),
+            .play
+        )
+        XCTAssertFalse(
+            TheaterSpokenDelivery.outputChoice(preferredUID: nil, deviceFound: false, deviceSet: false).clearsEngine
+        )
+        let skipped = TheaterSpokenDelivery.outputChoice(
+            preferredUID: "speakers",
+            deviceFound: true,
+            deviceSet: false
+        )
+        XCTAssertEqual(skipped, .skipAndClear)
+        XCTAssertTrue(skipped.clearsEngine)
+        XCTAssertEqual(
+            TheaterSpokenDelivery.outputChoice(preferredUID: "speakers", deviceFound: false, deviceSet: false),
+            .skipAndClear
+        )
+        let ready = TheaterSpokenDelivery.outputChoice(
+            preferredUID: "speakers",
+            deviceFound: true,
+            deviceSet: true
+        )
+        XCTAssertEqual(ready, .play)
+        XCTAssertFalse(ready.clearsEngine)
     }
 
     func testEitherWayCombinesPacksAndAttachesTheMissingDirection() {

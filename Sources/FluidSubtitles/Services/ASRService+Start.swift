@@ -89,6 +89,7 @@ extension ASRService {
         self.abortStreamingWavWriter()
         self.audioBuffer.clear(keepingCapacity: true) // specific optimization for restart
         self.partialTranscription.removeAll()
+        SpokenLanguageResolver.noteDetectedLanguage(nil)
         self.previousFullTranscription.removeAll()
         self.committedStreamingText.removeAll()
         self.cancelIdleMemoryRelease()

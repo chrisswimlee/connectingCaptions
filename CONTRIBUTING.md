@@ -84,7 +84,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing Theater or the
 | Theater UI | `Sources/FluidSubtitles/UI/LiveTranslation/` | Home, Theater window, presenter chrome, Setup Wizard |
 | Speech engine | `ASRService.swift` plus `ASRService+*.swift` | Microphone audio → transcript. Reads `SpeechCapturePolicy`. Keep this as the engine, not the product. |
 | Theater Listen | `ContentView+TheaterListen.swift`, `TheaterSpeechSession.swift` | Caption and insert start/stop. Do not start Theater as dictation. |
-| Dictation insert | `TypingService`, `GlobalHotkeyManager` | Listen and type uses the app captured at start. Type into app uses the frontmost field. |
+| Dictation insert | `TypingService`, `GlobalHotkeyManager`, `QuickTranslateInsert` | Listen, then type uses the app captured at start and shows that line on a bar. Type the board uses the frontmost field. |
 | Overlay | `BottomOverlayView`, `NotchOverlayManager` | Insert chip only |
 | Settings | `SettingsStore.swift` plus `SettingsStore+*.swift` | Persist models, shortcuts, Theater options |
 | App shell | `ContentView.swift` plus `ContentView+*.swift` | Window, Theater Listen, onboarding |

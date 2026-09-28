@@ -8,8 +8,8 @@ Personal tap files live in a separate `homebrew-fluidsubtitles` repo, not this g
 2. `./scripts/enable-github-gates.sh` so `chrisswimlee/fluidSubtitles` is public
 3. `./build.sh release` with Developer ID and notarization credentials
 4. Put the published team ID in `FluidProduct.allowedUpdateTeamIDs`
-5. Tag `v1.6.11` (must match `CFBundleShortVersionString`) so `.github/workflows/release.yml` attaches `fluidsubtitles-1.6.11.zip` and `SHA256SUMS`
-6. From the tap checkout: `./update-cask.sh 1.6.11 /path/to/fluidSubtitles/dist/SHA256SUMS`
+5. Tag `v1.6.12` (must match `CFBundleShortVersionString`) so `.github/workflows/release.yml` attaches `fluidsubtitles-1.6.12.zip` and `SHA256SUMS`
+6. From the tap checkout: `./update-cask.sh 1.6.12 /path/to/fluidSubtitles/dist/SHA256SUMS`
 7. Publish the tap:
 
 ```bash
@@ -30,4 +30,4 @@ brew uninstall --cask fluidsubtitles
 
 9. After one launch, refresh zap paths with `brew generate-zap --cask fluidsubtitles` and commit any extras (do not zap FluidVoice or FluidAudio)
 10. Add `brew tap chrisswimlee/fluidsubtitles && brew install --cask fluidsubtitles` to the app README Install section
-11. After roughly 75 GitHub stars, PR `chrisswimlee-fluidsubtitles` to [Homebrew/homebrew-cask](https://github.com/Homebrew/homebrew-cask) with a pinned `sha256` (not `:no_check`). Commit message: `chrisswimlee-fluidsubtitles 1.6.11 (new cask)`
+11. After roughly 75 GitHub stars, PR `chrisswimlee-fluidsubtitles` to [Homebrew/homebrew-cask](https://github.com/Homebrew/homebrew-cask) with a pinned `sha256` (not `:no_check`). Commit message: `chrisswimlee-fluidsubtitles 1.6.12 (new cask)`

@@ -15,6 +15,9 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
     private var settingsCancellables = Set<AnyCancellable>()
     private var appliedWindowStyle: (presentation: String, captionsOnly: Bool)?
     private var persistFrameWork: DispatchWorkItem?
+    /// Polls the pointer while idle Overlay clicks through. SwiftUI hover cannot
+    /// see the cursor until this window accepts events again.
+    private var overlayHoverTimer: Timer?
 
     func setVisible(_ visible: Bool) {
         if visible {
@@ -47,6 +50,7 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
             self.restoreFrame()
         }
         self.rememberExternalApp()
+        self.updateOverlayPlacementGate()
         self.applyOverlayPin()
         if TheaterMinimize.shouldOrderFront(minimized: SettingsStore.shared.theaterMinimized) {
             self.panel?.orderFront(nil)
@@ -74,6 +78,7 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         self.model.paceCueLabel = ""
         self.model.paceCueCompactLabel = ""
         self.model.paceCueKind = ""
+        self.model.inboxLines = []
     }
 
     func update(
@@ -86,7 +91,8 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         canRetryTranslation: Bool = false,
         latencyReadout: String = "",
         compactLatencyReadout: String = "",
-        paceCue: TheaterPaceCue.Snapshot? = nil
+        paceCue: TheaterPaceCue.Snapshot? = nil,
+        inboxLines: [String] = []
     ) {
         if self.model.board != board { self.model.board = board }
         if self.model.pairLabel != pairLabel { self.model.pairLabel = pairLabel }
@@ -114,6 +120,9 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         }
         if self.model.paceCueKind != paceKind {
             self.model.paceCueKind = paceKind
+        }
+        if self.model.inboxLines != inboxLines {
+            self.model.inboxLines = inboxLines
         }
     }
 
@@ -219,15 +228,18 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
     }
 
     func windowDidMove(_ notification: Notification) {
+        self.refreshPlacementConfirmation()
         self.schedulePersistFrame()
     }
 
     func windowDidResize(_ notification: Notification) {
+        self.refreshPlacementConfirmation()
         guard !(self.panel?.inLiveResize ?? false) else { return }
         self.schedulePersistFrame()
     }
 
     func windowDidEndLiveResize(_ notification: Notification) {
+        self.refreshPlacementConfirmation()
         self.schedulePersistFrame()
     }
 
@@ -245,6 +257,8 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         SettingsStore.shared.theaterWindowEnabled = false
         SettingsStore.shared.theaterMinimized = false
         self.model.overlayToolsPinned = false
+        self.model.isPlacingOverlay = false
+        self.model.canConfirmOverlayPlacement = false
         self.applyOverlayPin()
         LiveTranslationController.shared.theaterWasClosed()
         self.isDismissing = false
@@ -313,6 +327,22 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
                 self?.lowerPopupIfAppWindowBecameKey(notification.object as? NSWindow)
             }
             .store(in: &self.settingsCancellables)
+        self.model.$overlayDockHeight
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.refreshOverlayHoverCapture()
+                }
+            }
+            .store(in: &self.settingsCancellables)
+        self.model.$overlayDockHolding
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.refreshOverlayHoverCapture()
+                }
+            }
+            .store(in: &self.settingsCancellables)
     }
 
     /// Pop-up shares the normal window stack. When Home or Settings becomes
@@ -338,11 +368,16 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         if let applied = self.appliedWindowStyle, applied == current { return }
         if settings.theaterPresentation == .popup {
             self.model.overlayToolsPinned = false
+            self.model.isPlacingOverlay = false
+            self.model.canConfirmOverlayPlacement = false
         }
         self.applyWindowSharing()
         self.applyPresentationStyle()
         if presentationChanged, self.panel?.isVisible == true, !settings.theaterMinimized {
             self.refitAfterPresentationChange()
+        } else {
+            self.updateOverlayPlacementGate()
+            self.applyOverlayPin()
         }
     }
 
@@ -351,7 +386,14 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         guard let panel = self.panel else { return }
         let screen = panel.screen ?? Self.preferredScreen()
         guard let screen else { return }
-        Self.place(panel, stored: panel.frame, on: screen)
+        Self.place(
+            panel,
+            stored: panel.frame,
+            on: screen,
+            placing: self.model.isPlacingOverlay
+        )
+        self.updateOverlayPlacementGate()
+        self.applyOverlayPin()
     }
 
     var overlayToolsPinned: Bool { self.model.overlayToolsPinned }
@@ -370,26 +412,171 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         }
     }
 
+    /// Saves the rectangle under the pointer and enters click-through Overlay.
+    func confirmOverlayPlacement() {
+        guard self.model.isPlacingOverlay, let panel = self.panel, panel.isVisible else { return }
+        let screen = panel.screen ?? Self.preferredScreen()
+        guard let screen else { return }
+        guard !TheaterWindowPlacement.needsOverlayPlacement(
+            stored: panel.frame,
+            visible: screen.visibleFrame
+        ) else {
+            self.refreshPlacementConfirmation()
+            return
+        }
+        self.model.isPlacingOverlay = false
+        self.model.canConfirmOverlayPlacement = false
+        self.persistFrame()
+        self.applyOverlayPin()
+    }
+
+    private func updateOverlayPlacementGate() {
+        let settings = SettingsStore.shared
+        guard settings.theaterPresentation == .transparent,
+              !settings.theaterMinimized,
+              settings.theaterWindowEnabled,
+              let panel = self.panel,
+              let screen = panel.screen ?? Self.preferredScreen()
+        else {
+            if self.model.isPlacingOverlay {
+                self.model.isPlacingOverlay = false
+            }
+            self.refreshPlacementConfirmation()
+            return
+        }
+        if self.model.isPlacingOverlay {
+            self.refreshPlacementConfirmation()
+            return
+        }
+        let decision = TheaterWindowPlacement.overlayFrameDecision(
+            stored: panel.frame,
+            saved: Self.savedOverlayFrame(),
+            visible: screen.visibleFrame,
+            preset: settings.theaterPositionPreset,
+            placing: false
+        )
+        if decision.needsPlacement {
+            self.model.isPlacingOverlay = true
+        }
+        self.refreshPlacementConfirmation()
+    }
+
+    private func refreshPlacementConfirmation() {
+        let next: Bool
+        if self.model.isPlacingOverlay,
+           let panel = self.panel,
+           let screen = panel.screen ?? Self.preferredScreen()
+        {
+            next = !TheaterWindowPlacement.needsOverlayPlacement(
+                stored: panel.frame,
+                visible: screen.visibleFrame
+            )
+        } else {
+            next = false
+        }
+        if self.model.canConfirmOverlayPlacement != next {
+            self.model.canConfirmOverlayPlacement = next
+        }
+    }
+
+    private static func savedOverlayFrame() -> CGRect? {
+        let stored = SettingsStore.shared.theaterOverlayFrame
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !stored.isEmpty else { return nil }
+        let rect = NSRectFromString(stored)
+        guard rect.width > 200, rect.height > 80 else { return nil }
+        return rect
+    }
+
+    /// Idle Overlay clicks through, so the tool bar cannot use SwiftUI hover.
+    /// The pointer is sampled while that window is up, and only the bar's rect
+    /// accepts clicks. A faded bar stays a thin strip so captions underneath
+    /// still reach the slides.
+    private func refreshOverlayHoverCapture() {
+        guard let panel = self.panel else {
+            self.updateOverlayHoverTimer(running: false)
+            return
+        }
+        let settings = SettingsStore.shared
+        let idle = panel.isVisible
+            && !settings.theaterMinimized
+            && TheaterOverlayPolicy.hidesAllChrome(
+                presentation: settings.theaterPresentation,
+                toolsPinned: self.model.overlayToolsPinned,
+                placing: self.model.isPlacingOverlay
+            )
+        self.updateOverlayHoverTimer(running: idle)
+        let inside = idle && self.overlayPointerInHoverDock(panel: panel)
+        if self.model.overlayDockEngaged != inside {
+            self.model.overlayDockEngaged = inside
+            if inside, !settings.theaterOverlayCoachSeen {
+                settings.theaterOverlayCoachSeen = true
+            }
+        }
+        let ignore = TheaterOverlayPolicy.ignoresMouseEvents(
+            presentation: settings.theaterPresentation,
+            toolsPinned: self.model.overlayToolsPinned,
+            minimized: settings.theaterMinimized,
+            placing: self.model.isPlacingOverlay,
+            pointerInHoverDock: inside
+        )
+        if panel.ignoresMouseEvents != ignore {
+            panel.ignoresMouseEvents = ignore
+        }
+    }
+
+    private func overlayPointerInHoverDock(panel: NSPanel) -> Bool {
+        if self.model.overlayDockHolding { return true }
+        if NSEvent.pressedMouseButtons != 0, self.model.overlayDockEngaged {
+            return true
+        }
+        let open = TheaterOverlayPolicy.showsHoverDock(
+            engaged: self.model.overlayDockEngaged,
+            holding: self.model.overlayDockHolding
+        )
+        let height = open ? self.model.overlayDockHeight : 0
+        return TheaterOverlayPolicy.hoverDockContains(
+            NSEvent.mouseLocation,
+            windowFrame: panel.frame,
+            contentHeight: height
+        )
+    }
+
+    private func updateOverlayHoverTimer(running: Bool) {
+        if running {
+            guard self.overlayHoverTimer == nil else { return }
+            let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.refreshOverlayHoverCapture()
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.overlayHoverTimer = timer
+            return
+        }
+        self.overlayHoverTimer?.invalidate()
+        self.overlayHoverTimer = nil
+    }
+
     private func applyOverlayPin() {
         guard let panel = self.panel else { return }
         let settings = SettingsStore.shared
         let presentation = settings.theaterPresentation
         let pinned = self.model.overlayToolsPinned
         let minimized = settings.theaterMinimized
-        panel.ignoresMouseEvents = TheaterOverlayPolicy.ignoresMouseEvents(
-            presentation: presentation,
-            toolsPinned: pinned,
-            minimized: minimized
-        )
+        let placing = self.model.isPlacingOverlay
+        self.refreshOverlayHoverCapture()
         panel.isMovableByWindowBackground = TheaterOverlayPolicy.movableByBackground(
             presentation: presentation,
             toolsPinned: pinned,
-            minimized: minimized
+            minimized: minimized,
+            placing: placing
         )
         let hideButtons = TheaterOverlayPolicy.hidesTitlebarButtons(
             presentation: presentation,
             toolsPinned: pinned,
-            hideChrome: settings.theaterHideChrome
+            hideChrome: settings.theaterHideChrome,
+            placing: placing
         )
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             guard let control = panel.standardWindowButton(button) else { continue }
@@ -397,6 +584,11 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
             control.alphaValue = hideButtons ? 0 : 1
         }
         panel.minSize = TheaterOverlayPolicy.minSize(for: presentation)
+        let showShadow = placing || TheaterOverlayPolicy.showsWindowShadow(presentation: presentation)
+        panel.hasShadow = showShadow
+        if showShadow {
+            panel.invalidateShadow()
+        }
         let appIsActive = NSApp.isActive
         panel.level = TheaterOverlayPolicy.windowLevel(
             presentation: presentation,
@@ -416,7 +608,15 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         guard let screen else { return }
         let stored = onScreen ? panel.frame : nil
         let keepUserSize = onScreen && SettingsStore.shared.theaterPositionPreset == nil
-        Self.place(panel, stored: stored, on: screen, keepUserSize: keepUserSize)
+        Self.place(
+            panel,
+            stored: stored,
+            on: screen,
+            keepUserSize: keepUserSize,
+            placing: self.model.isPlacingOverlay
+        )
+        self.updateOverlayPlacementGate()
+        self.applyOverlayPin()
     }
 
     private func applyWindowSharing() {
@@ -437,9 +637,13 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         let presentation = SettingsStore.shared.theaterPresentation
         if presentation == .popup {
             self.model.overlayToolsPinned = false
+            self.model.isPlacingOverlay = false
+            self.model.canConfirmOverlayPlacement = false
         }
-        panel.hasShadow = TheaterOverlayPolicy.showsWindowShadow(presentation: presentation)
-        if panel.hasShadow {
+        let showShadow = self.model.isPlacingOverlay
+            || TheaterOverlayPolicy.showsWindowShadow(presentation: presentation)
+        panel.hasShadow = showShadow
+        if showShadow {
             panel.invalidateShadow()
         }
         panel.isOpaque = false
@@ -504,14 +708,15 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         return panel
     }
 
-    /// Pop-up fills this display unless `keepUserSize` is restoring a resize
-    /// after Minimize. Overlay still uses its caption bar / presets.
+    /// Pop-up opens as a lower third unless a position or a saved size is set.
+    /// Overlay uses a kept rectangle, or stays put for placement.
     private static func place(
         _ panel: NSPanel,
         stored: CGRect?,
         on screen: NSScreen,
         keepUserSize: Bool = false,
-        animate: Bool = false
+        animate: Bool = false,
+        placing: Bool = false
     ) {
         let presentation = SettingsStore.shared.theaterPresentation
         if presentation == .popup {
@@ -527,27 +732,19 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
             )
             return
         }
-        if let preset = SettingsStore.shared.theaterPositionPreset {
-            let resolved = preset.resolved(for: presentation)
-            if resolved != preset {
-                SettingsStore.shared.theaterPositionPreset = resolved
-            }
-            panel.setFrame(resolved.frame(in: screen.visibleFrame), display: true, animate: animate)
-            return
-        }
-        panel.setFrame(
-            TheaterWindowPlacement.resolvedFrame(
-                stored: stored,
-                visible: screen.visibleFrame,
-                presentation: presentation
-            ),
-            display: true,
-            animate: animate
+        let decision = TheaterWindowPlacement.overlayFrameDecision(
+            stored: stored,
+            saved: Self.savedOverlayFrame(),
+            visible: screen.visibleFrame,
+            preset: SettingsStore.shared.theaterPositionPreset,
+            placing: placing
         )
+        panel.setFrame(decision.frame, display: true, animate: animate)
     }
 
     private func persistFrame() {
         guard let panel = self.panel, panel.isVisible else { return }
+        guard !self.model.isPlacingOverlay else { return }
         SettingsStore.shared.theaterScreenName = panel.screen.map(Self.screenKey) ?? ""
         if SettingsStore.shared.theaterMinimized {
             return
@@ -561,6 +758,9 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         let frame = NSStringFromRect(panel.frame)
         SettingsStore.shared.theaterWindowFrame = frame
         SettingsStore.shared.theaterExpandedWindowFrame = frame
+        if SettingsStore.shared.theaterPresentation == .transparent {
+            SettingsStore.shared.theaterOverlayFrame = frame
+        }
     }
 
     private func applyMinimizedLayout() {
@@ -579,7 +779,13 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         let stored = SettingsStore.shared.theaterExpandedWindowFrame
         let storedRect = stored.isEmpty ? nil : NSRectFromString(stored)
         if let screen {
-            Self.place(panel, stored: storedRect, on: screen, keepUserSize: true)
+            Self.place(
+                panel,
+                stored: storedRect,
+                on: screen,
+                keepUserSize: true,
+                placing: self.model.isPlacingOverlay
+            )
             return
         }
         var frame = panel.frame
@@ -621,6 +827,7 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         let resolved = preset.resolved(for: SettingsStore.shared.theaterPresentation)
         SettingsStore.shared.theaterPositionPreset = resolved
         panel.setFrame(resolved.frame(in: screen.visibleFrame), display: true, animate: true)
+        self.refreshPlacementConfirmation()
         self.schedulePersistFrame()
     }
 

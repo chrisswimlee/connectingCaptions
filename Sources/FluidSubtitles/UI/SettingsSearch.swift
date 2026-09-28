@@ -71,8 +71,10 @@ enum SettingsSearchTarget: Hashable {
 
     var section: SettingsSection {
         switch self {
-        case .liveTranslation, .theaterAppearance, .setupWizard, .translateInsertShortcut, .captionListenShortcut:
+        case .liveTranslation, .theaterAppearance, .setupWizard, .captionListenShortcut:
             return .translation
+        case .translateInsertShortcut:
+            return .speakAndType
 
         case .general,
              .launchAtStartup,
@@ -86,10 +88,7 @@ enum SettingsSearchTarget: Hashable {
              .transcriptionHistory,
              .historyRetention,
              .globalHotkey,
-             .dictionarySuggestions:
-            return .general
-
-        case .dictation,
+             .dictionarySuggestions,
              .primaryDictationShortcuts,
              .cancelRecordingShortcut,
              .pasteLastTranscriptionShortcut,
@@ -100,7 +99,10 @@ enum SettingsSearchTarget: Hashable {
              .audioHistory,
              .audioStorage,
              .usageStreak,
-             .skipSilentRecordings,
+             .skipSilentRecordings:
+            return .general
+
+        case .dictation,
              .pauseMedia,
              .textFormatting:
             return .dictation
@@ -136,6 +138,7 @@ extension SettingsSection {
     var searchTarget: SettingsSearchTarget {
         switch self {
         case .translation: return .liveTranslation
+        case .speakAndType: return .translateInsertShortcut
         case .general: return .general
         case .dictation: return .dictation
         case .aiProviders: return .aiProviders
@@ -194,7 +197,7 @@ enum SettingsSearchIndex {
                 "popup pop-up transparent overlay board slides keynote see-through caption bar caption plate",
                 "menu bar theater font size plate theme position overlay tools",
                 "screen share screenshots zoom meet slides window capture projector OBS",
-                "also hear english korean thai questions whisper auto detect Q&A",
+                "also hear questions whisper auto detect setup languages Q&A either way speak captions",
                 "clear captions board archive wipe reset high contrast",
                 "talk notes notes pdf rtf markdown json glossary names",
                 "pace cue teleprompter behind caught up last print",
@@ -216,8 +219,8 @@ enum SettingsSearchIndex {
         ),
         .init(
             target: .translateInsertShortcut,
-            title: "Listen and Type",
-            terms: ["listen and type insert hotkey shortcut speak translate type into app"]
+            title: "Speak and type",
+            terms: ["speak and type insert section listen and type hotkey shortcut speak translate type into app quick bar release"]
         ),
         .init(target: .general, title: "General", terms: ["app settings preferences startup menu bar dock"]),
         .init(
@@ -247,6 +250,7 @@ enum SettingsSearchIndex {
             terms: [
                 "license commercial enterprise SLA IT legal procurement named organization",
                 "for work request a commercial license licensed to activation key air-gapped",
+                "seat list Jamf Fleet MDM pkg audit log caption policy activity log backup restore",
             ]
         ),
 

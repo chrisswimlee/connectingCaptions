@@ -38,7 +38,9 @@
 		FTAS00000000000000000002 /* AppleSpeechLocaleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTAS00000000000000000001 /* AppleSpeechLocaleTests.swift */; };
 		FTCC00000000000000000002 /* LiveTranslationCommitContextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTCC00000000000000000001 /* LiveTranslationCommitContextTests.swift */; };
 		FTCL00000000000000000002 /* LiveTranslationClauseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTCL00000000000000000001 /* LiveTranslationClauseTests.swift */; };
+		FTFL00000000000000000002 /* FleetCommercialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTFL00000000000000000001 /* FleetCommercialTests.swift */; };
 		FTGL00000000000000000002 /* LiveTranslationGlossaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTGL00000000000000000001 /* LiveTranslationGlossaryTests.swift */; };
+		FTIB00000000000000000002 /* TheaterInboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTIB00000000000000000001 /* TheaterInboxTests.swift */; };
 		FTIME0000000000000000002 /* InsertIMEGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTIME0000000000000000001 /* InsertIMEGuardTests.swift */; };
 		FTLIC000000000000000002 /* CommercialLicenseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTLIC000000000000000001 /* CommercialLicenseTests.swift */; };
 		FTLT00000000000000000002 /* LiveTranslationLatencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTLT00000000000000000001 /* LiveTranslationLatencyTests.swift */; };
@@ -46,6 +48,7 @@
 		FTMB00000000000000000002 /* LiveTranslationMailboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTMB00000000000000000001 /* LiveTranslationMailboxTests.swift */; };
 		FTMN00000000000000000002 /* TheaterMinimizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTMN00000000000000000001 /* TheaterMinimizeTests.swift */; };
 		FTMX00000000000000000002 /* MLXRunnerCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTMX00000000000000000001 /* MLXRunnerCatalogTests.swift */; };
+		FTQI00000000000000000002 /* QuickTranslateInsertTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTQI00000000000000000001 /* QuickTranslateInsertTests.swift */; };
 		FTQT00000000000000000002 /* LiveTranslationQualityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTQT00000000000000000001 /* LiveTranslationQualityTests.swift */; };
 		FTRP00000000000000000002 /* TheaterRepeatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTRP00000000000000000001 /* TheaterRepeatTests.swift */; };
 		FTSB00000000000000000002 /* LiveTranslationSubscriberTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTSB00000000000000000001 /* LiveTranslationSubscriberTests.swift */; };
@@ -119,7 +122,9 @@
 		FTAS00000000000000000001 /* AppleSpeechLocaleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechLocaleTests.swift; sourceTree = "<group>"; };
 		FTCC00000000000000000001 /* LiveTranslationCommitContextTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationCommitContextTests.swift; sourceTree = "<group>"; };
 		FTCL00000000000000000001 /* LiveTranslationClauseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationClauseTests.swift; sourceTree = "<group>"; };
+		FTFL00000000000000000001 /* FleetCommercialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FleetCommercialTests.swift; sourceTree = "<group>"; };
 		FTGL00000000000000000001 /* LiveTranslationGlossaryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationGlossaryTests.swift; sourceTree = "<group>"; };
+		FTIB00000000000000000001 /* TheaterInboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterInboxTests.swift; sourceTree = "<group>"; };
 		FTIME0000000000000000001 /* InsertIMEGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsertIMEGuardTests.swift; sourceTree = "<group>"; };
 		FTLIC000000000000000001 /* CommercialLicenseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommercialLicenseTests.swift; sourceTree = "<group>"; };
 		FTLT00000000000000000001 /* LiveTranslationLatencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationLatencyTests.swift; sourceTree = "<group>"; };
@@ -127,6 +132,7 @@
 		FTMB00000000000000000001 /* LiveTranslationMailboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationMailboxTests.swift; sourceTree = "<group>"; };
 		FTMN00000000000000000001 /* TheaterMinimizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterMinimizeTests.swift; sourceTree = "<group>"; };
 		FTMX00000000000000000001 /* MLXRunnerCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXRunnerCatalogTests.swift; sourceTree = "<group>"; };
+		FTQI00000000000000000001 /* QuickTranslateInsertTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTranslateInsertTests.swift; sourceTree = "<group>"; };
 		FTQT00000000000000000001 /* LiveTranslationQualityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationQualityTests.swift; sourceTree = "<group>"; };
 		FTRP00000000000000000001 /* TheaterRepeatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterRepeatTests.swift; sourceTree = "<group>"; };
 		FTSB00000000000000000001 /* LiveTranslationSubscriberTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationSubscriberTests.swift; sourceTree = "<group>"; };
@@ -220,6 +226,7 @@
 				CD1C7A0000000000000000B1 /* CustomDictionaryManualEntryTests.swift */,
 				7C91B0022F42AA0100C0DEF0 /* HotkeyShortcutTests.swift */,
 				FTGL00000000000000000001 /* LiveTranslationGlossaryTests.swift */,
+				FTIB00000000000000000001 /* TheaterInboxTests.swift */,
 				FTCL00000000000000000001 /* LiveTranslationClauseTests.swift */,
 				FTMB00000000000000000001 /* LiveTranslationMailboxTests.swift */,
 				FTSB00000000000000000001 /* LiveTranslationSubscriberTests.swift */,
@@ -230,6 +237,7 @@
 				FTWO00000000000000000001 /* TheaterListenPolicyTests.swift */,
 				FTAR00000000000000000001 /* LiveTranslationArchiveTests.swift */,
 				FTIME0000000000000000001 /* InsertIMEGuardTests.swift */,
+				FTQI00000000000000000001 /* QuickTranslateInsertTests.swift */,
 				FTAS00000000000000000001 /* AppleSpeechLocaleTests.swift */,
 				C0DE89000000000000000001 /* SettingsNavigationStateTests.swift */,
 				343B29013F4441D6A797D12D /* LLMClientRequestBodyTests.swift */,
@@ -254,6 +262,7 @@
 				FTMN00000000000000000001 /* TheaterMinimizeTests.swift */,
 				FTRP00000000000000000001 /* TheaterRepeatTests.swift */,
 				FTSW00000000000000000001 /* TheaterSetupWizardTests.swift */,
+				FTFL00000000000000000001 /* FleetCommercialTests.swift */,
 				FTLIC000000000000000001 /* CommercialLicenseTests.swift */,
 				1DD32F263064555600D02CC2 /* SettingsStoreMigrationsTests.swift */,
 				1DD32F283064558F00D02CC2 /* SettingsStoreDictationFormattingTests.swift */,
@@ -486,6 +495,7 @@
 				CD1C7A0000000000000000B2 /* CustomDictionaryManualEntryTests.swift in Sources */,
 				7C91B0012F42AA0100C0DEF0 /* HotkeyShortcutTests.swift in Sources */,
 				FTGL00000000000000000002 /* LiveTranslationGlossaryTests.swift in Sources */,
+				FTIB00000000000000000002 /* TheaterInboxTests.swift in Sources */,
 				FTCL00000000000000000002 /* LiveTranslationClauseTests.swift in Sources */,
 				FTMB00000000000000000002 /* LiveTranslationMailboxTests.swift in Sources */,
 				FTSB00000000000000000002 /* LiveTranslationSubscriberTests.swift in Sources */,
@@ -498,6 +508,7 @@
 				FTAR00000000000000000002 /* LiveTranslationArchiveTests.swift in Sources */,
 				1DD32F2B3064563600D02CC2 /* SettingsStorePromptBindingAndMigrationTests.swift in Sources */,
 				FTIME0000000000000000002 /* InsertIMEGuardTests.swift in Sources */,
+				FTQI00000000000000000002 /* QuickTranslateInsertTests.swift in Sources */,
 				FTAS00000000000000000002 /* AppleSpeechLocaleTests.swift in Sources */,
 				C0DE89000000000000000002 /* SettingsNavigationStateTests.swift in Sources */,
 				86CAA2D4EF18433096185602 /* LLMClientRequestBodyTests.swift in Sources */,
@@ -522,6 +533,7 @@
 				FTMN00000000000000000002 /* TheaterMinimizeTests.swift in Sources */,
 				FTRP00000000000000000002 /* TheaterRepeatTests.swift in Sources */,
 				FTSW00000000000000000002 /* TheaterSetupWizardTests.swift in Sources */,
+				FTFL00000000000000000002 /* FleetCommercialTests.swift in Sources */,
 				FTLIC000000000000000002 /* CommercialLicenseTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -694,7 +706,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_CODE_COVERAGE = NO;
@@ -724,7 +736,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.6.11;
+				MARKETING_VERSION = 1.6.12;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluidsubtitles.app.debug;
 				PRODUCT_MODULE_NAME = FluidSubtitles_Debug;
 				PRODUCT_NAME = "fluidSubtitles Debug";
@@ -753,7 +765,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 23;
+				CURRENT_PROJECT_VERSION = 24;
 				DEAD_CODE_STRIPPING = YES;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_CODE_COVERAGE = NO;
@@ -783,7 +795,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.6.11;
+				MARKETING_VERSION = 1.6.12;
 				PRODUCT_BUNDLE_IDENTIFIER = com.fluidsubtitles.app;
 				PRODUCT_MODULE_NAME = FluidSubtitles;
 				PRODUCT_NAME = fluidSubtitles;

@@ -33,6 +33,9 @@ final class LiveTranslationController: ObservableObject {
     private var presenterRefreshPending = false
     private(set) var alignSpokenEngineCallCountForTesting = 0
     private var sessionTrace: LiveTranslationSessionTrace?
+    /// Swallows a second Clear that the menu shortcut and the presenter chord
+    /// can both deliver for one keypress.
+    private var clearPromptQuietUntil = Date.distantPast
 
     var shouldHandleTranslationStop: Bool {
         self.isSessionActive || self.abandonCaptionSession
@@ -96,6 +99,7 @@ final class LiveTranslationController: ObservableObject {
             startedUptime: ProcessInfo.processInfo.systemUptime
         )
         self.sessionTrace = trace
+        FleetAudit.recordListenStarted(kind: kind.rawValue)
         self.trace(trace.beginLine(
             mode: SettingsStore.shared.theaterSessionMode.rawValue,
             pair: self.pairTrace(),
@@ -259,6 +263,7 @@ final class LiveTranslationController: ObservableObject {
             TheaterHaptics.alignment()
         }
         self.refreshPresenter()
+        QuickTranslateInsertController.disarmIfNeeded()
     }
 
     func theaterWasClosed() {
@@ -335,7 +340,7 @@ final class LiveTranslationController: ObservableObject {
         self.finishLanguageChange()
     }
 
-    /// Either way is a later product. The setting stays so a later release can restore the toggle.
+    /// Either way. The stored flag stays; the engine gate decides whether Listen flips.
     func applyDynamicPairing(_ enabled: Bool) {
         SettingsStore.shared.theaterDynamicPairing = enabled
         self.finishLanguageChange()
@@ -758,6 +763,30 @@ final class LiveTranslationController: ObservableObject {
         self.objectWillChange.send()
     }
 
+    /// Menu bar, Theater menu, and Control-Option-K. The window and Settings
+    /// already ask, then call `clearBoard()`.
+    func requestClearBoard() {
+        guard !SettingsStore.isRunningTests else {
+            self.clearBoard()
+            return
+        }
+        let now = Date()
+        guard now >= self.clearPromptQuietUntil else { return }
+        guard self.hasClearableBoard else { return }
+        self.clearPromptQuietUntil = now.addingTimeInterval(0.4)
+        let alert = NSAlert()
+        alert.messageText = "Clear captions?"
+        alert.informativeText = TheaterReadiness.clearCaptionsConfirm
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Clear")
+        alert.addButton(withTitle: "Cancel")
+        alert.buttons.first?.hasDestructiveAction = true
+        let confirmed = alert.runModal() == .alertFirstButtonReturn
+        self.clearPromptQuietUntil = Date().addingTimeInterval(0.4)
+        guard confirmed else { return }
+        self.clearBoard()
+    }
+
     func clearBoard() {
         self.trace(LiveTranslationTrace.event("board clear", token: self.sessionTrace?.token, "listening=\(self.isSessionActive)"))
         self.startFreshTheaterBoard()
@@ -791,7 +820,7 @@ final class LiveTranslationController: ObservableObject {
     }
 
     /// Warms the I speak → Show as pack, then attaches the download sheet.
-    /// Both-direction warm is a later Either way product.
+    /// Either way also warms Show as → I speak before Listen.
     func requestNeededLanguagePackDownload(
         source: TranslationLanguage? = nil,
         target: TranslationLanguage? = nil
@@ -936,7 +965,8 @@ final class LiveTranslationController: ObservableObject {
                 liveSpoken: "",
                 lastTranslation: self.subscriber.committedLines.last ?? "",
                 pendingWaitMilliseconds: board.oldestInFlightWaitMs
-            )
+            ),
+            inboxLines: self.subscriber.inboxLines
         )
     }
 
@@ -964,6 +994,12 @@ final class LiveTranslationController: ObservableObject {
     private func endSessionTrace(outcome: String) {
         let lines = self.subscriber.committedLines.count
         if let trace = self.sessionTrace {
+            FleetAudit.recordListenStopped(
+                kind: trace.kind,
+                outcome: outcome,
+                startedUptime: trace.startedUptime,
+                now: ProcessInfo.processInfo.systemUptime
+            )
             self.trace(trace.endLine(
                 outcome: outcome,
                 now: ProcessInfo.processInfo.systemUptime,
