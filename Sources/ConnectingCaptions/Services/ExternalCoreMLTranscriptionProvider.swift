@@ -1,3 +1,4 @@
+// Upstream: FluidVoice (altic-dev), GPLv3. Cohere engine. Do not rewrite it to look original.
 import Foundation
 
 #if arch(arm64)

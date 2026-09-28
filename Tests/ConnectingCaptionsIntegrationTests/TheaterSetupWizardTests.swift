@@ -234,4 +234,69 @@ final class TheaterSetupWizardTests: XCTestCase {
         XCTAssertTrue(TheaterReadiness.boardIdle.contains("Listen"))
         XCTAssertTrue(TheaterReadiness.boardListening.contains("Listening"))
     }
+
+    func testAppLanguageDefaultsToEnglishUntilTheWizardChooses() {
+        let settings = SettingsStore.shared
+        let previousApp = settings.appLanguageID
+        let previousSource = settings.translationSourceLanguageID
+        let previousTarget = settings.translationTargetLanguageID
+        let previousOpened = settings.theaterSetupWizardOpened
+        let previousCompleted = settings.theaterSetupWizardCompleted
+        let previousStep = settings.theaterSetupWizardStep
+        defer {
+            settings.appLanguageID = previousApp
+            settings.translationSourceLanguageID = previousSource
+            settings.translationTargetLanguageID = previousTarget
+            settings.theaterSetupWizardOpened = previousOpened
+            settings.theaterSetupWizardCompleted = previousCompleted
+            settings.theaterSetupWizardStep = previousStep
+        }
+
+        settings.defaults.removeObject(forKey: "AppLanguageID")
+        XCTAssertEqual(settings.appLanguageID, "en")
+        XCTAssertFalse(settings.hasChosenAppLanguage)
+        XCTAssertEqual(AppLanguage.text("Setup Wizard"), "Setup Wizard")
+        XCTAssertEqual(AppLanguage.stepLabel(current: 2, total: 5, title: "Languages"), "Step 2 of 5 · Languages")
+        XCTAssertEqual(AppLanguage.localizedName(for: TranslationLanguageCatalog.korean), "Korean")
+        XCTAssertFalse(AppLanguage.layoutIsRightToLeft(languageID: "en"))
+        XCTAssertTrue(AppLanguage.layoutIsRightToLeft(languageID: "ar"))
+        XCTAssertTrue(AppLanguage.layoutIsRightToLeft(languageID: "he"))
+        XCTAssertNotNil(TranslationLanguageCatalog.language(id: SettingsStore.suggestedAppLanguageID))
+
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "ko"
+        settings.appLanguageID = "ja"
+        XCTAssertEqual(settings.translationSourceLanguageID, "en")
+        XCTAssertEqual(settings.translationTargetLanguageID, "ko")
+        XCTAssertEqual(AppLanguage.text("App language"), "アプリの言語")
+        XCTAssertEqual(AppLanguage.text("Continue"), "続ける")
+        XCTAssertEqual(AppLanguage.localizedName(for: TranslationLanguageCatalog.japanese), "日本語")
+        XCTAssertEqual(AppLanguage.text("Not a wizard string"), "Not a wizard string")
+        XCTAssertEqual(
+            AppLanguage.stepLabel(current: 2, total: 5, title: AppLanguage.text("Languages")),
+            "ステップ 2 / 5 · 言語"
+        )
+
+        settings.appLanguageID = "zz"
+        XCTAssertEqual(settings.appLanguageID, "en")
+
+        settings.defaults.removeObject(forKey: "AppLanguageID")
+        settings.startSetupWizard()
+        XCTAssertTrue(settings.hasChosenAppLanguage)
+        XCTAssertEqual(settings.appLanguageID, SettingsStore.suggestedAppLanguageID)
+    }
+
+    func testEverySetupLanguageTranslatesTheWizard() {
+        let phrases = ["Continue", "App language", "Welcome", "I speak", "Show as", "Setup Wizard"]
+        for language in TranslationLanguageCatalog.all where language.id != "en" {
+            for phrase in phrases {
+                XCTAssertNotEqual(
+                    AppLanguage.text(phrase, languageID: language.id),
+                    phrase,
+                    "\(language.displayName) should translate \(phrase)"
+                )
+            }
+            XCTAssertFalse(AppLanguage.text(TheaterReadiness.screenShare, languageID: language.id).isEmpty)
+        }
+    }
 }

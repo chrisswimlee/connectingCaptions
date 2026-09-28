@@ -27,7 +27,7 @@ enum TheaterSetupWizard {
             case .welcome:
                 return "A preview of the caption the room sees."
             case .languages:
-                return "I speak is what you say. Show as is the caption."
+                return "App language is the language this app uses. I speak is what you say. Show as is the caption."
             case .captions:
                 return "Choose whether the original language sits under each sentence."
             case .audience:

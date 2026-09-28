@@ -1,3 +1,4 @@
+// Upstream: FluidVoice (altic-dev), GPLv3. Speech engine. Do not rewrite it to look original.
 import Foundation
 
 nonisolated enum ModelPreparationPhase: Sendable, Equatable {

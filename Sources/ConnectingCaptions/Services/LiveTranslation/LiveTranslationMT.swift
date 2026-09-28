@@ -5,6 +5,33 @@ enum LiveTranslationMTError: Error {
     case sharpenBudget
 }
 
+/// Apple Translation runs one call at a time. A marked-context call that
+/// loses its marks is followed by a second, isolated call, so every sentence
+/// paid twice. After `missLimit` misses in a row for a pair this Listen, a
+/// sentence goes straight to the isolated call.
+@MainActor
+final class LiveTranslationContextStreak {
+    static let missLimit = 2
+    private var misses: [String: Int] = [:]
+
+    func reset() {
+        self.misses = [:]
+    }
+
+    func usesContext(source: TranslationLanguage, target: TranslationLanguage) -> Bool {
+        (self.misses[Self.key(source, target)] ?? 0) < Self.missLimit
+    }
+
+    func note(hit: Bool, source: TranslationLanguage, target: TranslationLanguage) {
+        let key = Self.key(source, target)
+        self.misses[key] = hit ? 0 : (self.misses[key] ?? 0) + 1
+    }
+
+    private static func key(_ source: TranslationLanguage, _ target: TranslationLanguage) -> String {
+        "\(source.id)>\(target.id)"
+    }
+}
+
 @MainActor
 enum LiveTranslationMT {
     /// Apple Translation is `session.translate(text)` with no prompt. Isolated
@@ -19,7 +46,8 @@ enum LiveTranslationMT {
         prior: (sources: [String], translations: [String]),
         translator: TranslationEngine,
         llmEngine: LLMTranslationEngine,
-        allowLocal: Bool = true
+        allowLocal: Bool = true,
+        contextStreak: LiveTranslationContextStreak? = nil
     ) async throws -> String {
         do {
             let apple = try await self.appleClause(
@@ -29,7 +57,8 @@ enum LiveTranslationMT {
                 terms: terms,
                 kind: kind,
                 prior: prior,
-                translator: translator
+                translator: translator,
+                contextStreak: contextStreak
             )
             if allowLocal, let sharpened = await self.localFirstPrint(
                 text,
@@ -65,13 +94,14 @@ enum LiveTranslationMT {
         terms: [String],
         kind: TranslationRequestKind,
         prior: (sources: [String], translations: [String]),
-        translator: TranslationEngine
+        translator: TranslationEngine,
+        contextStreak: LiveTranslationContextStreak? = nil
     ) async throws -> String {
         // Do not pause the speech tick for this call. A commit used to skip
         // every recognition update until Apple returned, so a slow or repeated
         // translation left a hole and the next tick had to catch up. The
         // Apple mailbox still runs one session call at a time.
-        if !prior.sources.isEmpty {
+        if !prior.sources.isEmpty, contextStreak?.usesContext(source: source, target: target) ?? true {
             let payload = LiveTranslationCommitContext.markedContextPayload(
                 priors: prior.sources,
                 current: text,
@@ -93,6 +123,7 @@ enum LiveTranslationMT {
                    targetID: target.id
                )
             {
+                contextStreak?.note(hit: true, source: source, target: target)
                 return marked
             }
             DebugLogger.shared.debug(
@@ -110,6 +141,7 @@ enum LiveTranslationMT {
                    targetID: target.id
                )
             {
+                contextStreak?.note(hit: true, source: source, target: target)
                 return lined
             }
             if LiveTranslationCommitContext.containsContextClauseMark(contextual) == false,
@@ -123,8 +155,10 @@ enum LiveTranslationMT {
                    targetID: target.id
                )
             {
+                contextStreak?.note(hit: true, source: source, target: target)
                 return peeled
             }
+            contextStreak?.note(hit: false, source: source, target: target)
         }
         return try await self.translateProtected(
             text,

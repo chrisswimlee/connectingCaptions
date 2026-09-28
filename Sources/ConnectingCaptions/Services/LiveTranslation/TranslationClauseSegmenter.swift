@@ -45,7 +45,11 @@ nonisolated enum TranslationClauseSegmenter {
     }
 
     static func split(_ text: String, languageID: String) -> Split {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = self.joinOpenIfClause(
+            self.absorbUnfinishedEllipsis(
+                text.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        )
         guard !trimmed.isEmpty else { return Split(completed: [], tail: "") }
 
         var completed: [String] = []
@@ -96,6 +100,9 @@ nonisolated enum TranslationClauseSegmenter {
     static func isCommitComplete(_ text: String, languageID: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
+        // Apple Speech ends an unfinished partial with "..." / "…". That is
+        // still this sentence, not a period the board can paint.
+        if self.endsWithOpenEllipsis(trimmed) { return false }
         let complete: Bool
         if let last = trimmed.unicodeScalars.last, Self.terminalPunctuation.contains(last) {
             complete = true
@@ -242,7 +249,7 @@ nonisolated enum TranslationClauseSegmenter {
 
     static func isPauseFinalizable(_ text: String, languageID: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return false }
+        if trimmed.isEmpty || self.endsWithOpenEllipsis(trimmed) { return false }
         if self.looksComplete(trimmed, languageID: languageID) { return true }
         if self.isVerbFinalLanguage(languageID) {
             return trimmed.count >= LiveTranslationTiming.minPauseFinalizeCharactersVerbFinal
@@ -284,6 +291,11 @@ nonisolated enum TranslationClauseSegmenter {
             return !compactA.isEmpty && compactA == compactB
         }
         return false
+    }
+
+    /// Lowercased letters and digits with single spaces, as `isSameClause` compares them.
+    static func normalizedKey(_ text: String) -> String {
+        self.normalized(text)
     }
 
     /// Same answer as `isSameClause`, as one string, so a long listen can
@@ -329,6 +341,482 @@ nonisolated enum TranslationClauseSegmenter {
         let coreA = self.stripTerminalPunctuation(a)
         let coreB = self.stripTerminalPunctuation(b)
         return !coreA.isEmpty && (b.hasPrefix(coreA) || coreB.hasPrefix(coreA))
+    }
+
+    /// The painted line joined two sentences with a comma. A later decode put
+    /// the period back ("table, time." → "table." + "Time.").
+    static func separatedSentences(
+        painted: String,
+        hypothesis: String,
+        languageID: String
+    ) -> (head: String, next: String)? {
+        let paintedWords = self.wordKeys(painted)
+        guard paintedWords.count >= 4 else { return nil }
+        let sentences = self.split(hypothesis, languageID: languageID).completed.filter {
+            self.looksComplete($0, languageID: languageID)
+        }
+        guard sentences.count >= 2 else { return nil }
+        for index in 0..<(sentences.count - 1) {
+            let head = sentences[index]
+            let next = sentences[index + 1]
+            let headWords = self.wordKeys(head)
+            let nextWords = self.wordKeys(next)
+            guard headWords.count >= 3, !nextWords.isEmpty else { continue }
+            guard headWords + nextWords == paintedWords else { continue }
+            return (head, next)
+        }
+        return nil
+    }
+
+    /// A later decode added a few words at the end of the newest line
+    /// ("roster building." → "roster building tool.", "recognize patterns."
+    /// → "recognize patterns and perform tasks."). The window may have
+    /// dropped the opening, so the new sentence only has to share the ending.
+    /// A last word that changes and then keeps going ("assistance." →
+    /// "assistants like Siri…") is the same line.
+    static func sentenceWithAppendedTail(
+        painted: String,
+        hypothesis: String,
+        languageID: String
+    ) -> String? {
+        let paintedWords = self.wordKeys(painted)
+        guard paintedWords.count >= 4 else { return nil }
+        let sentences = self.split(hypothesis, languageID: languageID).completed
+        let addedWordLimit = 4
+        var best: (extra: Int, sentence: String)?
+        var tailRevision: String?
+        var revisedEnding: (overlap: Int, sentence: String)?
+        for sentence in sentences {
+            let words = self.wordKeys(sentence)
+            let extra = words.count - paintedWords.count
+            if extra >= 1, extra <= addedWordLimit, words.starts(with: paintedWords) {
+                if best == nil || extra < best?.extra ?? Int.max {
+                    best = (extra, sentence)
+                }
+                continue
+            }
+            if self.isTailRevisionGrowth(previous: painted, incoming: sentence),
+               tailRevision == nil || words.count > self.wordKeys(tailRevision ?? "").count
+            {
+                tailRevision = sentence
+            }
+            guard words.count >= 5 else { continue }
+            let limit = min(paintedWords.count, words.count - 1)
+            guard limit >= 4 else { continue }
+            let paintedTokens = self.tokens(painted)
+            let sentenceTokens = self.tokens(sentence)
+            guard paintedTokens.count == paintedWords.count, sentenceTokens.count == words.count else {
+                continue
+            }
+            for length in stride(from: limit, through: 4, by: -1) {
+                let suffix = Array(paintedWords.suffix(length))
+                guard let found = self.index(of: suffix, in: words) else { continue }
+                let trailing = words.count - (found + length)
+                guard trailing >= 1, trailing <= addedWordLimit else { continue }
+                let merged = (paintedTokens.dropLast(length) + sentenceTokens.dropFirst(found))
+                    .joined(separator: " ")
+                if best == nil || trailing < best?.extra ?? Int.max {
+                    best = (trailing, merged)
+                }
+                break
+            }
+            if let ending = self.revisedEnding(
+                paintedWords: paintedWords,
+                paintedTokens: paintedTokens,
+                sentenceWords: words,
+                sentenceTokens: sentenceTokens
+            ), revisedEnding == nil || ending.overlap > (revisedEnding?.overlap ?? 0) {
+                revisedEnding = ending
+            }
+        }
+        if let best, self.wordKeys(best.sentence).count > paintedWords.count {
+            return best.sentence
+        }
+        if let tailRevision, self.wordKeys(tailRevision).count > paintedWords.count {
+            return tailRevision
+        }
+        if let revisedEnding, self.wordKeys(revisedEnding.sentence).count > paintedWords.count {
+            return revisedEnding.sentence
+        }
+        return nil
+    }
+
+    /// "voice assistance." grew into "voice assistants like Siri…", and the
+    /// window no longer has the opening. The last painted word is a close
+    /// miss, and the words before it still sit at the end of the line.
+    private static func revisedEnding(
+        paintedWords: [String],
+        paintedTokens: [String],
+        sentenceWords: [String],
+        sentenceTokens: [String]
+    ) -> (overlap: Int, sentence: String)? {
+        guard paintedWords.count >= 5,
+              paintedTokens.count == paintedWords.count,
+              sentenceTokens.count == sentenceWords.count
+        else { return nil }
+        let dropped = paintedWords[paintedWords.count - 1]
+        let stem = Array(paintedWords.dropLast())
+        guard stem.count >= 4 else { return nil }
+        for length in stride(from: stem.count, through: 4, by: -1) {
+            let suffix = Array(stem.suffix(length))
+            guard let found = self.index(of: suffix, in: sentenceWords) else { continue }
+            let boundary = found + length
+            guard boundary + 1 < sentenceWords.count else { continue }
+            let revised = sentenceWords[boundary]
+            guard revised != dropped, self.isCloseTokenSubstitution(dropped, revised) else { continue }
+            let keep = paintedTokens.count - 1 - length
+            guard keep >= 0 else { continue }
+            let merged = (paintedTokens.prefix(keep) + sentenceTokens.dropFirst(found))
+                .joined(separator: " ")
+            return (length, merged)
+        }
+        return nil
+    }
+
+    private static func wordKeys(_ text: String) -> [String] {
+        self.tokens(text).map(self.tokenKey).filter { !$0.isEmpty }
+    }
+
+    private static func index(of needle: [String], in haystack: [String]) -> Int? {
+        guard !needle.isEmpty, haystack.count >= needle.count else { return nil }
+        let last = haystack.count - needle.count
+        for start in 0...last where Array(haystack[start..<(start + needle.count)]) == needle {
+            return start
+        }
+        return nil
+    }
+
+    /// The last word or two of a painted line were a mishear, and the next
+    /// decode keeps every earlier word and continues ("folks." → "focus on
+    /// modeling…", "challenges." → "challenge us to use AI responsibly.").
+    /// A longer line that only shares an opening is not this.
+    static func isTailRevisionGrowth(previous: String, incoming: String) -> Bool {
+        let previousWords = self.tokens(previous).map(self.tokenKey).filter { !$0.isEmpty }
+        let incomingWords = self.tokens(incoming).map(self.tokenKey).filter { !$0.isEmpty }
+        guard previousWords.count >= 4, incomingWords.count > previousWords.count else { return false }
+        for dropped in 1...2 {
+            let stem = previousWords.dropLast(dropped)
+            guard stem.count >= 3 else { continue }
+            if incomingWords.starts(with: Array(stem)) { return true }
+        }
+        return false
+    }
+
+    /// "which they... Used to make" is still one sentence. The ellipsis meant
+    /// the partial was open, and the next window came back with a capital.
+    fileprivate static func absorbUnfinishedEllipsis(_ text: String) -> String {
+        var output = ""
+        var index = text.startIndex
+        while index < text.endIndex {
+            if let end = self.ellipsisEnd(in: text, at: index) {
+                let hasMore = text[end...].contains { !$0.isWhitespace }
+                if hasMore, self.endsWithUnfinishedCue(output) {
+                    let word = self.firstWord(in: text, from: end)
+                    if !output.isEmpty, !output.hasSuffix(" ") {
+                        output.append(" ")
+                    }
+                    output += self.lowercasedContinuation(word.text)
+                    index = word.next
+                    continue
+                }
+            }
+            output.append(text[index])
+            index = text.index(after: index)
+        }
+        return output
+    }
+
+    fileprivate static func ellipsisEnd(in text: String, at index: String.Index) -> String.Index? {
+        if text[index] == "…" {
+            return text.index(after: index)
+        }
+        guard text.distance(from: index, to: text.endIndex) >= 3 else { return nil }
+        let end = text.index(index, offsetBy: 3)
+        guard text[index..<end].allSatisfy({ $0 == "." }) else { return nil }
+        return end
+    }
+
+    fileprivate static func firstWord(
+        in text: String,
+        from index: String.Index
+    ) -> (text: String, next: String.Index) {
+        var start = index
+        while start < text.endIndex, text[start].isWhitespace {
+            start = text.index(after: start)
+        }
+        var end = start
+        while end < text.endIndex, !text[end].isWhitespace {
+            end = text.index(after: end)
+        }
+        return (String(text[start..<end]), end)
+    }
+
+    /// A capital after an open ellipsis is the window restarting, not a name.
+    fileprivate static func lowercasedContinuation(_ word: String) -> String {
+        guard word.count > 1, let first = word.first, first.isUppercase else { return word }
+        let rest = word.dropFirst()
+        guard rest.allSatisfy(\.isLowercase) else { return word }
+        return first.lowercased() + rest
+    }
+
+    /// "that if you aren't paying attention. It could… your job. your spouse"
+    /// is still one sentence. The period is the window restarting the main
+    /// clause. A sentence that merely starts with "if", or "the model. on
+    /// the other hand", keeps the period.
+    fileprivate static func joinOpenIfClause(_ text: String) -> String {
+        var output = ""
+        var clause = ""
+        var joinedMainClause = false
+        var index = text.startIndex
+        while index < text.endIndex {
+            if text[index] == ".",
+               !self.isDecimalPoint(in: text, at: index),
+               !self.isPartOfEllipsis(in: text, at: index),
+               let continued = self.openIfContinuation(in: text, after: index),
+               self.clauseHasOpenThatIf(clause)
+            {
+                let startsAnotherSentence = joinedMainClause && continued.text.first?.isUppercase == true
+                if !startsAnotherSentence {
+                    let lowered = self.lowercasedContinuation(continued.text)
+                    output.append(", ")
+                    output += lowered
+                    clause.append(", ")
+                    clause += lowered
+                    if continued.text.first?.isUppercase == true {
+                        joinedMainClause = true
+                    }
+                    index = continued.next
+                    continue
+                }
+            }
+            let character = text[index]
+            output.append(character)
+            if self.endsKeptClause(in: text, at: index) {
+                clause = ""
+            } else {
+                clause.append(character)
+            }
+            index = text.index(after: index)
+        }
+        return output
+    }
+
+    fileprivate static let openIfContinuations: Set<String> = [
+        "it", "they", "he", "she", "we", "you", "your",
+    ]
+
+    fileprivate static func openIfContinuation(
+        in text: String,
+        after period: String.Index
+    ) -> (text: String, next: String.Index)? {
+        let next = text.index(after: period)
+        guard next < text.endIndex else { return nil }
+        let word = self.firstWord(in: text, from: next)
+        guard !word.text.isEmpty, Self.openIfContinuations.contains(self.tokenKey(word.text)) else {
+            return nil
+        }
+        return (word.text, word.next)
+    }
+
+    /// "something that if you aren't…" is waiting for its main clause.
+    /// A sentence that starts with "if" is not this.
+    fileprivate static func clauseHasOpenThatIf(_ clause: String) -> Bool {
+        let words = self.wordKeys(clause)
+        guard let ifAt = words.firstIndex(of: "if"), ifAt > 0 else { return false }
+        return words[..<ifAt].contains("that")
+    }
+
+    fileprivate static func isPartOfEllipsis(in text: String, at index: String.Index) -> Bool {
+        if text[index] == "…" { return true }
+        if index > text.startIndex, text[text.index(before: index)] == "." { return true }
+        let next = text.index(after: index)
+        return next < text.endIndex && text[next] == "."
+    }
+
+    fileprivate static func endsKeptClause(in text: String, at index: String.Index) -> Bool {
+        let character = text[index]
+        if character.isNewline || character == "!" || character == "?" || character == "。"
+            || character == "！" || character == "？"
+        {
+            return true
+        }
+        guard character == "." else { return false }
+        if self.isDecimalPoint(in: text, at: index) { return false }
+        if self.isPartOfEllipsis(in: text, at: index) { return false }
+        return true
+    }
+
+    fileprivate static func endsWithUnfinishedCue(_ text: String) -> Bool {
+        guard let last = self.tokens(text).last else { return false }
+        let key = self.tokenKey(last)
+        if key.isEmpty { return false }
+        return Self.thinEnglishStarters.contains(key)
+            || Self.thinEnglishAuxiliaries.contains(key)
+            || Self.unfinishedRelatives.contains(key)
+    }
+
+    fileprivate static let unfinishedRelatives: Set<String> = [
+        "which", "who", "whom", "whose", "what", "where",
+    ]
+
+    /// Apple Speech's trailing "..." / "…" means the partial is still open.
+    static func endsWithOpenEllipsis(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.hasSuffix("...") || trimmed.hasSuffix("…")
+    }
+
+    /// Stop closes an open partial. "responsibly..." becomes "responsibly."
+    static func finishOpenEllipsis(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body: String
+        if trimmed.hasSuffix("...") {
+            body = String(trimmed.dropLast(3))
+        } else if trimmed.hasSuffix("…") {
+            body = String(trimmed.dropLast())
+        } else {
+            return trimmed
+        }
+        let cleaned = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return trimmed }
+        if let last = cleaned.unicodeScalars.last, Self.terminalPunctuation.contains(last) {
+            return cleaned
+        }
+        return cleaned + "."
+    }
+
+    /// A leftover whose first word does not open a new clause ("inputs, and
+    /// perform…", "us to use…"). Uppercase and Then / Next still start a row.
+    static func startsContinuation(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = self.tokens(trimmed).first, let character = first.first else { return false }
+        guard character.isLowercase else { return false }
+        return !self.looksLikeClauseBoundaryStart(first)
+    }
+
+    /// Glue a lowercase leftover onto `row`. Drop the row's last one or two
+    /// words, then take the longest run of what remains (at least three words)
+    /// that also occurs in the hypothesis sentence holding `unit`. The merged
+    /// line is the row up to that run, then the hypothesis from that run on.
+    /// Matching inside the sentence, not only at its start, covers a window
+    /// that still has a few words ahead of the overlap.
+    static func mergedContinuation(
+        row: String,
+        hypothesis: String,
+        unit: String,
+        languageID: String
+    ) -> String? {
+        let rowTokens = self.tokens(row)
+        let rowKeys = rowTokens.map(self.tokenKey)
+        guard rowKeys.count >= 4,
+              let sentence = self.sentenceHolding(unit, in: hypothesis, languageID: languageID)
+        else { return nil }
+        let sentenceTokens = self.tokens(sentence)
+        let sentenceKeys = sentenceTokens.map(self.tokenKey)
+        guard sentenceKeys.count >= 3 else { return nil }
+
+        var best: (drop: Int, overlap: Int, at: Int)?
+        for drop in 0...2 {
+            let stemCount = rowKeys.count - drop
+            guard stemCount >= 3 else { continue }
+            let stem = Array(rowKeys.prefix(stemCount))
+            guard let found = self.longestSuffix(stem, in: sentenceKeys) else { continue }
+            let overlapWords = Array(stem.suffix(found.length))
+            let strongOverlap = found.length >= 3 || overlapWords.allSatisfy { $0.count >= 4 }
+            guard strongOverlap else { continue }
+            if let current = best {
+                if found.length > current.overlap || (found.length == current.overlap && drop < current.drop) {
+                    best = (drop, found.length, found.at)
+                }
+            } else {
+                best = (drop, found.length, found.at)
+            }
+        }
+        guard let best else { return nil }
+        let keepCount = rowKeys.count - best.drop - best.overlap
+        guard keepCount >= 0, best.at + best.overlap <= sentenceTokens.count else { return nil }
+        let prefix = rowTokens.prefix(keepCount).joined(separator: " ")
+        let continued = sentenceTokens.dropFirst(best.at).joined(separator: " ")
+        let merged = prefix.isEmpty ? continued : prefix + " " + continued
+        let mergedKeys = self.tokens(merged).map(self.tokenKey).filter { !$0.isEmpty }
+        let rowWordCount = rowKeys.filter { !$0.isEmpty }.count
+        guard mergedKeys.count > rowWordCount else { return nil }
+        let unitKeys = self.tokens(unit).map(self.tokenKey).filter { !$0.isEmpty }
+        let endsWithUnit = unitKeys.count <= mergedKeys.count
+            && Array(mergedKeys.suffix(unitKeys.count)) == unitKeys
+        guard !unitKeys.isEmpty, endsWithUnit || self.contains(merged, clause: unit) else {
+            return nil
+        }
+        return merged
+    }
+
+    /// The unit is already inside the newest row ("ethical considerations
+    /// grow." after that sentence was painted). One close miss still counts,
+    /// so "adjusts" matches "adjust".
+    static func wordsAlreadyPrinted(_ unit: String, in row: String) -> Bool {
+        let unitWords = self.tokens(unit).map(self.tokenKey).filter { !$0.isEmpty }
+        let rowWords = self.tokens(row).map(self.tokenKey).filter { !$0.isEmpty }
+        guard unitWords.count >= 2, !rowWords.isEmpty else { return false }
+        var best = 0
+        guard !rowWords.isEmpty else { return false }
+        for start in 0..<rowWords.count {
+            var hits = 0
+            var rowIndex = start
+            for word in unitWords {
+                guard rowIndex < rowWords.count else { break }
+                if rowWords[rowIndex] == word || self.isCloseTokenSubstitution(word, rowWords[rowIndex]) {
+                    hits += 1
+                    rowIndex += 1
+                } else if rowIndex + 1 < rowWords.count,
+                          rowWords[rowIndex + 1] == word
+                            || self.isCloseTokenSubstitution(word, rowWords[rowIndex + 1])
+                {
+                    hits += 1
+                    rowIndex += 2
+                } else {
+                    break
+                }
+            }
+            best = max(best, hits)
+        }
+        return Double(best) / Double(unitWords.count) >= 0.85
+    }
+
+    private static func sentenceHolding(
+        _ unit: String,
+        in hypothesis: String,
+        languageID: String
+    ) -> String? {
+        let split = self.split(hypothesis, languageID: languageID)
+        var pieces = split.completed
+        let tail = split.tail.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !tail.isEmpty { pieces.append(tail) }
+        let unitKey = self.normalized(unit)
+        guard !unitKey.isEmpty else { return nil }
+        let matches = pieces.filter { piece in
+            let key = self.normalized(piece)
+            return key == unitKey || key.hasSuffix(unitKey) || key.hasSuffix(" " + unitKey) || key.contains(unitKey)
+        }
+        return matches.max { self.normalized($0).count < self.normalized($1).count }
+    }
+
+    /// Longest suffix of `stem` that is a contiguous run in `sentence`.
+    private static func longestSuffix(
+        _ stem: [String],
+        in sentence: [String]
+    ) -> (length: Int, at: Int)? {
+        let limit = min(stem.count, sentence.count)
+        guard limit >= 2 else { return nil }
+        for length in stride(from: limit, through: 2, by: -1) {
+            let suffix = Array(stem.suffix(length))
+            let lastStart = sentence.count - length
+            guard lastStart >= 0 else { continue }
+            for start in 0...lastStart {
+                if Array(sentence[start..<(start + length)]) == suffix {
+                    return (length, start)
+                }
+            }
+        }
+        return nil
     }
 
     /// ASR re-punctuates while it grows a line ("Why, won't you." →
@@ -684,46 +1172,28 @@ nonisolated enum TranslationClauseSegmenter {
         return remainder
     }
 
-    /// Drop speech before the first still-present peel-window clause. Returns the
-    /// text from that clause onward after consuming it, plus how many `already`
-    /// entries that accounts for.
+    /// Drop speech up to the newest peel-window clause still in the text.
+    /// Returns what follows it, plus how many `already` entries that accounts for.
     ///
-    /// Do not scan every prefix of the talk. A miss means this clause is not
-    /// the leading text; the caller keeps the previous leftover.
+    /// The ASR transcript is the whole talk, and unread speech is at its end.
+    /// Anchor on the newest window clause, at its last occurrence. The oldest
+    /// clause at its first occurrence matched a short line said earlier in the
+    /// talk ("The creamer."), and everything after that old copy printed again.
     fileprivate static func alignToPeelWindow(
         _ text: String,
         already: [String]
     ) -> (remainder: String, consumed: Int)? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        for (index, chunk) in already.enumerated() {
-            let prefixN = chunk.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !prefixN.isEmpty else { continue }
-            if let after = self.consumeEmbeddedClause(trimmed, prefix: chunk) {
-                return (after, index + 1)
-            }
-            if let range = trimmed.range(of: prefixN)
-                ?? trimmed.range(of: prefixN, options: .caseInsensitive)
-            {
-                if range.lowerBound > trimmed.startIndex {
-                    let before = trimmed[trimmed.startIndex..<range.lowerBound]
-                    guard let last = before.last else { continue }
-                    let boundary = last.isWhitespace
-                        || self.isTerminal(last)
-                        || self.looksComplete(String(before), languageID: "ko")
-                        || self.looksComplete(String(before), languageID: "th")
-                        || self.looksComplete(String(before), languageID: "ja")
-                    guard boundary else { continue }
+        for requireDistinctClause in [true, false] {
+            for (index, chunk) in already.enumerated().reversed() {
+                if let after = self.textAfterLastClause(
+                    trimmed,
+                    clause: chunk,
+                    requireDistinctClause: requireDistinctClause
+                ) {
+                    return (after, index + 1)
                 }
-                var end = range.upperBound
-                while end < trimmed.endIndex,
-                      let scalar = trimmed[end].unicodeScalars.first,
-                      Self.terminalPunctuation.contains(scalar)
-                {
-                    end = trimmed.index(after: end)
-                }
-                let after = self.stripLeadingBoundaries(String(trimmed[end...]))
-                return (after, index + 1)
             }
         }
         return nil
@@ -1054,6 +1524,9 @@ extension TranslationClauseSegmenter {
             if character == ".", self.isDecimalPoint(in: text, at: index) {
                 return false
             }
+            if self.isPartOfTrailingOpenEllipsis(in: text, at: index) {
+                return false
+            }
             if atEnd || followedBySpace || self.isTerminal(text[next]) {
                 return true
             }
@@ -1187,6 +1660,16 @@ extension TranslationClauseSegmenter {
             return token.count > 1
         }
         return token.count >= 4
+    }
+
+    /// The final "..." / "…" of this text. A dot inside it is not a sentence end.
+    fileprivate static func isPartOfTrailingOpenEllipsis(in text: String, at index: String.Index) -> Bool {
+        if text.hasSuffix("…") {
+            return index == text.index(before: text.endIndex)
+        }
+        guard text.hasSuffix("...") else { return false }
+        let start = text.index(text.endIndex, offsetBy: -3)
+        return index >= start
     }
 
     fileprivate static func isTerminal(_ character: Character) -> Bool {
@@ -1443,28 +1926,47 @@ extension TranslationClauseSegmenter {
 
     /// Peel a committed clause that still sits later in a cumulative ASR transcript
     /// (previous-listen prefix, or a restitch that no longer starts at the clause).
-    fileprivate static func consumeEmbeddedClause(_ text: String, prefix: String) -> String? {
+    /// Text after the last occurrence of `clause` that starts on a boundary.
+    /// A distinct clause is long enough not to match a stray word in new speech.
+    fileprivate static func textAfterLastClause(
+        _ text: String,
+        clause: String,
+        requireDistinctClause: Bool
+    ) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let prefixN = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, prefixN.count >= 8 else { return nil }
-        let prefixWords = self.tokens(prefixN)
-        if prefixN.contains(where: { $0.isWhitespace }), prefixWords.count < 3 {
-            return nil
+        let prefixN = clause.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !prefixN.isEmpty else { return nil }
+        if requireDistinctClause {
+            guard prefixN.count >= 8 else { return nil }
+            if prefixN.contains(where: { $0.isWhitespace }), self.tokens(prefixN).count < 3 {
+                return nil
+            }
         }
-        guard let range = trimmed.range(of: prefixN)
-            ?? trimmed.range(of: prefixN, options: .caseInsensitive)
-        else { return nil }
-        if range.lowerBound > trimmed.startIndex {
-            let before = trimmed[trimmed.startIndex..<range.lowerBound]
-            guard let last = before.last else { return nil }
-            let boundary = last.isWhitespace
-                || self.isTerminal(last)
-                || self.looksComplete(String(before), languageID: "ko")
-                || self.looksComplete(String(before), languageID: "th")
-                || self.looksComplete(String(before), languageID: "ja")
-            guard boundary else { return nil }
+        for options in [String.CompareOptions.backwards, [.backwards, .caseInsensitive]] {
+            var searchEnd = trimmed.endIndex
+            while let range = trimmed.range(of: prefixN, options: options, range: trimmed.startIndex..<searchEnd) {
+                if self.startsOnBoundary(trimmed, at: range.lowerBound) {
+                    return self.textAfterMatch(trimmed, matchEnd: range.upperBound)
+                }
+                searchEnd = range.lowerBound
+            }
         }
-        var end = range.upperBound
+        return nil
+    }
+
+    fileprivate static func startsOnBoundary(_ text: String, at index: String.Index) -> Bool {
+        guard index > text.startIndex else { return true }
+        let before = text[text.startIndex..<index]
+        guard let last = before.last else { return true }
+        return last.isWhitespace
+            || self.isTerminal(last)
+            || self.looksComplete(String(before), languageID: "ko")
+            || self.looksComplete(String(before), languageID: "th")
+            || self.looksComplete(String(before), languageID: "ja")
+    }
+
+    fileprivate static func textAfterMatch(_ trimmed: String, matchEnd: String.Index) -> String {
+        var end = matchEnd
         while end < trimmed.endIndex,
               let scalar = trimmed[end].unicodeScalars.first,
               Self.terminalPunctuation.contains(scalar)

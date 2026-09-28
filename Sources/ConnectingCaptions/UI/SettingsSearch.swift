@@ -208,7 +208,7 @@ enum SettingsSearchIndex {
             target: .setupWizard,
             title: "Setup Wizard",
             terms: [
-                "setup wizard first run theater captions spoken line original language",
+                "setup wizard first run theater captions spoken line original language app language",
                 "spoken line after a pause while talking sentence ready show as I speak Korean English Thai Japanese",
             ]
         ),

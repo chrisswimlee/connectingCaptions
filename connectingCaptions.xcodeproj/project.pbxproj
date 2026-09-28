@@ -52,10 +52,14 @@
 		FTQT00000000000000000002 /* LiveTranslationQualityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTQT00000000000000000001 /* LiveTranslationQualityTests.swift */; };
 		FTRP00000000000000000002 /* TheaterRepeatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTRP00000000000000000001 /* TheaterRepeatTests.swift */; };
 		FTSB00000000000000000002 /* LiveTranslationSubscriberTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTSB00000000000000000001 /* LiveTranslationSubscriberTests.swift */; };
+		FTSE00000000000000000002 /* SpeechEnergyGateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTSE00000000000000000001 /* SpeechEnergyGateTests.swift */; };
 		FTSO00000000000000000002 /* TheaterShellOwnershipTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTSO00000000000000000001 /* TheaterShellOwnershipTests.swift */; };
 		FTSW00000000000000000002 /* TheaterSetupWizardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTSW00000000000000000001 /* TheaterSetupWizardTests.swift */; };
+		FTTE00000000000000000002 /* TypingEventSourceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTTE00000000000000000001 /* TypingEventSourceTests.swift */; };
 		FTVI00000000000000000002 /* LiveTranslationVisibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTVI00000000000000000001 /* LiveTranslationVisibilityTests.swift */; };
 		FTWO00000000000000000002 /* TheaterListenPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTWO00000000000000000001 /* TheaterListenPolicyTests.swift */; };
+		FTYT00000000000000000002 /* TheaterYouTubeReplayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTYT00000000000000000001 /* TheaterYouTubeReplayTests.swift */; };
+		FTYU00000000000000000002 /* TheaterYouTubeUnitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTYU00000000000000000001 /* TheaterYouTubeUnitTests.swift */; };
 		HTXM00000000000000000002 /* HistoryTextMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = HTXM00000000000000000001 /* HistoryTextMetricsTests.swift */; };
 		RAM00000000000000000002 /* LiveAudioRetentionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = RAM00000000000000000001 /* LiveAudioRetentionTests.swift */; };
 		SUPS00000000000000000002 /* SimpleUpdaterSignatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SUPS00000000000000000001 /* SimpleUpdaterSignatureTests.swift */; };
@@ -136,10 +140,14 @@
 		FTQT00000000000000000001 /* LiveTranslationQualityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationQualityTests.swift; sourceTree = "<group>"; };
 		FTRP00000000000000000001 /* TheaterRepeatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterRepeatTests.swift; sourceTree = "<group>"; };
 		FTSB00000000000000000001 /* LiveTranslationSubscriberTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationSubscriberTests.swift; sourceTree = "<group>"; };
+		FTSE00000000000000000001 /* SpeechEnergyGateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechEnergyGateTests.swift; sourceTree = "<group>"; };
 		FTSO00000000000000000001 /* TheaterShellOwnershipTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterShellOwnershipTests.swift; sourceTree = "<group>"; };
 		FTSW00000000000000000001 /* TheaterSetupWizardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterSetupWizardTests.swift; sourceTree = "<group>"; };
+		FTTE00000000000000000001 /* TypingEventSourceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypingEventSourceTests.swift; sourceTree = "<group>"; };
 		FTVI00000000000000000001 /* LiveTranslationVisibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationVisibilityTests.swift; sourceTree = "<group>"; };
 		FTWO00000000000000000001 /* TheaterListenPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterListenPolicyTests.swift; sourceTree = "<group>"; };
+		FTYT00000000000000000001 /* TheaterYouTubeReplayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterYouTubeReplayTests.swift; sourceTree = "<group>"; };
+		FTYU00000000000000000001 /* TheaterYouTubeUnitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterYouTubeUnitTests.swift; sourceTree = "<group>"; };
 		HTXM00000000000000000001 /* HistoryTextMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryTextMetricsTests.swift; sourceTree = "<group>"; };
 		RAM00000000000000000001 /* LiveAudioRetentionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAudioRetentionTests.swift; sourceTree = "<group>"; };
 		SUPS00000000000000000001 /* SimpleUpdaterSignatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleUpdaterSignatureTests.swift; sourceTree = "<group>"; };
@@ -201,7 +209,7 @@
 		7C078D902E3B339200FB7CAC /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				7C078D8F2E3B339200FB7CAC /* connectingCaptions Debug.app */,
+				7C078D8F2E3B339200FB7CAC /* Connecting Captions Debug.app */,
 				7CDB0A202F3C4D5600FB7CAD /* ConnectingCaptionsIntegrationTests.xctest */,
 				UIT10000000000000000002 /* ConnectingCaptionsUITests.xctest */,
 			);
@@ -261,6 +269,10 @@
 				FTMA00000000000000000001 /* LiveTranslationMockASRTests.swift */,
 				FTMN00000000000000000001 /* TheaterMinimizeTests.swift */,
 				FTRP00000000000000000001 /* TheaterRepeatTests.swift */,
+				FTSE00000000000000000001 /* SpeechEnergyGateTests.swift */,
+				FTTE00000000000000000001 /* TypingEventSourceTests.swift */,
+				FTYT00000000000000000001 /* TheaterYouTubeReplayTests.swift */,
+				FTYU00000000000000000001 /* TheaterYouTubeUnitTests.swift */,
 				FTSW00000000000000000001 /* TheaterSetupWizardTests.swift */,
 				FTFL00000000000000000001 /* FleetCommercialTests.swift */,
 				FTLIC000000000000000001 /* CommercialLicenseTests.swift */,
@@ -340,7 +352,7 @@
 				7C9A71012F58B00000FB7CAF /* TranscribeCpp */,
 			);
 			productName = connectingCaptions;
-			productReference = 7C078D8F2E3B339200FB7CAC /* connectingCaptions Debug.app */;
+			productReference = 7C078D8F2E3B339200FB7CAC /* Connecting Captions Debug.app */;
 			productType = "com.apple.product-type.application";
 		};
 		7CDB0A1F2F3C4D5600FB7CAD /* ConnectingCaptionsIntegrationTests */ = {
@@ -532,6 +544,10 @@
 				FTMA00000000000000000002 /* LiveTranslationMockASRTests.swift in Sources */,
 				FTMN00000000000000000002 /* TheaterMinimizeTests.swift in Sources */,
 				FTRP00000000000000000002 /* TheaterRepeatTests.swift in Sources */,
+				FTSE00000000000000000002 /* SpeechEnergyGateTests.swift in Sources */,
+				FTTE00000000000000000002 /* TypingEventSourceTests.swift in Sources */,
+				FTYT00000000000000000002 /* TheaterYouTubeReplayTests.swift in Sources */,
+				FTYU00000000000000000002 /* TheaterYouTubeUnitTests.swift in Sources */,
 				FTSW00000000000000000002 /* TheaterSetupWizardTests.swift in Sources */,
 				FTFL00000000000000000002 /* FleetCommercialTests.swift in Sources */,
 				FTLIC000000000000000002 /* CommercialLicenseTests.swift in Sources */,

@@ -638,8 +638,18 @@ struct PresenterCaptionView: View {
 
     /// Incoming speech stays visible after the tools hide, including Overlay
     /// and Captions only. Overlay keeps one line so the caption bar still fits.
+    /// An idle Pop-up still shows the bar so the name can sit there.
     private var showsIncomingBar: Bool {
-        !self.settings.theaterMinimized && !self.model.inboxLines.isEmpty
+        guard !self.settings.theaterMinimized else { return false }
+        return !self.model.inboxLines.isEmpty || self.showsIdleTaskBarLogo
+    }
+
+    /// Pop-up with its tools shows the wordmark while nothing is waiting.
+    /// Overlay and Captions only stay clear until a line arrives.
+    private var showsIdleTaskBarLogo: Bool {
+        self.presentationStyle == .popup
+            && !self.usesCaptionsOnlyChrome
+            && self.model.inboxLines.isEmpty
     }
 
     private var visibleInboxLines: [String] {
@@ -649,15 +659,32 @@ struct PresenterCaptionView: View {
         return self.model.inboxLines
     }
 
+    private var taskBarWordmark: Text {
+        Text("Connecting ")
+            .foregroundStyle(self.captionColors.chrome)
+            + Text("Captions")
+            .foregroundStyle(Color(nsColor: ConnectingCaptionsLinkMark.amber))
+    }
+
     private var incomingBar: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            ForEach(Array(self.visibleInboxLines.enumerated()), id: \.offset) { _, line in
-                Text(line)
-                    .font(.system(size: 10, weight: .regular))
-                    .foregroundStyle(self.captionColors.chrome.opacity(0.78))
+        HStack(alignment: .center, spacing: 8) {
+            FluidIcon(size: 16)
+            if self.model.inboxLines.isEmpty {
+                self.taskBarWordmark
+                    .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
-                    .truncationMode(.head)
                     .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(Array(self.visibleInboxLines.enumerated()), id: \.offset) { _, line in
+                        Text(line)
+                            .font(.system(size: 10, weight: .regular))
+                            .foregroundStyle(self.captionColors.chrome.opacity(0.78))
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
             }
         }
         .padding(.horizontal, TheaterChromeLayout.barInset)
@@ -673,7 +700,7 @@ struct PresenterCaptionView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Incoming")
+        .accessibilityLabel(self.model.inboxLines.isEmpty ? ConnectingCaptionsProduct.displayName : "Incoming")
         .accessibilityValue(self.model.inboxLines.joined(separator: " "))
         .accessibilityIdentifier("theater.inbox")
         .theaterTag(TheaterChromeHelp.inbox)

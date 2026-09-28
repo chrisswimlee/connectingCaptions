@@ -1,3 +1,4 @@
+// Upstream: FluidVoice (altic-dev), GPLv3. Parakeet streaming engine. Do not rewrite it to look original.
 import AVFoundation
 import Foundation
 #if arch(arm64)
@@ -6,7 +7,7 @@ import FluidAudio
 
 /// TranscriptionProvider implementation using FluidAudio's true streaming Parakeet EOU pipeline.
 final class ParakeetRealtimeProvider: TranscriptionProvider {
-    let name = "Parakeet Flash (FluidAudio)"
+    let name = "Parakeet Flash"
 
     var isAvailable: Bool { true }
 
@@ -63,18 +64,21 @@ final class ParakeetRealtimeProvider: TranscriptionProvider {
         let engine = StreamingEouAsrManager(configuration: configuration, chunkSize: self.chunkSize)
         let progressRelay = ModelPreparationProgressRelay(progressHandler)
         do {
-            try await engine.loadModelsFromHuggingFace(progressHandler: { progress in
-                switch progress.phase {
-                case .listing:
-                    progressRelay.report(.preparingDownload)
-                case .downloading:
-                    // FluidAudio reserves 0.0-0.5 for transfer bytes. Show percent only for that
-                    // real download phase, not for later Core ML work.
-                    progressRelay.report(.downloading(progress.fractionCompleted / 0.5))
-                case .compiling:
-                    progressRelay.report(.optimizing)
+            try await engine.loadModelsFromHuggingFace(
+                to: Self.cacheRootDirectory(),
+                progressHandler: { progress in
+                    switch progress.phase {
+                    case .listing:
+                        progressRelay.report(.preparingDownload)
+                    case .downloading:
+                        // FluidAudio reserves 0.0-0.5 for transfer bytes. Show percent only for that
+                        // real download phase, not for later Core ML work.
+                        progressRelay.report(.downloading(progress.fractionCompleted / 0.5))
+                    case .compiling:
+                        progressRelay.report(.optimizing)
+                    }
                 }
-            })
+            )
         } catch {
             if Task.isCancelled {
                 throw CancellationError()
@@ -192,10 +196,7 @@ final class ParakeetRealtimeProvider: TranscriptionProvider {
     }
 
     func clearCache() async throws {
-        let cacheRoot = Self.cacheRootDirectory()
-        if FileManager.default.fileExists(atPath: cacheRoot.path) {
-            try FileManager.default.removeItem(at: cacheRoot)
-        }
+        try VoiceEngineModelDirectory.discardOwnedCopy(of: Self.legacyCacheRoot())
         self.isReady = false
         self.streamedSampleCount = 0
         self.engine = nil
@@ -303,7 +304,7 @@ final class ParakeetRealtimeProvider: TranscriptionProvider {
         return "rootExists=\(rootExists), modelExists=\(modelExists), rootContents=\(rootContents), modelContents=\(modelContents)"
     }
 
-    private static func cacheRootDirectory() -> URL {
+    private static func legacyCacheRoot() -> URL {
         let baseDirectory =
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
                 ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(
@@ -316,10 +317,14 @@ final class ParakeetRealtimeProvider: TranscriptionProvider {
             .appendingPathComponent("Models", isDirectory: true)
             .appendingPathComponent("parakeet-eou-streaming", isDirectory: true)
     }
+
+    private static func cacheRootDirectory() -> URL {
+        VoiceEngineModelDirectory.adopt(legacy: Self.legacyCacheRoot())
+    }
 }
 #else
 final class ParakeetRealtimeProvider: TranscriptionProvider {
-    let name = "Parakeet Flash (FluidAudio)"
+    let name = "Parakeet Flash"
     var isAvailable: Bool { false }
     var isReady: Bool { false }
 

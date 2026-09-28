@@ -4,8 +4,13 @@ All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
 
+- The menu bar mark and the Theater task bar use the linked CC. The name shows on the Pop-up bar only while it is idle.
+- Voice Engine weights stay in this app's Application Support folder. A model already in the shared FluidAudio cache is copied once, and that cache is not deleted.
+- Settings names FluidVoice as the source of speech recognition.
+
 ## [1.6.13] — 2026-09-28
 
+- Settings and credits name **Local Host AI** as the publisher.
 - The app icon, menu bar mark, sidebar logo, and wordmark use a gold **CC** monogram on the Theater plate.
 - The app is **Connecting Captions** again. Downloads ship as `Connecting-Captions-{version}.zip` with **Connecting Captions.app** inside. The GitHub repo and bundle identifier stay **connectingCaptions**. Application Support and Keychain data from **fluidSubtitles** still migrate forward.
 - The Apple Translation pack window now names the language pair, shows installation status, and closes when the pack is ready.

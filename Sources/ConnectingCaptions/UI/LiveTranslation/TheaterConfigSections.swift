@@ -12,11 +12,11 @@ struct TheaterModeSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(self.title)
+            Text(AppLanguage.text(self.title))
                 .font(self.theme.typography.bodyStrong)
                 .foregroundStyle(self.theme.palette.primaryText)
             TheaterWordPicker(
-                accessibilityLabel: self.title,
+                accessibilityLabel: AppLanguage.text(self.title),
                 accessibilityIdentifier: self.accessibilityIdentifier,
                 options: Array(TheaterSessionMode.allCases),
                 title: { $0.displayName },

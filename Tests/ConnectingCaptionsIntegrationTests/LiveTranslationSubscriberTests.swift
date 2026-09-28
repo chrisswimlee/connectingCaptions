@@ -1385,6 +1385,161 @@ final class LiveTranslationSubscriberTests: XCTestCase {
         XCTAssertEqual(subscriber.committedLines.count, 2)
     }
 
+    /// Apple Speech ticks from a real Listen. "visualize..." was rewritten to
+    /// "visually see…", but the held leftover kept the old wording. The pause
+    /// printed "I feel like being able to visualize." and the rest waited for
+    /// the next utterance.
+    func testPausePrintsTheLatestRewriteNotAStaleHeldSentence() async {
+        let settings = SettingsStore.shared
+        let originalSource = settings.translationSourceLanguageID
+        let originalTarget = settings.translationTargetLanguageID
+        defer {
+            settings.translationSourceLanguageID = originalSource
+            settings.translationTargetLanguageID = originalTarget
+        }
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "ko"
+
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        let hey = "Hey, this works really well surprisingly."
+        subscriber.handlePartial(hey)
+        subscriber.handlePartial(hey)
+        subscriber.noteSilenceHold()
+        await subscriber.waitForIdleForTesting()
+        subscriber.noteSpeechStart(uptime: ProcessInfo.processInfo.systemUptime)
+        let ticks = [
+            "\(hey)  I feel like being able...",
+            "\(hey)  I feel like being able to visualize...",
+            "\(hey)  I feel like being able to visually see what comes in.",
+            "\(hey)  I feel like being able to visually see what comes in and out.",
+            "\(hey)  I feel like being able to visually see what comes in and out of love.",
+            "\(hey)  I feel like being able to visually see what comes in and out allows this to.",
+            "\(hey)  I feel like being able to visually see what comes in and out allows this to feel a lot more.",
+            "I feel like being able to visually see what comes in and out allows this to feel a lot more better.",
+        ]
+        for tick in ticks {
+            subscriber.handlePartial(tick)
+        }
+        subscriber.noteSilenceHold()
+        await subscriber.waitForIdleForTesting()
+
+        XCTAssertFalse(
+            subscriber.committedSourceLines.contains { $0.contains("visualize") },
+            "\(subscriber.committedSourceLines)"
+        )
+        XCTAssertTrue(
+            subscriber.committedSourceLines.contains {
+                $0.hasPrefix("I feel like being able to visually see") && $0.hasSuffix("better.")
+            },
+            "\(subscriber.committedSourceLines)"
+        )
+        XCTAssertTrue(subscriber.liveSpokenText.isEmpty, subscriber.liveSpokenText)
+    }
+
+    /// Same Listen: "Right." on one tick became "Write me a song…". The pause
+    /// printed "Right." and the real sentence waited for the next utterance.
+    func testPauseDoesNotPrintAOneTickMishearingOfTheNextSentence() async {
+        let settings = SettingsStore.shared
+        let originalSource = settings.translationSourceLanguageID
+        let originalTarget = settings.translationTargetLanguageID
+        defer {
+            settings.translationSourceLanguageID = originalSource
+            settings.translationTargetLanguageID = originalTarget
+        }
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "ko"
+
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        subscriber.seedCommittedForTesting(
+            source: "That's all I want today for me.",
+            translated: "오늘 나에게 바라는 건 그게 전부야."
+        )
+        let ticks = [
+            "That's all I want today for me.",
+            "Well, that's all I want today for me.  Right.",
+            "That's all I want today for me.  Write me a song.",
+            "all I want today for me.  Write me a song, and...",
+            "What today for me?  Write me a song and love...",
+            "Today for me.  Write me a song and love me tomorrow.",
+            "for me.  Write me a song and love me tomorrow.",
+            "Write me a song and love me tomorrow.",
+        ]
+        for tick in ticks {
+            subscriber.handlePartial(tick)
+        }
+        subscriber.noteSilenceHold()
+        await subscriber.waitForIdleForTesting()
+
+        XCTAssertFalse(subscriber.committedSourceLines.contains("Right."), "\(subscriber.committedSourceLines)")
+        XCTAssertEqual(subscriber.committedSourceLines.last, "Write me a song and love me tomorrow.")
+    }
+
+    func testHeldWordingSurvivesOneRewriteTickButFollowsTwo() {
+        XCTAssertEqual(
+            StreamingTranscriptStitcher.heldTarget(
+                printed: "what it on me",
+                incoming: "what it all means",
+                previousIncoming: "what it on me"
+            ),
+            "what it on me"
+        )
+        XCTAssertEqual(
+            StreamingTranscriptStitcher.heldTarget(
+                printed: "what it on me",
+                incoming: "what it all means to us",
+                previousIncoming: "what it all means"
+            ),
+            "what it all means to us"
+        )
+    }
+
+    func testRepeatedContextMissesStopPayingForTheContextCall() async {
+        let settings = SettingsStore.shared
+        let originalSource = settings.translationSourceLanguageID
+        let originalTarget = settings.translationTargetLanguageID
+        defer {
+            settings.translationSourceLanguageID = originalSource
+            settings.translationTargetLanguageID = originalTarget
+        }
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "ko"
+
+        let engine = FakeTranslationEngine()
+        engine.result = .success("UNPEELABLE BLOB")
+        let subscriber = LiveTranslationSubscriber(translator: engine)
+        subscriber.beginListening()
+        subscriber.seedCommittedForTesting(
+            source: "We opened the lab this morning.",
+            translated: "오늘 아침 실험실을 열었습니다."
+        )
+        subscriber.markAllPosted()
+        let missed = [
+            ("The weather turned cold outside.", "밖은 날씨가 추워졌습니다."),
+            ("Our budget doubled this year.", "올해 예산이 두 배가 되었습니다."),
+        ]
+        XCTAssertEqual(missed.count, LiveTranslationContextStreak.missLimit)
+        for (sentence, caption) in missed {
+            engine.resultsByText[sentence] = caption
+            _ = await subscriber.translateFinal(sentence)
+        }
+        let callsBeforeSkip = engine.calls.count
+        XCTAssertEqual(callsBeforeSkip, missed.count * 2)
+
+        let isolated = "Then we shipped the new model."
+        engine.resultsByText[isolated] = "그다음 새 모델을 출시했습니다."
+        _ = await subscriber.translateFinal(isolated)
+        XCTAssertEqual(subscriber.committedLines.last, "그다음 새 모델을 출시했습니다.")
+        XCTAssertEqual(Array(engine.calls.dropFirst(callsBeforeSkip)), [isolated])
+
+        subscriber.beginListening()
+        XCTAssertTrue(subscriber.contextStreak.usesContext(
+            source: SpokenLanguageResolver.sourceLanguage(),
+            target: SpokenLanguageResolver.targetLanguage()
+        ))
+    }
+
     func testDroppedMarksFallThroughToPrefixPeel() async {
         let settings = SettingsStore.shared
         let originalSource = settings.translationSourceLanguageID

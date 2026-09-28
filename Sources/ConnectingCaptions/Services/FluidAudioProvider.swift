@@ -23,7 +23,7 @@ final class FluidAudioProvider: TranscriptionProvider {
         )
     }
 
-    let name = "FluidAudio (Apple Silicon Optimized)"
+    let name = "Parakeet"
 
     /// Whether this provider is supported on the current system.
     /// FluidAudio is optimized for Apple Silicon, but may still function on Intel.
@@ -61,8 +61,9 @@ final class FluidAudioProvider: TranscriptionProvider {
         let asrModelVersion: AsrModelVersion = selectedModel == .parakeetTDTv2 ? .v2 : .v3
         let modelVersion = selectedModel == .parakeetTDTv2 ? "v2" : "v3"
         self.pronunciationModelKey = "parakeet-\(modelVersion)"
-        let cacheDirectory = AsrModels.defaultCacheDirectory().deletingLastPathComponent()
-        let modelCacheDirectory = AsrModels.defaultCacheDirectory(for: asrModelVersion)
+        let legacyModelDirectory = AsrModels.defaultCacheDirectory(for: asrModelVersion)
+        let modelCacheDirectory = VoiceEngineModelDirectory.adopt(legacy: legacyModelDirectory)
+        let cacheDirectory = modelCacheDirectory.deletingLastPathComponent()
         DebugLogger.shared.info(
             "FluidAudioProvider: Starting model preparation for \(selectedModel.displayName) [version=\(modelVersion)]",
             source: "FluidAudioProvider"
@@ -96,6 +97,7 @@ final class FluidAudioProvider: TranscriptionProvider {
         let models: AsrModels
         do {
             models = try await AsrModels.downloadAndLoad(
+                to: modelCacheDirectory,
                 version: asrModelVersion,
                 progressHandler: fluidAudioProgressHandler
             )
@@ -747,7 +749,6 @@ final class FluidAudioProvider: TranscriptionProvider {
 
     func clearCache() async throws {
         self.resetIncrementalSession()
-        let baseCacheDir = AsrModels.defaultCacheDirectory().deletingLastPathComponent()
         let selectedModel = self.modelOverride ?? SettingsStore.shared.selectedSpeechModel
         DebugLogger.shared.info(
             "FluidAudioProvider: clearCache called for \(selectedModel.displayName)",
@@ -755,21 +756,12 @@ final class FluidAudioProvider: TranscriptionProvider {
         )
 
         let start = Date()
-        if selectedModel == .parakeetTDTv2 {
-            // Clear v2 cache only
-            let v2CacheDir = baseCacheDir.appendingPathComponent("parakeet-tdt-0.6b-v2-coreml")
-            if FileManager.default.fileExists(atPath: v2CacheDir.path) {
-                try FileManager.default.removeItem(at: v2CacheDir)
-                DebugLogger.shared.info("FluidAudioProvider: Deleted Parakeet v2 cache", source: "FluidAudioProvider")
-            }
-        } else {
-            // Clear v3 cache only (default)
-            let v3CacheDir = baseCacheDir.appendingPathComponent("parakeet-tdt-0.6b-v3-coreml")
-            if FileManager.default.fileExists(atPath: v3CacheDir.path) {
-                try FileManager.default.removeItem(at: v3CacheDir)
-                DebugLogger.shared.info("FluidAudioProvider: Deleted Parakeet v3 cache", source: "FluidAudioProvider")
-            }
-        }
+        let version: AsrModelVersion = selectedModel == .parakeetTDTv2 ? .v2 : .v3
+        try VoiceEngineModelDirectory.discardOwnedCopy(of: AsrModels.defaultCacheDirectory(for: version))
+        DebugLogger.shared.info(
+            "FluidAudioProvider: Deleted this app's Parakeet cache",
+            source: "FluidAudioProvider"
+        )
 
         DebugLogger.shared.debug(
             "FluidAudioProvider: clearCache completed in \(String(format: "%.3f", Date().timeIntervalSince(start)))s",
@@ -850,7 +842,7 @@ final class FluidAudioProvider: TranscriptionProvider {
 #else
 /// Check-shim for Intel Macs where FluidAudio is not available
 final class FluidAudioProvider: TranscriptionProvider {
-    let name = "FluidAudio (Apple Silicon ONLY)"
+    let name = "Parakeet"
     var isAvailable: Bool { false }
     var isReady: Bool { false }
     private(set) var isWordBoostingActive: Bool = false

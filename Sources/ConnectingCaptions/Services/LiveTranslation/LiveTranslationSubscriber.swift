@@ -97,9 +97,12 @@ final class LiveTranslationSubscriber: ObservableObject {
     private let translator: TranslationEngine
     private let llmEngine: LLMTranslationEngine
     private let prefetchCache = LiveTranslationPrefetchCache()
+    let contextStreak = LiveTranslationContextStreak()
     private var lastFailedSource: String?
     /// Last leftover held for the next clause. The board does not paint it.
     private var heldLiveSpoken: String = ""
+    /// Last tick's unread speech, so a rewrite two ticks agree on replaces the held wording.
+    private var previousPartialLeftover: String = ""
     /// Pause freezes unaccepted speech. Accepted translations already in flight may still land.
     private var liveSpeechHeld = false
     var confirmTranscript: (() async -> String)?
@@ -373,6 +376,13 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.peelSources + self.orderedPendingSources + self.suppressedSources
     }
 
+    /// The newest accepted sentence that is still translating.
+    private var newestUnpublishedCommitIndex: Int? {
+        self.commitOrder.indices.last {
+            $0 >= self.nextCommitToPublish && !self.skippedCommitIndexes.contains($0)
+        }
+    }
+
     /// Accepted translation commits that have not reached the board yet.
     /// This includes a translation that is ready but waiting for an earlier
     /// sentence, so the task bar never goes blank before that sentence prints.
@@ -463,7 +473,7 @@ final class LiveTranslationSubscriber: ObservableObject {
             return false
         }
         switch reason {
-        case .sameAsPrinted, .revisesEarlier, .revisesNewest, .inFlight:
+        case .sameAsPrinted, .revisesEarlier, .revisesNewest, .repeatsPrintedEnding, .printedThisListen, .rejoinsPrinted, .inFlight:
             return true
         case .empty, .junk, .tooThin, .untracked:
             return false
@@ -515,7 +525,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.didAutoRetryFailure = false
         self.lastVoicedUptime = nil
         self.heldLiveSpoken = ""
+        self.previousPartialLeftover = ""
         self.llmEngine.resetListenEchoTally()
+        self.contextStreak.reset()
         self.refreshInbox()
     }
 
@@ -532,6 +544,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.sourceDraft = ""
         self.translatedDraft = self.captionLog.translatedLines.last ?? ""
         self.heldLiveSpoken = ""
+        self.previousPartialLeftover = ""
         TheaterSpokenDelivery.shared.dropPending()
         self.refreshInbox()
     }
@@ -557,7 +570,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.didAutoRetryFailure = false
         self.lastVoicedUptime = nil
         self.heldLiveSpoken = ""
+        self.previousPartialLeftover = ""
         self.llmEngine.resetListenEchoTally()
+        self.contextStreak.reset()
         self.listenBatchStart = self.captionLog.sourceLines.count
         self.listenHistory = []
         self.latencyTracker.resetUtterance()
@@ -580,7 +595,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.lastFailedSource = nil
         self.failedPrintedRowIDs = [:]
         self.heldLiveSpoken = ""
+        self.previousPartialLeftover = ""
         self.llmEngine.resetListenEchoTally()
+        self.contextStreak.reset()
         self.listenBatchStart = self.captionLog.sourceLines.count
         self.listenHistory = []
         self.refreshInbox()
@@ -602,12 +619,11 @@ final class LiveTranslationSubscriber: ObservableObject {
     }
 
     func noteSpeechStart(uptime: TimeInterval) {
-        self.pauseRevisionTask?.cancel()
-        self.pauseRevisionTask = nil
-        self.tailSettleTask?.cancel()
-        self.tailSettleTask = nil
-        self.voiceCatchUpTask?.cancel()
-        self.voiceCatchUpTask = nil
+        // Energy returns before the next words. A breath or the tail of this
+        // sentence must not cancel the silence flush, or the caption stays
+        // off the board until the speaker starts again. A partial that is
+        // actually a new sentence still cancels in `handlePartial`. The
+        // open-tail settle also drops itself when the draft has moved on.
         self.didPauseReviseThisUtterance = false
         self.lastVoicedUptime = uptime
         self.latencyTracker.markSpeechStart(uptime)
@@ -627,6 +643,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.translatedDraftSource = ""
         self.lastHeardText = ""
         self.heldLiveSpoken = ""
+        self.previousPartialLeftover = ""
         self.refreshInbox()
     }
 
@@ -654,6 +671,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.translatedDraftSource = ""
         self.lastHeardText = ""
         self.heldLiveSpoken = ""
+        self.previousPartialLeftover = ""
         self.refreshInbox()
     }
 
@@ -780,6 +798,8 @@ final class LiveTranslationSubscriber: ObservableObject {
             self.retranslatePrintedFailure(id: id, source: source, generation: self.generation)
             return
         }
+        // Retry is asked for. The listen-repeat gate must not refuse the same sentence.
+        self.commitIdentities.remove(key)
         self.enqueueCommit(source)
     }
 
@@ -853,6 +873,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         // A printed line is not on the live row. Seeding it here would make the
         // monotonic guard hold this clause and swallow the next one.
         self.heldLiveSpoken = ""
+        self.previousPartialLeftover = ""
     }
 
     func handlePartial(_ text: String) {
@@ -883,10 +904,12 @@ final class LiveTranslationSubscriber: ObservableObject {
             self.voiceCatchUpTask?.cancel()
             self.voiceCatchUpTask = nil
         }
-        let display = StreamingTranscriptStitcher.monotonicTarget(
+        let display = StreamingTranscriptStitcher.heldTarget(
             printed: self.heldLiveSpoken,
-            incoming: leftover
+            incoming: leftover,
+            previousIncoming: self.previousPartialLeftover
         )
+        self.previousPartialLeftover = leftover
         self.sourceDraft = display
         self.advance(PartialCaption(
             text: leftover,
@@ -983,6 +1006,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         languageID: String
     ) {
         self.retargetNewestClauseIfGrown(into: initial, languageID: languageID)
+        self.adoptLatestSentenceBoundary(languageID: languageID)
         var remaining = TranslationClauseSegmenter.leftoverTail(
             initial,
             already: self.printedSources,
@@ -1033,6 +1057,11 @@ final class LiveTranslationSubscriber: ObservableObject {
             }
             if self.replaceNewestWithRevision(next.unit, languageID: languageID) {
                 remaining = next.rest
+                continue
+            }
+            if self.absorbIntoNewestRow(next.unit, languageID: languageID) {
+                remaining = next.rest
+                didCommit = true
                 continue
             }
             if self.shouldSkipSettledUnit(next.unit) {
@@ -1153,6 +1182,61 @@ final class LiveTranslationSubscriber: ObservableObject {
         return ".?!。！？…".contains(first)
     }
 
+    /// A later decode put a period back inside the newest line, or added a
+    /// word at its end. Peel uses the corrected wording immediately, so the
+    /// sentence after the new period can print on its own line.
+    private func adoptLatestSentenceBoundary(languageID: String) {
+        let hypothesis = self.latestHypothesis
+        guard !hypothesis.isEmpty else { return }
+        if let pending = self.pendingGrowth,
+           self.adoptSentenceBoundary(previous: pending.source, hypothesis: hypothesis, languageID: languageID, replace: { corrected in
+               self.schedulePaintedGrowth(id: pending.id, source: corrected)
+           })
+        {
+            return
+        }
+        if let index = self.newestUnpublishedCommitIndex,
+           self.adoptSentenceBoundary(previous: self.commitOrder[index], hypothesis: hypothesis, languageID: languageID, replace: { corrected in
+               self.replaceUnpublishedCommit(at: index, with: corrected)
+           })
+        {
+            return
+        }
+        guard let last = self.captionLog.entries.last else { return }
+        let source = self.pendingGrowthSource(for: last.id) ?? last.source
+        _ = self.adoptSentenceBoundary(previous: source, hypothesis: hypothesis, languageID: languageID) { corrected in
+            self.schedulePaintedGrowth(id: last.id, source: corrected)
+        }
+    }
+
+    /// A split replaces the newest line with its first sentence. The commit
+    /// loop then prints the second sentence. An added tail replaces the line
+    /// with the longer wording.
+    private func adoptSentenceBoundary(
+        previous: String,
+        hypothesis: String,
+        languageID: String,
+        replace: (String) -> Void
+    ) -> Bool {
+        if let split = TranslationClauseSegmenter.separatedSentences(
+            painted: previous,
+            hypothesis: hypothesis,
+            languageID: languageID
+        ) {
+            replace(split.head)
+            return true
+        }
+        if let grown = TranslationClauseSegmenter.sentenceWithAppendedTail(
+            painted: previous,
+            hypothesis: hypothesis,
+            languageID: languageID
+        ), !TranslationClauseSegmenter.isSameClause(grown, previous) {
+            replace(grown)
+            return true
+        }
+        return false
+    }
+
     /// The newest caption grew in place ("the model." → "the model on new
     /// data."). Keep that line id. The board stays on the previous pair until
     /// the replacement translation is ready, then source and Show-as update
@@ -1204,7 +1288,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         if let index = self.commitOrder.indices.last,
            index >= self.nextCommitToPublish,
            !self.skippedCommitIndexes.contains(index),
-           TranslationClauseSegmenter.shouldReviseCommitted(
+           self.correctsNewest(
                previous: self.commitOrder[index],
                incoming: candidate,
                languageID: languageID
@@ -1215,7 +1299,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
         guard self.commitOrder.indices.allSatisfy({ $0 < self.nextCommitToPublish }),
               let last = self.captionLog.entries.last,
-              TranslationClauseSegmenter.shouldReviseCommitted(
+              self.correctsNewest(
                   previous: last.source,
                   incoming: candidate,
                   languageID: languageID
@@ -1231,11 +1315,91 @@ final class LiveTranslationSubscriber: ObservableObject {
         languageID: String
     ) -> Bool {
         TranslationClauseSegmenter.isInPlaceGrowth(previous: previous, incoming: incoming)
-            || TranslationClauseSegmenter.shouldReviseCommitted(
-                previous: previous,
-                incoming: incoming,
-                languageID: languageID
-            )
+            || TranslationClauseSegmenter.isTailRevisionGrowth(previous: previous, incoming: incoming)
+            || self.correctsNewest(previous: previous, incoming: incoming, languageID: languageID)
+    }
+
+    /// "model" → "modal" replaces the newest line only when Speech took the
+    /// old wording back. Two similar sentences both still in the transcript
+    /// were both said.
+    private func correctsNewest(
+        previous: String,
+        incoming: String,
+        languageID: String
+    ) -> Bool {
+        guard TranslationClauseSegmenter.shouldReviseCommitted(
+            previous: previous,
+            incoming: incoming,
+            languageID: languageID
+        ) else { return false }
+        if TranslationClauseSegmenter.shouldReplaceLast(previous: previous, incoming: incoming) {
+            return true
+        }
+        let heard = self.latestHypothesis
+        guard !heard.isEmpty else { return true }
+        return !TranslationClauseSegmenter.contains(heard, clause: previous)
+    }
+
+    /// A lowercase leftover, or a last-word correction, belongs on the newest
+    /// painted row. A new utterance after a long quiet is left alone.
+    private static let continuationMergeWindow: TimeInterval = 8
+
+    private func absorbIntoNewestRow(_ unit: String, languageID: String) -> Bool {
+        guard let last = self.captionLog.entries.last else {
+            return self.absorbIntoUnpublishedCommit(unit, languageID: languageID)
+        }
+        // The painted line can still be the short first words while a longer
+        // growth is translating. Compare against that growth, or the suffix
+        // prints beside the sentence it already belongs to.
+        let source = self.pendingGrowthSource(for: last.id) ?? last.source
+        if self.continuesNewestClause(previous: source, incoming: unit, languageID: languageID) {
+            self.schedulePaintedGrowth(id: last.id, source: unit)
+            return true
+        }
+        let stillGrowing = self.pendingGrowthSource(for: last.id) != nil
+        let recent = stillGrowing
+            || Date().timeIntervalSince(last.committedAt) <= Self.continuationMergeWindow
+        guard recent else {
+            return self.absorbIntoUnpublishedCommit(unit, languageID: languageID)
+        }
+        if TranslationClauseSegmenter.wordsAlreadyPrinted(unit, in: source) {
+            return true
+        }
+        if let merged = TranslationClauseSegmenter.mergedContinuation(
+            row: source,
+            hypothesis: self.latestHypothesis,
+            unit: unit,
+            languageID: languageID
+        ), !TranslationClauseSegmenter.isSameClause(merged, source) {
+            self.schedulePaintedGrowth(id: last.id, source: merged)
+            return true
+        }
+        return self.absorbIntoUnpublishedCommit(unit, languageID: languageID)
+    }
+
+    /// The sentence is still translating, so it is not the painted row yet.
+    /// A later window of that same sentence replaces the commit instead of
+    /// becoming another row.
+    private func absorbIntoUnpublishedCommit(_ unit: String, languageID: String) -> Bool {
+        guard let index = self.newestUnpublishedCommitIndex else { return false }
+        let pending = self.commitOrder[index]
+        if TranslationClauseSegmenter.wordsAlreadyPrinted(unit, in: pending) {
+            return true
+        }
+        if self.continuesNewestClause(previous: pending, incoming: unit, languageID: languageID) {
+            self.replaceUnpublishedCommit(at: index, with: unit)
+            return true
+        }
+        if let merged = TranslationClauseSegmenter.mergedContinuation(
+            row: pending,
+            hypothesis: self.latestHypothesis,
+            unit: unit,
+            languageID: languageID
+        ), !TranslationClauseSegmenter.isSameClause(merged, pending) {
+            self.replaceUnpublishedCommit(at: index, with: merged)
+            return true
+        }
+        return false
     }
 
     private func replaceUnpublishedCommit(at index: Int, with candidate: String) {
@@ -1341,6 +1505,11 @@ final class LiveTranslationSubscriber: ObservableObject {
         guard token == self.generation else { return }
         var cleaned = self.lastHeardText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { return }
+        if isFinal {
+            cleaned = TranslationClauseSegmenter.finishOpenEllipsis(cleaned)
+            self.lastHeardText = cleaned
+            self.latestHypothesis = cleaned
+        }
         let languageID = SpokenLanguageResolver.listenLanguageID(for: cleaned)
 
         if LiveTranslationConfirm.shouldReDecode(
@@ -1395,6 +1564,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         forceOpenTail: Bool,
         generation _: UInt64
     ) {
+        self.adoptLatestSentenceBoundary(languageID: languageID)
         var remaining = initial
         var steps = 0
         while steps < 32, !remaining.isEmpty {
@@ -1450,6 +1620,14 @@ final class LiveTranslationSubscriber: ObservableObject {
             }
 
             if rest == remaining { break }
+            if TranslationClauseSegmenter.endsWithOpenEllipsis(unit) {
+                self.sourceDraft = remaining
+                return
+            }
+            if self.absorbIntoNewestRow(unit, languageID: languageID) {
+                remaining = rest
+                continue
+            }
             if !isForcedTrailingFragment, self.shouldSkipSettledUnit(unit) {
                 let skipped = self.remainderAfterSkippedUnit(unit, rest: rest, languageID: languageID)
                 if skipped == remaining { break }
@@ -1501,9 +1679,12 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     /// Insert Stop types one trailing fragment the clause cutter refused.
     private func commitTrailingFragment() {
-        let heard = self.lastHeardText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let heard = TranslationClauseSegmenter.finishOpenEllipsis(
+            self.lastHeardText.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
         let languageID = SpokenLanguageResolver.listenLanguageID(for: heard)
         var leftover = self.leftoverSpeech(heard, languageID: languageID)
+        leftover = TranslationClauseSegmenter.finishOpenEllipsis(leftover)
         // A sentence already sent through the commit pipeline this Stop —
         // in flight, already published, or failed and holding its one
         // retry — is not a *new* trailing fragment. `lastHeardText` is not
@@ -1600,6 +1781,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     private func commitVoiceCaption(_ cleaned: String, generation: UInt64) {
         guard generation == self.generation else { return }
         guard self.publish(.append(source: cleaned, translated: cleaned)) != nil else { return }
+        self.rememberCommit(cleaned)
         self.finishPublishedCaption(
             source: cleaned,
             translated: cleaned,
@@ -1629,6 +1811,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         // monotonic guard compares the next clause against the printed one,
         // keeps the printed text, and the next sentence never appears.
         self.heldLiveSpoken = leftover
+        self.previousPartialLeftover = leftover
         let shown = TheaterCaptionFailure.isLine(translated) ? "" : translated
         if leftover.isEmpty {
             self.translatedDraft = shown
@@ -2192,7 +2375,8 @@ final class LiveTranslationSubscriber: ObservableObject {
                 prior: prior,
                 translator: self.translator,
                 llmEngine: self.llmEngine,
-                allowLocal: false
+                allowLocal: false,
+                contextStreak: self.contextStreak
             )
             guard generation == self.generation else { return }
             guard let safe = LLMTranslationEngine.captionSafeForBoard(translated, sourceText: unit)
@@ -2270,7 +2454,8 @@ final class LiveTranslationSubscriber: ObservableObject {
                     terms: terms,
                     kind: kind,
                     prior: prior,
-                    translator: self.translator
+                    translator: self.translator,
+                    contextStreak: self.contextStreak
                 )
             }
             group.addTask {
@@ -2526,9 +2711,16 @@ final class LiveTranslationSubscriber: ObservableObject {
             // an exact string match would drop the flush over nothing and
             // strand this fragment until the next utterance, same as a
             // dropped growth tick must not cancel the pause hold above.
+            // A sentence ahead of this tail can print during the wait and
+            // shrink the leftover to its end. That is not new speech: more
+            // words would make the leftover longer than the tail's end.
             let current = self.sourceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            let currentKey = TranslationClauseSegmenter.normalizedKey(current)
+            let shrankToEnd = !currentKey.isEmpty
+                && TranslationClauseSegmenter.normalizedKey(tail).hasSuffix(currentKey)
             guard token == self.generation,
                   current == tail
+                    || shrankToEnd
                     || TranslationClauseSegmenter.isSameClause(current, tail)
                     || TranslationClauseSegmenter.isGrowingClause(tail, toward: current)
             else { return }

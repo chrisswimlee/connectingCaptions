@@ -80,12 +80,13 @@ final class LiveTranslationMockASRTests: XCTestCase {
         XCTAssertFalse(liveRows.contains { $0.isDraft })
 
         await subscriber.waitForIdleForTesting()
+        // The last sentence is still the whole draft. It waits for the next
+        // line or silence, so a close correction can still replace it.
         XCTAssertEqual(
             subscriber.committedSourceLines,
             [
                 "Today we trained the model.",
                 "Then we applied it.",
-                "And we shipped it to production.",
             ]
         )
 

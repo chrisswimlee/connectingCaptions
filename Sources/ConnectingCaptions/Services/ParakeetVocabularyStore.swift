@@ -1,3 +1,4 @@
+// Upstream: FluidVoice (altic-dev), GPLv3. Parakeet vocabulary. Do not rewrite it to look original.
 import Foundation
 #if arch(arm64)
 import FluidAudio
@@ -343,12 +344,15 @@ extension ParakeetVocabularyStore {
             "ParakeetVocabularyStore: capped terms count=\(cappedTerms.count)",
             source: "ParakeetVocabularyStore"
         )
-        let ctcModels = try await CtcModels.downloadAndLoad(variant: .ctc110m)
+        let ctcDirectory = VoiceEngineModelDirectory.adopt(
+            legacy: CtcModels.defaultCacheDirectory(for: .ctc110m)
+        )
+        let ctcModels = try await CtcModels.downloadAndLoad(to: ctcDirectory, variant: .ctc110m)
         DebugLogger.shared.debug(
             "ParakeetVocabularyStore: ctc model loaded variant=\(ctcModels.variant)",
             source: "ParakeetVocabularyStore"
         )
-        let ctcTokenizer = try await CtcTokenizer.load(from: CtcModels.defaultCacheDirectory(for: ctcModels.variant))
+        let ctcTokenizer = try await CtcTokenizer.load(from: ctcDirectory)
 
         let tokenizedTerms: [CustomVocabularyTerm] = cappedTerms.compactMap { term in
             let tokens = ctcTokenizer.encode(term.text)

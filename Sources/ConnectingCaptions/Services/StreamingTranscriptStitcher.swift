@@ -76,6 +76,19 @@ enum StreamingTranscriptStitcher {
         return printed
     }
 
+    /// `monotonicTarget` holds the shown wording through a one-tick rewrite.
+    /// Once the next tick grows from that rewrite, the engine has moved on.
+    /// Holding longer kept a stale sentence ("Right." after "Write me a
+    /// song…") as the leftover, and a pause printed it while the real
+    /// wording waited for the next utterance.
+    static func heldTarget(printed: String, incoming: String, previousIncoming: String) -> String {
+        let held = self.monotonicTarget(printed: printed, incoming: incoming)
+        let incoming = incoming.trimmingCharacters(in: .whitespacesAndNewlines)
+        let previous = previousIncoming.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard held != incoming, !previous.isEmpty else { return held }
+        return self.monotonicTarget(printed: previous, incoming: incoming) == incoming ? incoming : held
+    }
+
     /// The confirmed text already contains this clause, and that confirmed
     /// text looks finished in the listen language. A sentence end that exists
     /// only on `unit` does not count, and neither does the same words with

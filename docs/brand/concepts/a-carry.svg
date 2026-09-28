@@ -8,8 +8,8 @@
       <stop offset="1" stop-color="#0A0F17"/>
     </linearGradient>
     <linearGradient id="ink" x1="0" y1="420" x2="0" y2="604" gradientUnits="userSpaceOnUse">
-      <stop offset="0.28" stop-color="#EBA84E"/>
-      <stop offset="0.72" stop-color="#5DD0B9"/>
+      <stop offset="0.2" stop-color="#EBA84E"/>
+      <stop offset="0.8" stop-color="#5DD0B9"/>
     </linearGradient>
   </defs>
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>

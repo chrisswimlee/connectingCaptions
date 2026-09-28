@@ -121,6 +121,102 @@ final class TheaterRepeatTests: XCTestCase {
         )
     }
 
+    /// The ASR transcript is the whole talk. A short printed line that was also
+    /// said earlier ("The creamer.") anchored peel at the old copy, and the
+    /// talk after it printed a second time.
+    func testLongTalkPeelAnchorsOnTheNewestCopyOfAPrintedLine() {
+        let talk = "Hello there everyone. Like the Korean is actually very good. We talked about dogs for a while. "
+            + "Like the Korean is actually very good. I told you to hold on. Oh hey sorry."
+        let window = ["Like the Korean is actually very good.", "I told you to hold on."]
+        XCTAssertEqual(
+            TranslationClauseSegmenter.leftoverTail(talk, already: window, languageID: "en"),
+            "Oh hey sorry."
+        )
+    }
+
+    func testLongTalkPeelStillFindsAShortNewestLine() {
+        let talk = "We talked about dogs for a while. Mm hmm. Then we went home and cooked. Mm hmm. Oh hey sorry."
+        let window = ["Then we went home and cooked.", "Mm hmm."]
+        XCTAssertEqual(
+            TranslationClauseSegmenter.leftoverTail(talk, already: window, languageID: "en"),
+            "Oh hey sorry."
+        )
+    }
+
+    func testAFullSentencePrintedEarlierThisListenDoesNotPrintAgain() {
+        let printed = "This thing printed it three times."
+        let context = TheaterBoardAdmission.Context(
+            peelSources: ["Something newer.", "And another line here."],
+            commitIdentities: [TranslationClauseSegmenter.clauseIdentity(printed)]
+        )
+        XCTAssertEqual(
+            TheaterBoardAdmission.decide(printed, languageID: "en", phase: .propose, context: context),
+            .skip(.printedThisListen)
+        )
+        XCTAssertEqual(
+            TheaterBoardAdmission.decide(printed, languageID: "en", phase: .publish, context: context),
+            .admit
+        )
+        let shortReply = "Yeah, sure thing."
+        let shortContext = TheaterBoardAdmission.Context(
+            peelSources: ["Something newer."],
+            commitIdentities: [TranslationClauseSegmenter.clauseIdentity(shortReply)]
+        )
+        XCTAssertEqual(
+            TheaterBoardAdmission.decide(shortReply, languageID: "en", phase: .propose, context: shortContext),
+            .admit
+        )
+    }
+
+    func testRestitchedEndingOfThePrintedLineDoesNotPrintAgain() {
+        let context = TheaterBoardAdmission.Context(
+            peelSources: ["Hey guys, Come on, please work."],
+            latestHypothesis: "Hey guys. Come on. Please work."
+        )
+        XCTAssertEqual(
+            TheaterBoardAdmission.decide(
+                "Please work.",
+                languageID: "en",
+                phase: .propose,
+                context: context
+            ),
+            .skip(.repeatsPrintedEnding)
+        )
+    }
+
+    func testEndingSpokenTwiceStillPrints() {
+        let context = TheaterBoardAdmission.Context(
+            peelSources: ["Hey guys, Come on, please work."],
+            latestHypothesis: "Hey guys, Come on, please work. Please work."
+        )
+        XCTAssertEqual(
+            TheaterBoardAdmission.decide(
+                "Please work.",
+                languageID: "en",
+                phase: .propose,
+                context: context
+            ),
+            .admit
+        )
+    }
+
+    func testANewSentenceThatSharesNoEndingStillPrints() {
+        XCTAssertFalse(
+            TheaterBoardAdmission.repeatsPrintedEnding(
+                printed: "Today we trained the model.",
+                incoming: "Then we shipped it.",
+                hypothesis: "Today we trained the model. Then we shipped it."
+            )
+        )
+        XCTAssertFalse(
+            TheaterBoardAdmission.repeatsPrintedEnding(
+                printed: "We tested the model.",
+                incoming: "Model.",
+                hypothesis: "We tested the model. Model."
+            )
+        )
+    }
+
     func testRepunctuatedGrowthUpdatesTheLineInsteadOfPrintingAgain() {
         XCTAssertTrue(
             TranslationClauseSegmenter.isInPlaceGrowth(

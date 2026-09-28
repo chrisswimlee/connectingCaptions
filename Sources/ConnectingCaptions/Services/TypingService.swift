@@ -113,18 +113,14 @@ final class TypingService {
         let appScriptSelectedRange: CFRange?
     }
 
-    private enum PasteVerificationResult: String {
-        case appScriptContainsText = "appscript_contains_text"
-        case appScriptCaretMovedExpectedDistance = "appscript_caret_moved_expected_distance"
-        case fieldContainsText = "field_contains_text"
-        case caretMovedExpectedDistance = "caret_moved_expected_distance"
-        case timeout
-        case unavailable
-    }
-
     private static let focusSnapshotQueue = DispatchQueue(label: "TypingService.FocusSnapshot")
     private static let pasteboardSessionSemaphore = DispatchSemaphore(value: 1)
     private static let pasteboardRestoreQueue = DispatchQueue(label: "TypingService.PasteboardRestore", qos: .utility)
+    /// A slow or just-activated app can read the pasteboard well after Cmd+V
+    /// posts, so restoring too early pastes the user's old clipboard. The wait
+    /// is a plain sleep: polling the focused app over Accessibility during it
+    /// stalled that app, and the next keystrokes lagged.
+    private static let clipboardRestoreSettleMicros: useconds_t = 1_000_000
     private static var focusSnapshot: FocusSnapshot?
     private static let ghosttyBundleIdentifier = "com.mitchellh.ghostty"
 
@@ -689,16 +685,11 @@ final class TypingService {
 
     private func postReturnKey(_ key: SettingsStore.SpokenSendKey, targetPID: pid_t) -> Bool {
         let returnKeyCode = CGKeyCode(kVK_Return)
-        guard let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: returnKeyCode, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: returnKeyCode, keyDown: false)
-        else {
+        guard let events = TypingEventSource.pair(virtualKey: returnKeyCode, flags: key.eventFlags) else {
             return false
         }
-
-        keyDown.flags = key.eventFlags
-        keyUp.flags = key.eventFlags
-        keyDown.setIntegerValueField(.eventSourceUserData, value: Self.synthesizedEventUserData)
-        keyUp.setIntegerValueField(.eventSourceUserData, value: Self.synthesizedEventUserData)
+        let keyDown = events.down
+        let keyUp = events.up
         keyDown.postToPid(targetPID)
         usleep(10_000)
         keyUp.postToPid(targetPID)
@@ -859,7 +850,6 @@ final class TypingService {
 
     private func withTemporaryPasteboardString(
         _ text: String,
-        restoreDelayMicros: useconds_t,
         action: () -> Bool
     ) -> Bool {
         let pasteboardWaitStartedAt = ProcessInfo.processInfo.systemUptime
@@ -886,9 +876,6 @@ final class TypingService {
         }
         let temporaryChangeCount = pasteboard.changeCount
         self.bench("pasteboard_write_done elapsedMs=\(Self.elapsedMs(since: writeStartedAt))")
-        let focusSnapshotStartedAt = ProcessInfo.processInfo.systemUptime
-        let focusedTextSnapshot = self.captureFocusedTextSnapshot()
-        self.bench("paste_focus_snapshot_done elapsedMs=\(Self.elapsedMs(since: focusSnapshotStartedAt))")
         let actionStartedAt = ProcessInfo.processInfo.systemUptime
         let actionResult = action()
         self.bench("paste_dispatch_done elapsedMs=\(Self.elapsedMs(since: actionStartedAt)) success=\(actionResult)")
@@ -901,11 +888,7 @@ final class TypingService {
         releasesPasteboardSessionOnReturn = false
         Self.pasteboardRestoreQueue.async {
             defer { Self.pasteboardSessionSemaphore.signal() }
-            _ = self.waitForFocusedTextVerification(
-                from: focusedTextSnapshot,
-                expectedText: text,
-                timeoutMicros: restoreDelayMicros
-            )
+            usleep(Self.clipboardRestoreSettleMicros)
             let pasteboard = NSPasteboard.general
 
             // Avoid clobbering user clipboard changes that happened after our insertion.
@@ -937,20 +920,17 @@ final class TypingService {
         }
         self.bench("paste_target_prepared elapsedMs=\(Self.elapsedMs(since: targetStartedAt))")
 
-        return self.withTemporaryPasteboardString(text, restoreDelayMicros: 5_000_000) {
+        return self.withTemporaryPasteboardString(text) {
             let dispatchStartedAt = ProcessInfo.processInfo.systemUptime
             let vKey = Self.pasteVirtualKeyCode
             let keyResolvedAt = ProcessInfo.processInfo.systemUptime
-            guard let cmdVDown = CGEvent(keyboardEventSource: nil, virtualKey: vKey, keyDown: true),
-                  let cmdVUp = CGEvent(keyboardEventSource: nil, virtualKey: vKey, keyDown: false)
-            else {
+            guard let events = TypingEventSource.pair(virtualKey: vKey, flags: .maskCommand) else {
                 self.bench("paste_dispatch_failed route=pid stage=event_creation elapsedMs=\(Self.elapsedMs(since: keyResolvedAt))")
                 self.log("[TypingService] ERROR: Failed to create Cmd+V events for PID insertion")
                 return false
             }
-
-            cmdVDown.flags = .maskCommand
-            cmdVUp.flags = .maskCommand
+            let cmdVDown = events.down
+            let cmdVUp = events.up
 
             let eventsCreatedAt = ProcessInfo.processInfo.systemUptime
             cmdVDown.postToPid(targetPID)
@@ -1012,12 +992,12 @@ final class TypingService {
                 let chunkEnd = Self.unicodeChunkEnd(in: utf16Array, start: chunkStart)
                 let chunkLength = chunkEnd - chunkStart
 
-                guard let keyDown = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
-                      let keyUp = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false)
-                else {
+                guard let events = TypingEventSource.pair(virtualKey: 0) else {
                     self.log("[TypingService] ERROR: Failed to create unicode chunk CGEvents")
                     return -1
                 }
+                let keyDown = events.down
+                let keyUp = events.up
 
                 let chunkPointer = baseAddress.advanced(by: chunkStart)
                 keyDown.keyboardSetUnicodeString(stringLength: chunkLength, unicodeString: chunkPointer)
@@ -1062,20 +1042,17 @@ final class TypingService {
     /// More reliable but slightly slower - copies text to clipboard then pastes
     private func insertTextViaClipboard(_ text: String) -> Bool {
         self.log("[TypingService] Starting clipboard-based insertion")
-        return self.withTemporaryPasteboardString(text, restoreDelayMicros: 5_000_000) {
+        return self.withTemporaryPasteboardString(text) {
             let dispatchStartedAt = ProcessInfo.processInfo.systemUptime
             let vKey = Self.pasteVirtualKeyCode
             let keyResolvedAt = ProcessInfo.processInfo.systemUptime
-            guard let cmdVDown = CGEvent(keyboardEventSource: nil, virtualKey: vKey, keyDown: true),
-                  let cmdVUp = CGEvent(keyboardEventSource: nil, virtualKey: vKey, keyDown: false)
-            else {
+            guard let events = TypingEventSource.pair(virtualKey: vKey, flags: .maskCommand) else {
                 self.bench("paste_dispatch_failed route=global stage=event_creation elapsedMs=\(Self.elapsedMs(since: keyResolvedAt))")
                 self.log("[TypingService] ERROR: Failed to create Cmd+V events")
                 return false
             }
-
-            cmdVDown.flags = .maskCommand
-            cmdVUp.flags = .maskCommand
+            let cmdVDown = events.down
+            let cmdVUp = events.up
 
             let eventsCreatedAt = ProcessInfo.processInfo.systemUptime
             cmdVDown.post(tap: .cghidEventTap)
@@ -1102,7 +1079,7 @@ final class TypingService {
             return false
         }
 
-        return self.withTemporaryPasteboardString(text, restoreDelayMicros: 5_000_000) {
+        return self.withTemporaryPasteboardString(text) {
             let escapedAppName = appName.replacingOccurrences(of: "\"", with: "\\\"")
             let script = """
             tell application "System Events"
@@ -1362,71 +1339,6 @@ final class TypingService {
         let selectedRange: CFRange?
     }
 
-    private func waitForFocusedTextVerification(
-        from snapshot: FocusedTextSnapshot?,
-        expectedText: String,
-        timeoutMicros: useconds_t
-    ) -> PasteVerificationResult {
-        guard let snapshot else {
-            usleep(timeoutMicros)
-            return .unavailable
-        }
-
-        let pollMicros: useconds_t = 50_000
-        let expectedLength = max(1, (expectedText as NSString).length)
-        let tolerance = max(2, expectedLength / 5)
-        var waited: useconds_t = 0
-
-        while waited < timeoutMicros {
-            usleep(pollMicros)
-            waited += pollMicros
-
-            guard let current = self.captureFocusedTextSnapshot(),
-                  current.pid == snapshot.pid
-            else {
-                continue
-            }
-
-            if let currentValue = current.appScriptValue,
-               currentValue.contains(expectedText),
-               currentValue != snapshot.appScriptValue
-            {
-                return .appScriptContainsText
-            }
-
-            if let before = snapshot.appScriptSelectedRange,
-               let after = current.appScriptSelectedRange,
-               after.length == 0
-            {
-                let expectedCaretLocation = before.location + expectedLength
-                let caretDelta = abs(after.location - expectedCaretLocation)
-                if caretDelta <= tolerance {
-                    return .appScriptCaretMovedExpectedDistance
-                }
-            }
-
-            if let currentValue = current.value,
-               currentValue.contains(expectedText),
-               currentValue != snapshot.value
-            {
-                return .fieldContainsText
-            }
-
-            if let before = snapshot.selectedRange,
-               let after = current.selectedRange,
-               after.length == 0
-            {
-                let expectedCaretLocation = before.location + expectedLength
-                let caretDelta = abs(after.location - expectedCaretLocation)
-                if caretDelta <= tolerance {
-                    return .caretMovedExpectedDistance
-                }
-            }
-        }
-
-        return .timeout
-    }
-
     private func captureAppScriptTextSnapshot(forBundleIdentifier bundleIdentifier: String?) -> AppScriptTextSnapshot? {
         switch bundleIdentifier {
         case "com.apple.dt.Xcode":
@@ -1588,12 +1500,12 @@ final class TypingService {
         let utf16Array = Array(charString.utf16)
 
         // Create keyboard events for this character
-        guard let keyDownEvent = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true),
-              let keyUpEvent = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false)
-        else {
+        guard let events = TypingEventSource.pair(virtualKey: 0) else {
             self.log("[TypingService] ERROR: Failed to create CGEvents for character: \(char)")
             return
         }
+        let keyDownEvent = events.down
+        let keyUpEvent = events.up
 
         // Set the unicode string for both events
         keyDownEvent.keyboardSetUnicodeString(stringLength: utf16Array.count, unicodeString: utf16Array)

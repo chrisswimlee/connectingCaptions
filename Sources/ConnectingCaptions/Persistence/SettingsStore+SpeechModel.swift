@@ -291,7 +291,7 @@ extension SettingsStore {
             case .parakeetRealtime:
                 return "English-only streaming for Theater Listen, with live partial text. Other languages need another Voice Engine."
             case .qwen3Asr:
-                return "Local FluidAudio model for Korean, English, Thai, or Japanese. Heavier memory footprint."
+                return "Local model for Korean, English, Thai, or Japanese. Heavier memory footprint."
             case .cohereTranscribeSixBit:
                 return "High-accuracy transcription for Cohere's languages. Pick the language before Listen."
             case .nemotronOffline:
@@ -584,7 +584,10 @@ extension SettingsStore {
             case .qwen3Asr:
                 #if canImport(FluidAudio) && ENABLE_QWEN
                 if #available(macOS 15.0, *) {
-                    return Qwen3AsrModels.modelsExist(at: Qwen3AsrModels.defaultCacheDirectory())
+                    let legacy = Qwen3AsrModels.defaultCacheDirectory()
+                    return Self.voiceEngineCacheIsComplete(legacy) { directory in
+                        Qwen3AsrModels.modelsExist(at: directory)
+                    }
                 }
                 return false
                 #else
@@ -633,36 +636,49 @@ extension SettingsStore {
 
         #if canImport(FluidAudio)
         static func parakeetModelsExist(version: AsrModelVersion) -> Bool {
-            let directory = AsrModels.defaultCacheDirectory(for: version)
-            let vocabulary = directory.appendingPathComponent(ModelNames.ASR.vocabularyFile)
-            guard
-                AsrModels.modelsExist(at: directory, version: version),
-                HuggingFaceModelDownloader.artifactIsComplete(at: vocabulary, isDirectory: false)
-            else {
-                return false
-            }
+            let legacy = AsrModels.defaultCacheDirectory(for: version)
+            return Self.voiceEngineCacheIsComplete(legacy) { directory in
+                let vocabulary = directory.appendingPathComponent(ModelNames.ASR.vocabularyFile)
+                guard
+                    AsrModels.modelsExist(at: directory, version: version),
+                    HuggingFaceModelDownloader.artifactIsComplete(at: vocabulary, isDirectory: false)
+                else {
+                    return false
+                }
 
-            return AsrModels.requiredModelNames.allSatisfy { modelName in
-                HuggingFaceModelDownloader.artifactIsComplete(
-                    at: directory.appendingPathComponent(modelName, isDirectory: true),
-                    isDirectory: true
-                )
+                return AsrModels.requiredModelNames.allSatisfy { modelName in
+                    HuggingFaceModelDownloader.artifactIsComplete(
+                        at: directory.appendingPathComponent(modelName, isDirectory: true),
+                        isDirectory: true
+                    )
+                }
             }
         }
 
         static func parakeetRealtimeModelsExist() -> Bool {
-            let modelsDirectory = AsrModels.defaultCacheDirectory().deletingLastPathComponent()
-            let modelDirectory = modelsDirectory
+            let legacy = AsrModels.defaultCacheDirectory()
+                .deletingLastPathComponent()
                 .appendingPathComponent("parakeet-eou-streaming", isDirectory: true)
-                .appendingPathComponent(Repo.parakeetEou160.folderName, isDirectory: true)
-
-            return ModelNames.ParakeetEOU.requiredModels.allSatisfy { modelName in
-                let artifact = modelDirectory.appendingPathComponent(modelName)
-                return HuggingFaceModelDownloader.artifactIsComplete(
-                    at: artifact,
-                    isDirectory: modelName.hasSuffix(".mlmodelc")
-                )
+            return Self.voiceEngineCacheIsComplete(legacy) { root in
+                let modelDirectory = root.appendingPathComponent(Repo.parakeetEou160.folderName, isDirectory: true)
+                return ModelNames.ParakeetEOU.requiredModels.allSatisfy { modelName in
+                    let artifact = modelDirectory.appendingPathComponent(modelName)
+                    return HuggingFaceModelDownloader.artifactIsComplete(
+                        at: artifact,
+                        isDirectory: modelName.hasSuffix(".mlmodelc")
+                    )
+                }
             }
+        }
+
+        /// Before the first copy, a complete shared FluidAudio folder still counts as installed.
+        /// After that copy is discarded, only this app's folder counts.
+        private static func voiceEngineCacheIsComplete(_ legacy: URL, _ isComplete: (URL) -> Bool) -> Bool {
+            let owned = VoiceEngineModelDirectory.ownedURL(mirroring: legacy)
+            if VoiceEngineModelDirectory.hasAdopted(legacy: legacy) {
+                return isComplete(owned)
+            }
+            return isComplete(owned) || isComplete(legacy)
         }
         #endif
 
@@ -722,14 +738,14 @@ extension SettingsStore {
         var displayName: String {
             switch self {
             case .auto: return "Automatic (Recommended)"
-            case .fluidAudio: return "FluidAudio (Apple Silicon)"
+            case .fluidAudio: return "Parakeet (Apple Silicon)"
             case .whisper: return "Whisper (Intel/Universal)"
             }
         }
 
         var description: String {
             switch self {
-            case .auto: return "Uses FluidAudio on Apple Silicon, Whisper on Intel"
+            case .auto: return "Uses Parakeet on Apple Silicon, Whisper on Intel"
             case .fluidAudio: return "Fast CoreML-based transcription optimized for M-series chips"
             case .whisper: return "whisper.cpp - CPU-based, works on any Mac"
             }

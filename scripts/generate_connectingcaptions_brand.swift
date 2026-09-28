@@ -57,108 +57,80 @@ func savePNG(_ image: NSImage, to url: URL) {
 
 /// Caption gold. Matches AccentColor.
 let captionGold = NSColor(srgbRed: 0.910, green: 0.647, blue: 0.294, alpha: 1)
-let ink = NSColor(srgbRed: 0.043, green: 0.067, blue: 0.102, alpha: 1)
-let spokenWhite = NSColor(srgbRed: 0.96, green: 0.95, blue: 0.92, alpha: 0.78)
+/// "I speak" amber (#E8A04A) and "Show as" teal (#3ECFB8). Matches b-link.svg.
+let linkAmber = NSColor(srgbRed: 0.910, green: 0.627, blue: 0.290, alpha: 1)
+let linkTeal = NSColor(srgbRed: 0.243, green: 0.812, blue: 0.722, alpha: 1)
+let plateTop = NSColor(srgbRed: 0.106, green: 0.141, blue: 0.196, alpha: 1)
+let plateBottom = NSColor(srgbRed: 0.039, green: 0.059, blue: 0.090, alpha: 1)
 
-func ccFont(forHeight height: CGFloat, weight: NSFont.Weight = .bold) -> NSFont {
-    let fontSize = height * 0.52
-    let base = NSFont.systemFont(ofSize: fontSize, weight: weight)
-    let rounded = base.fontDescriptor.withDesign(.rounded) ?? base.fontDescriptor
-    return NSFont(descriptor: rounded, size: fontSize) ?? base
+/// Concept B "Link": two Cs woven like chain links. Geometry is in the
+/// 1024-unit, y-down space of b-link.svg. Matches `ConnectingCaptionsLinkMark`.
+enum LinkMark {
+    static let bounds = CGRect(x: 236, y: 327, width: 532, height: 370)
+    static let amberCenter = CGPoint(x: 421, y: 512)
+    static let tealCenter = CGPoint(x: 611, y: 512)
+    static let radius: CGFloat = 142
+    static let strokeWidth: CGFloat = 86
+    static let cutWidth: CGFloat = 150
+
+    static func draw(in rect: CGRect, amber: NSColor, teal: NSColor) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let scale = min(rect.width / bounds.width, rect.height / bounds.height)
+        ctx.saveGState()
+        ctx.translateBy(x: rect.midX, y: rect.midY)
+        ctx.scaleBy(x: scale, y: -scale)
+        ctx.translateBy(x: -bounds.midX, y: -bounds.midY)
+        // Amber C, mouth open to the right. Cut where teal passes over it at the bottom crossing.
+        strokeRing(ctx, center: amberCenter, from: 40, to: 320, color: amber.cgColor,
+                   cutCenter: tealCenter, cutFrom: 100, cutTo: 164, cutCap: .butt)
+        // Teal C, wider mouth so the opening survives an 18pt template.
+        // Cut where amber passes over it at the top crossing.
+        strokeRing(ctx, center: tealCenter, from: 37, to: 323, color: teal.cgColor,
+                   cutCenter: amberCenter, cutFrom: -78, cutTo: -22, cutCap: .round)
+        ctx.restoreGState()
+    }
+
+    private static func strokeRing(
+        _ ctx: CGContext, center: CGPoint, from: CGFloat, to: CGFloat, color: CGColor,
+        cutCenter: CGPoint, cutFrom: CGFloat, cutTo: CGFloat, cutCap: CGLineCap
+    ) {
+        ctx.saveGState()
+        ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+        ctx.setStrokeColor(color)
+        ctx.setLineCap(.round)
+        ctx.setLineWidth(strokeWidth)
+        ctx.addArc(center: center, radius: radius, startAngle: from * .pi / 180, endAngle: to * .pi / 180, clockwise: false)
+        ctx.strokePath()
+        ctx.setBlendMode(.clear)
+        ctx.setLineCap(cutCap)
+        ctx.setLineWidth(cutWidth)
+        ctx.addArc(center: cutCenter, radius: radius, startAngle: cutFrom * .pi / 180, endAngle: cutTo * .pi / 180, clockwise: false)
+        ctx.strokePath()
+        ctx.endTransparencyLayer()
+        ctx.restoreGState()
+    }
 }
 
-func drawMonogramCC(in rect: NSRect, color: NSColor, kern: CGFloat = -1.2) {
-    let font = ccFont(forHeight: rect.height)
-    let letters = NSAttributedString(
-        string: "CC",
-        attributes: [
-            .font: font,
-            .foregroundColor: color,
-            .kern: kern,
-        ]
-    )
-    let box = letters.size()
-    letters.draw(at: NSPoint(x: rect.midX - box.width / 2, y: rect.midY - box.height / 2 + rect.height * 0.02))
-}
-
-/// Show-as title over a shorter spoken line, both left-aligned.
-func drawCaptionBars(in rect: NSRect, title: NSColor, spoken: NSColor) {
-    let barHeight = rect.height * 0.38
-    let gap = rect.height * 0.18
-    let spokenHeight = barHeight * 0.78
-    let stack = barHeight + gap + spokenHeight
-    let originY = rect.minY + (rect.height - stack) / 2
-    title.setFill()
-    NSBezierPath(
-        roundedRect: NSRect(x: rect.minX, y: originY + spokenHeight + gap, width: rect.width, height: barHeight),
-        xRadius: barHeight / 2,
-        yRadius: barHeight / 2
-    ).fill()
-    spoken.setFill()
-    NSBezierPath(
-        roundedRect: NSRect(x: rect.minX, y: originY, width: rect.width * 0.58, height: spokenHeight),
-        xRadius: spokenHeight / 2,
-        yRadius: spokenHeight / 2
-    ).fill()
-}
-
+/// App icon on the macOS grid: 824/1024 plate, 185/1024 corner radius.
 func drawCaptionIcon(in rect: NSRect, size: CGFloat) {
-    let inset = size * 0.04
-    let canvas = rect.insetBy(dx: inset, dy: inset)
-    let corner = canvas.width * 0.223
+    let unit = size / 1024
+    let canvas = rect.insetBy(dx: 100 * unit, dy: 100 * unit)
+    let corner = 185 * unit
     let plate = NSBezierPath(roundedRect: canvas, xRadius: corner, yRadius: corner)
-    ink.setFill()
-    plate.fill()
-
-    NSGraphicsContext.saveGraphicsState()
-    plate.addClip()
-    NSColor.white.withAlphaComponent(0.05).setFill()
-    NSBezierPath(
-        roundedRect: NSRect(x: canvas.minX, y: canvas.midY, width: canvas.width, height: canvas.height / 2),
-        xRadius: 0,
-        yRadius: 0
-    ).fill()
-    NSGraphicsContext.restoreGraphicsState()
-
-    let mark = canvas.insetBy(dx: canvas.width * 0.18, dy: canvas.height * 0.22)
-    drawMonogramCC(in: mark, color: captionGold)
+    NSGradient(starting: plateTop, ending: plateBottom)?.draw(in: plate, angle: -90)
+    // Mark sits at the same place as in b-link.svg (x 236-768 of 1024).
+    let mark = NSRect(
+        x: rect.minX + LinkMark.bounds.minX * unit,
+        y: rect.minY + (1024 - LinkMark.bounds.maxY) * unit,
+        width: LinkMark.bounds.width * unit,
+        height: LinkMark.bounds.height * unit
+    )
+    LinkMark.draw(in: mark, amber: linkAmber, teal: linkTeal)
 }
 
-/// Menu bar mark, 22×18pt. CC with the caption pills underneath.
+/// Menu bar mark, 22×18pt template. The Link mark in a single ink.
 func drawMenuBarIcon(in rect: NSRect) {
-    let height = rect.height
-    let fontSize = height * 0.58
-    let base = NSFont.systemFont(ofSize: fontSize, weight: .bold)
-    let rounded = base.fontDescriptor.withDesign(.rounded) ?? base.fontDescriptor
-    let font = NSFont(descriptor: rounded, size: fontSize) ?? base
-    let letters = NSAttributedString(
-        string: "CC",
-        attributes: [
-            .font: font,
-            .foregroundColor: NSColor.black,
-            .kern: -0.6,
-        ]
-    )
-    let box = letters.size()
-    let bar = height * 0.12
-    let gap = height * 0.05
-    let spoken = bar * 0.78
-    let stack = bar + gap + spoken
-    let bottom = rect.minY + height * 0.02
-    let originX = rect.midX - box.width / 2
-    letters.draw(at: NSPoint(x: originX, y: bottom + stack + height * 0.03))
-
-    NSColor.black.setFill()
-    NSBezierPath(
-        roundedRect: NSRect(x: originX, y: bottom + spoken + gap, width: box.width, height: bar),
-        xRadius: bar / 2,
-        yRadius: bar / 2
-    ).fill()
-    NSBezierPath(
-        roundedRect: NSRect(x: originX, y: bottom, width: box.width * 0.58, height: spoken),
-        xRadius: spoken / 2,
-        yRadius: spoken / 2
-    ).fill()
+    LinkMark.draw(in: rect.insetBy(dx: rect.width * 0.02, dy: rect.height * 0.04), amber: .black, teal: .black)
 }
 
 func wordmarkName(fontSize: CGFloat) -> NSAttributedString {
@@ -174,7 +146,7 @@ func wordmarkName(fontSize: CGFloat) -> NSAttributedString {
         string: "Captions",
         attributes: [
             .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
-            .foregroundColor: captionGold,
+            .foregroundColor: linkAmber,
         ]
     ))
     return name
@@ -185,23 +157,21 @@ func drawWordmark(in rect: NSRect) {
     var fontSize = rect.height * 0.42
     var name = wordmarkName(fontSize: fontSize)
     var nameSize = name.size()
-    var markWidth = nameSize.height * 0.92
-    var gap = nameSize.height * 0.22
+    let markAspect = LinkMark.bounds.width / LinkMark.bounds.height
+    var markWidth = nameSize.height * markAspect
+    var gap = nameSize.height * 0.28
     while markWidth + gap + nameSize.width > available, fontSize > 12 {
         fontSize *= 0.94
         name = wordmarkName(fontSize: fontSize)
         nameSize = name.size()
-        markWidth = nameSize.height * 0.92
-        gap = nameSize.height * 0.22
+        markWidth = nameSize.height * markAspect
+        gap = nameSize.height * 0.28
     }
     let total = markWidth + gap + nameSize.width
     let originX = (rect.width - total) / 2
     let originY = (rect.height - nameSize.height) / 2
     let markRect = NSRect(x: originX, y: originY, width: markWidth, height: nameSize.height)
-    let markCorner = markWidth * 0.22
-    ink.setFill()
-    NSBezierPath(roundedRect: markRect, xRadius: markCorner, yRadius: markCorner).fill()
-    drawMonogramCC(in: markRect.insetBy(dx: markWidth * 0.12, dy: markRect.height * 0.12), color: captionGold, kern: -0.8)
+    LinkMark.draw(in: markRect, amber: linkAmber, teal: linkTeal)
     name.draw(at: NSPoint(x: originX + markWidth + gap, y: originY))
 }
 

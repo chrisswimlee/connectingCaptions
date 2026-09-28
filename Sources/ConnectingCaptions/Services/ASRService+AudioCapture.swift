@@ -1,3 +1,4 @@
+// Upstream: FluidVoice (altic-dev), GPLv3. Speech engine. Do not rewrite it to look original.
 //
 //  ASRService+AudioCapture.swift
 //  fluid
@@ -52,6 +53,7 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
     var smoothedLevel: CGFloat = 0.0
     let historySize: Int = 2
     let silenceThreshold: CGFloat = 0.04
+    var speechEnergyGate = SpeechEnergyGate()
 
     static let hostTicksPerSecond: Double = {
         var info = mach_timebase_info_data_t()
@@ -94,6 +96,7 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
             self.resetResamplerLocked()
             self.lastInputSampleEnd = nil
             self.resetCaptureHealthLocked()
+            self.speechEnergyGate.reset()
             self.recordingEnabled = true
         }
         if enabled == false {
@@ -338,7 +341,10 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
             advancedByFrames: acceptedRange.lowerBound,
             sampleRate: sampleRate
         )
-        self.onSpeechEnergy(acceptedHostTime, measurement.level > 0)
+        self.lock.lock()
+        let voiced = self.speechEnergyGate.isVoiced(rms: measurement.rms)
+        self.lock.unlock()
+        self.onSpeechEnergy(acceptedHostTime, voiced)
         if let health = self.captureHealthDiagnostic(
             sampleCount: mono16k.count,
             rms: measurement.rms,

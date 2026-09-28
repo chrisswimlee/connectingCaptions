@@ -40,6 +40,8 @@ nonisolated enum ConnectingCaptionsProduct {
     static let publisherName = "Local Host AI"
     static let publisherSiteHost = "local-host.ai"
     static let publisherURL = URL(string: "https://local-host.ai")!
+    static let voiceEngineUpstreamName = "FluidVoice"
+    static let voiceEngineUpstreamURL = URL(string: "https://github.com/altic-dev/FluidVoice")!
     static let commercialLicenseEmail = "suyoung.lee99@gmail.com"
     static let commercialLicenseURL = URL(string: "https://chrisswimlee.com/connectingCaptions/license/")!
     static let licenseKeychainService = "com.connectingcaptions.commercial-license"

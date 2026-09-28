@@ -175,7 +175,7 @@ xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions
 
 Connecting Captions is **local-first**. Your voice, audio, and transcribed text never leave your machine unless you explicitly opt in to a cloud AI provider.
 
-This release does not send analytics, feedback, or update checks to a third-party analytics host. A FluidVoice install on the same Mac is left alone: this app does not read or delete that app's Keychain or Application Support folder.
+This release does not send analytics, feedback, or update checks to a third-party analytics host. Voice Engine weights stay in this app's folder. A model already in the shared FluidAudio cache is copied once, and that cache is not deleted. A FluidVoice install on the same Mac is left alone: this app does not read or delete that app's Keychain or Application Support folder.
 
 **Not collected:**
 

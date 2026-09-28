@@ -382,7 +382,7 @@ struct LiveTranslationSettingsView: View {
                         .accessibilityLabel("Captions only")
                 }
 
-                Text(TheaterReadiness.screenShare)
+                Text(AppLanguage.text(TheaterReadiness.screenShare))
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.settingsSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -917,7 +917,7 @@ struct TranslationLanguagePairCard: View {
 
     private var cardBody: some View {
         VStack(alignment: .leading, spacing: 14) {
-            FluidSectionHeader(title: "Languages", systemImage: "globe")
+            FluidSectionHeader(title: AppLanguage.text("Languages"), systemImage: "globe")
                 .accessibilityIdentifier("theater.languages")
             self.languagePairRow
             self.engineHint
@@ -985,7 +985,7 @@ struct TranslationLanguagePairCard: View {
         .buttonStyle(.theaterTextIcon)
         .disabled(SpokenLanguageResolver.isSameLanguagePair())
         .help(TheaterChromeHelp.swapLanguages)
-        .accessibilityLabel("Swap languages")
+        .accessibilityLabel(AppLanguage.text("Swap languages"))
     }
 
     @ViewBuilder
@@ -1283,7 +1283,7 @@ struct TheaterAudienceCard: View {
     }
 
     private var cardBody: some View {
-        Text(TheaterReadiness.screenShare)
+        Text(AppLanguage.text(TheaterReadiness.screenShare))
             .font(self.theme.typography.bodySmall)
             .foregroundStyle(self.theme.palette.secondaryText)
             .fixedSize(horizontal: false, vertical: true)

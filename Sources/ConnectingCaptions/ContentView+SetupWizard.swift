@@ -18,6 +18,8 @@ extension ContentView {
             }
         }
         .background(MainWindowMarker())
+        .environment(\.locale, Locale(identifier: AppLanguage.localeIdentifier(for: self.settings.appLanguageID)))
+        .environment(\.layoutDirection, AppLanguage.layoutIsRightToLeft() ? .rightToLeft : .leftToRight)
     }
 
     var setupWizardView: some View {

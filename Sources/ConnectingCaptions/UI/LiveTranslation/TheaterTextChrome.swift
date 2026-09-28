@@ -408,30 +408,54 @@ private struct TheaterChoiceFlow: Layout {
     }
 }
 
-/// Language menu for I speak and Show as.
+/// Language menu for I speak, Show as, and the app language.
 struct TheaterLanguageMenu: View {
     var title: String
     @Binding var selection: String
     var languages: [TranslationLanguage] = TranslationLanguageCatalog.menuOrder
     var compactChrome = false
+    var menuHelp: String? = nil
+    var accessibilityIdentifier: String? = nil
+
+    @ObservedObject private var settings = SettingsStore.shared
+
+    private var visibleTitle: String {
+        AppLanguage.text(self.title, languageID: self.settings.appLanguageID)
+    }
+
+    private var selectedLanguage: TranslationLanguage? {
+        self.languages.first(where: { $0.id == self.selection })
+            ?? TranslationLanguageCatalog.language(id: self.selection)
+    }
 
     private var selectedName: String {
-        self.languages.first(where: { $0.id == self.selection })?.displayName
-            ?? TranslationLanguageCatalog.language(id: self.selection)?.displayName
-            ?? self.selection
+        if let selectedLanguage = self.selectedLanguage {
+            return AppLanguage.localizedName(for: selectedLanguage, languageID: self.settings.appLanguageID)
+        }
+        return self.selection
     }
 
     var body: some View {
-        self.styledMenu
-            .accessibilityLabel(self.title)
+        self.labeledMenu
+    }
+
+    @ViewBuilder
+    private var labeledMenu: some View {
+        let menu = self.styledMenu
+            .accessibilityLabel(self.visibleTitle)
             .accessibilityValue(self.selectedName)
+        if let accessibilityIdentifier = self.accessibilityIdentifier {
+            menu.accessibilityIdentifier(accessibilityIdentifier)
+        } else {
+            menu
+        }
     }
 
     private var menu: some View {
         Menu {
-            Picker(self.title, selection: self.$selection) {
+            Picker(self.visibleTitle, selection: self.$selection) {
                 ForEach(self.languages) { language in
-                    Text(language.displayName).tag(language.id)
+                    Text(AppLanguage.localizedName(for: language, languageID: self.settings.appLanguageID)).tag(language.id)
                 }
             }
             .pickerStyle(.inline)
@@ -444,7 +468,9 @@ struct TheaterLanguageMenu: View {
     @ViewBuilder
     private var styledMenu: some View {
         let menu = self.menu.theaterBarMenu()
-        if self.compactChrome {
+        if let menuHelp = self.menuHelp {
+            menu.help(menuHelp)
+        } else if self.compactChrome {
             menu
         } else {
             menu.help("Languages Apple Translation and the Voice Engine both support.")
@@ -454,7 +480,7 @@ struct TheaterLanguageMenu: View {
     private var label: some View {
         TheaterMenuLabel(
             title: self.selectedName,
-            role: self.title,
+            role: self.visibleTitle,
             compact: self.compactChrome,
             minWidth: self.compactChrome ? nil : 168
         )

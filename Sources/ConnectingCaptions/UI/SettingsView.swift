@@ -334,6 +334,9 @@ struct SettingsView: View {
                                             .textLinkPointer()
                                     }
                                     .font(self.theme.typography.bodySmall)
+                                    VoiceEngineCredit()
+                                        .font(self.theme.typography.bodySmall)
+                                        .foregroundStyle(self.settingsSecondaryText)
                                 }
                             }
                             .settingsSearchTarget(.automaticUpdates)

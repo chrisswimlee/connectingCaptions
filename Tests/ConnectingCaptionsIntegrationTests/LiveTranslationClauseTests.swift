@@ -2535,6 +2535,17 @@ final class TheaterTalkSimulationTests: XCTestCase {
         XCTAssertEqual(subscriber.committedSourceLines, [first, second])
     }
 
+    func testSpeechEnergyStillPrintsAFinishedSentence() async {
+        let (subscriber, engine) = self.makeSubscriber()
+        subscriber.handlePartial("Today we trained the model.")
+        await self.settle()
+        subscriber.noteSilenceHold()
+        subscriber.noteSpeechStart(uptime: ProcessInfo.processInfo.systemUptime)
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(engine.calls, ["Today we trained the model."])
+        XCTAssertEqual(subscriber.committedSourceLines, ["Today we trained the model."])
+    }
+
     func testResumingSpeechCancelsTheSilentTailPrint() async {
         let settings = SettingsStore.shared
         let originalSource = settings.translationSourceLanguageID

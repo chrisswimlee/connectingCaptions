@@ -101,16 +101,20 @@ jobs:
           set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
           zip="dist/Connecting-Captions-${version}.zip"
+          # Stable name for https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip
+          latest="dist/Connecting-Captions.zip"
           if [ ! -f "${zip}" ]; then
             echo "Expected release zip at ${zip}" >&2
             exit 1
           fi
+          cp "${zip}" "${latest}"
+          # Checksums stay on the versioned zip. The updater and Homebrew match that name.
           (cd dist && shasum -a 256 "$(basename "$zip")" > SHA256SUMS)
           notes="$(python3 scripts/extract-changelog.py "${GITHUB_REF_NAME}")"
           if [ -z "$notes" ]; then
             echo "CHANGELOG.md has no notes for ${GITHUB_REF_NAME}." >&2
             exit 1
           fi
-          gh release create "${GITHUB_REF_NAME}" "${zip}" "dist/SHA256SUMS" \
+          gh release create "${GITHUB_REF_NAME}" "${zip}" "${latest}" "dist/SHA256SUMS" \
             --title "Connecting Captions ${version}" \
             --notes "$notes"

@@ -353,6 +353,9 @@ final class TheaterMenuBarController: NSObject {
               let showAsItem = item(.showAsLanguage, in: menu), let showAsMenu = showAsItem.submenu
         else { return }
 
+        speakItem.title = AppLanguage.text("I speak")
+        showAsItem.title = AppLanguage.text("Show as")
+
         let translating = SettingsStore.shared.theaterSessionMode == .translation
         let source = SpokenLanguageResolver.sourceLanguage()
         let target = SpokenLanguageResolver.targetLanguage()
@@ -382,7 +385,7 @@ final class TheaterMenuBarController: NSObject {
     ) {
         submenu.removeAllItems()
         for language in candidates {
-            let item = NSMenuItem(title: language.displayName, action: action, keyEquivalent: "")
+            let item = NSMenuItem(title: AppLanguage.localizedName(for: language), action: action, keyEquivalent: "")
             item.representedObject = language.id
             item.target = Self.shared
             item.state = language.id == selected ? .on : .off

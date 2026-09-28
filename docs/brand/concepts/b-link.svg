@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <!-- Concept B, "Link": two Cs woven together like chain links, one per
-       language: amber is "I speak", teal is "Show as". -->
+       language: amber is "I speak", teal is "Show as". Strokes are thick
+       enough that the mouths and the over/under still read at 18pt. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="100" x2="0" y2="924" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#1B2432"/>
@@ -9,17 +10,17 @@
     <!-- Cut the teal C where the amber C passes over it (top crossing). -->
     <mask id="underAmber" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <rect width="1024" height="1024" fill="#fff"/>
-      <path d="M459.8 367.1 A150 150 0 0 1 550.9 437" fill="none" stroke="#000" stroke-width="112" stroke-linecap="round"/>
+      <path d="M450.5 373.1 A142 142 0 0 1 552.7 458.8" fill="none" stroke="#000" stroke-width="150" stroke-linecap="round"/>
     </mask>
     <!-- Cut the amber C where the teal C passes over it (bottom crossing). -->
     <mask id="underTeal" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <rect width="1024" height="1024" fill="#fff"/>
-      <path d="M551.7 653 A150 150 0 0 1 480.1 598" fill="none" stroke="#000" stroke-width="112" stroke-linecap="butt"/>
+      <path d="M586.3 651.8 A142 142 0 0 1 474.5 551.1" fill="none" stroke="#000" stroke-width="150" stroke-linecap="butt"/>
     </mask>
   </defs>
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
-  <path d="M550.9 587 A150 150 0 1 1 550.9 437" mask="url(#underTeal)"
-        fill="none" stroke="#EBA84E" stroke-width="70" stroke-linecap="round"/>
-  <path d="M732.9 587 A150 150 0 1 1 732.9 437" mask="url(#underAmber)"
-        fill="none" stroke="#5DD0B9" stroke-width="70" stroke-linecap="round"/>
+  <path d="M529.8 603.3 A142 142 0 1 1 529.8 420.7" mask="url(#underTeal)"
+        fill="none" stroke="#E8A04A" stroke-width="86" stroke-linecap="round"/>
+  <path d="M724.4 597.5 A142 142 0 1 1 724.4 426.5" mask="url(#underAmber)"
+        fill="none" stroke="#3ECFB8" stroke-width="86" stroke-linecap="round"/>
 </svg>

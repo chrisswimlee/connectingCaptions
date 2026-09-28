@@ -9,25 +9,28 @@
     <!-- Cut the teal C where the amber C passes over it (top crossing). -->
     <mask id="underAmber" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <rect width="1024" height="1024" fill="#fff"/>
-      <path d="M459.8 367.1 A150 150 0 0 1 550.9 437" fill="none" stroke="#000" stroke-width="112" stroke-linecap="round"/>
+      <path d="M450.5 373.1 A142 142 0 0 1 552.7 458.8" fill="none" stroke="#000" stroke-width="150" stroke-linecap="round"/>
     </mask>
     <!-- Cut the amber C where the teal C passes over it (bottom crossing). -->
     <mask id="underTeal" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">
       <rect width="1024" height="1024" fill="#fff"/>
-      <path d="M551.7 653 A150 150 0 0 1 480.1 598" fill="none" stroke="#000" stroke-width="112" stroke-linecap="butt"/>
+      <path d="M586.3 651.8 A142 142 0 0 1 474.5 551.1" fill="none" stroke="#000" stroke-width="150" stroke-linecap="butt"/>
     </mask>
   </defs>
   <rect width="1400" height="1000" fill="url(#bg)"/>
   <g transform="translate(188 -127)">
-    <path d="M521.4 623.5 A150 150 0 1 1 550.9 437" mask="url(#underTeal)"
-          fill="none" stroke="#EBA84E" stroke-width="70" stroke-linecap="round"/>
-    <path d="M732.9 587 A150 150 0 1 1 732.9 437" mask="url(#underAmber)"
-          fill="none" stroke="#5DD0B9" stroke-width="70" stroke-linecap="round"/>
+    <path d="M529.8 603.3 A142 142 0 1 1 529.8 420.7" mask="url(#underTeal)"
+          fill="none" stroke="#E8A04A" stroke-width="86" stroke-linecap="round"/>
+    <path d="M724.4 597.5 A142 142 0 1 1 724.4 426.5" mask="url(#underAmber)"
+          fill="none" stroke="#3ECFB8" stroke-width="86" stroke-linecap="round"/>
   </g>
-  <text x="700" y="760" text-anchor="middle"
+  <text x="192" y="760" text-anchor="start"
         font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif"
-        font-size="112" font-weight="600" letter-spacing="-1.5" fill="#F4F6F8">Connecting <tspan fill="#EBA84E">Captions</tspan></text>
+        font-size="112" font-weight="600" letter-spacing="-1.5" fill="#F4F6F8">Connecting</text>
+  <text x="774" y="760" text-anchor="start"
+        font-family="-apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif"
+        font-size="112" font-weight="600" letter-spacing="-1.5" fill="#E8A04A">Captions</text>
   <text x="700" y="840" text-anchor="middle"
         font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif"
-        font-size="38" font-weight="400" letter-spacing="0.5" fill="#8A94A3">Live subtitles, translated on your Mac</text>
+        font-size="38" font-weight="400" letter-spacing="0.5" fill="#8A94A3">Language is no longer a barrier</text>
 </svg>

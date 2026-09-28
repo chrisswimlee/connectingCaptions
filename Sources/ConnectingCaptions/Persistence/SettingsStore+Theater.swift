@@ -279,6 +279,7 @@ extension SettingsStore {
         self.defaults.set(true, forKey: TheaterDefaults.setupWizardOpened)
         self.defaults.set(false, forKey: TheaterDefaults.setupWizardCompleted)
         self.defaults.set(0, forKey: TheaterDefaults.setupWizardStep)
+        self.seedAppLanguageIfNeeded()
     }
 
     func completeSetupWizard() {

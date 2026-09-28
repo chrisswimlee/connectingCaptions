@@ -43,10 +43,14 @@ struct TheaterSetupWizardView: View {
         VStack(alignment: .leading, spacing: 10) {
             FluidPageHeader(
                 systemImage: self.step.systemImage,
-                title: TheaterSetupWizard.title,
-                subtitle: "Step \(self.step.rawValue + 1) of \(TheaterSetupWizard.Step.allCases.count) · \(self.step.title)"
+                title: AppLanguage.text(TheaterSetupWizard.title),
+                subtitle: AppLanguage.stepLabel(
+                    current: self.step.rawValue + 1,
+                    total: TheaterSetupWizard.Step.allCases.count,
+                    title: AppLanguage.text(self.step.title)
+                )
             )
-            Text(self.step.subtitle)
+            Text(AppLanguage.text(self.step.subtitle))
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(self.theme.palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -61,7 +65,13 @@ struct TheaterSetupWizardView: View {
             }
             .frame(height: 2)
             .accessibilityLabel("Setup progress")
-            .accessibilityValue("\(self.step.rawValue + 1) of \(TheaterSetupWizard.Step.allCases.count)")
+            .accessibilityValue(
+                AppLanguage.stepLabel(
+                    current: self.step.rawValue + 1,
+                    total: TheaterSetupWizard.Step.allCases.count,
+                    title: AppLanguage.text(self.step.title)
+                )
+            )
         }
         .padding(.horizontal, 28)
         .padding(.top, 24)
@@ -87,14 +97,18 @@ struct TheaterSetupWizardView: View {
     private var welcomeStep: some View {
         ThemedCard(style: .prominent, hoverEffect: false) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(TheaterSetupWizard.welcomeTitle)
+                Text(AppLanguage.text(TheaterSetupWizard.welcomeTitle))
                     .font(self.theme.typography.title)
                     .foregroundStyle(self.theme.palette.primaryText)
-                Text(TheaterSetupWizard.welcomeBody)
+                Text(AppLanguage.text(TheaterSetupWizard.welcomeBody))
                     .font(self.theme.typography.body)
                     .foregroundStyle(self.theme.palette.primaryText)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(TheaterSetupWizard.welcomeDetail)
+                Text(
+                    AppLanguage.text("The original language can sit under each sentence.")
+                        + " "
+                        + AppLanguage.text(TheaterReadiness.screenShare)
+                )
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -114,16 +128,31 @@ struct TheaterSetupWizardView: View {
     private var languagesStep: some View {
         VStack(alignment: .leading, spacing: 16) {
             ThemedCard(style: .standard, hoverEffect: false) {
+                TheaterLanguageMenu(
+                    title: "App language",
+                    selection: self.appLanguageID,
+                    menuHelp: AppLanguage.text("The language this app uses."),
+                    accessibilityIdentifier: "theater.setupWizard.appLanguage"
+                )
+            }
+            ThemedCard(style: .standard, hoverEffect: false) {
                 TheaterModeSection(accessibilityIdentifier: "theater.setupWizard.mode")
             }
             TranslationLanguagePairCard()
         }
     }
 
+    private var appLanguageID: Binding<String> {
+        Binding(
+            get: { self.settings.appLanguageID },
+            set: { self.settings.appLanguageID = $0 }
+        )
+    }
+
     private var captionsStep: some View {
         ThemedCard(style: .standard, hoverEffect: false) {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Each sentence appears when it is ready. Nothing shows while it is still being heard.")
+                Text(AppLanguage.text("Each sentence appears when it is ready. Nothing shows while it is still being heard."))
                     .font(self.theme.typography.body)
                     .foregroundStyle(self.theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -170,32 +199,39 @@ struct TheaterSetupWizardView: View {
                         .accessibilityHidden(true)
                 }
                 self.readyRow(
-                    title: "Mode",
+                    title: AppLanguage.text("App language"),
+                    detail: AppLanguage.localizedName(
+                        for: TranslationLanguageCatalog.language(id: self.settings.appLanguageID)
+                            ?? TranslationLanguageCatalog.english
+                    )
+                )
+                self.readyRow(
+                    title: AppLanguage.text("Mode"),
                     detail: self.settings.theaterSessionMode.displayName
                 )
                 self.readyRow(
-                    title: "I speak",
-                    detail: SpokenLanguageResolver.sourceLanguage().displayName
+                    title: AppLanguage.text("I speak"),
+                    detail: AppLanguage.localizedName(for: SpokenLanguageResolver.sourceLanguage())
                 )
                 if self.settings.theaterSessionMode.showsTranslation {
                     self.readyRow(
-                        title: "Show as",
-                        detail: SpokenLanguageResolver.targetLanguage().displayName
+                        title: AppLanguage.text("Show as"),
+                        detail: AppLanguage.localizedName(for: SpokenLanguageResolver.targetLanguage())
                     )
                     self.readyRow(
                         title: TheaterReadiness.spokenLineTitle,
                         detail: SpokenLanguageResolver.isSameLanguagePair()
-                            ? "Same language"
+                            ? AppLanguage.text("Same language")
                             : self.settings.theaterSpokenLineMode.displayName
                     )
                 }
                 self.readyRow(
-                    title: TheaterSetupWizard.accentTitle,
+                    title: AppLanguage.text(TheaterSetupWizard.accentTitle),
                     detail: self.settings.accentColorOption.rawValue
                 )
                 self.readyRow(
-                    title: "Share slides",
-                    detail: TheaterReadiness.screenShare
+                    title: AppLanguage.text("Share slides"),
+                    detail: AppLanguage.text(TheaterReadiness.screenShare)
                 )
             }
         }
@@ -203,8 +239,8 @@ struct TheaterSetupWizardView: View {
 
     private func accentColorRow(identifier: String) -> some View {
         TheaterSettingRow(
-            title: TheaterSetupWizard.accentTitle,
-            detail: TheaterSetupWizard.accentDetail
+            title: AppLanguage.text(TheaterSetupWizard.accentTitle),
+            detail: AppLanguage.text(TheaterSetupWizard.accentDetail)
         ) {
             AccentColorSwatches(accessibilityIdentifier: identifier)
         }
@@ -246,14 +282,14 @@ struct TheaterSetupWizardView: View {
     private var footerSecondary: some View {
         HStack(spacing: 12) {
             if self.step.previous != nil {
-                Button("Back") {
+                Button(AppLanguage.text("Back")) {
                     self.goBack()
                 }
                 .buttonStyle(.theaterText)
                 .accessibilityIdentifier("theater.setupWizard.back")
             }
             if self.step != .ready {
-                Button(TheaterSetupWizard.skipTitle) {
+                Button(AppLanguage.text(TheaterSetupWizard.skipTitle)) {
                     self.finish()
                 }
                 .buttonStyle(.theaterText)
@@ -265,19 +301,19 @@ struct TheaterSetupWizardView: View {
     private var footerPrimary: some View {
         HStack(spacing: 12) {
             if self.step == .ready {
-                Button(self.step.continueTitle) {
+                Button(AppLanguage.text(self.step.continueTitle)) {
                     self.goNext()
                 }
                 .buttonStyle(.theaterText)
                 .accessibilityIdentifier("theater.setupWizard.continue")
-                Button(TheaterSetupWizard.readyPrimary) {
+                Button(AppLanguage.text(TheaterSetupWizard.readyPrimary)) {
                     self.finishAndOpenTheater()
                 }
                 .buttonStyle(.theaterTextProminent)
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("theater.setupWizard.openTheater")
             } else {
-                Button(self.step.continueTitle) {
+                Button(AppLanguage.text(self.step.continueTitle)) {
                     self.goNext()
                 }
                 .buttonStyle(.theaterTextProminent)

@@ -153,6 +153,44 @@ final class TheaterShellOwnershipTests: XCTestCase {
         XCTAssertFalse(MicrophoneChangeOverlayController.supportsAlerts(bundleIdentifier: nil))
     }
 
+    func testVoiceEngineWeightsCopyOutOfTheSharedCache() throws {
+        let fixture = try Self.makeVoiceEngineFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        let legacy = fixture.legacy.appendingPathComponent("parakeet-tdt-0.6b-v3-coreml", isDirectory: true)
+        try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
+        let weight = legacy.appendingPathComponent("weights.bin")
+        try Data("model".utf8).write(to: weight)
+
+        let owned = VoiceEngineModelDirectory.adopt(legacy: legacy, modelsRoot: fixture.modelsRoot)
+        XCTAssertTrue(owned.path.contains("/connectingCaptions/Models/"))
+        XCTAssertFalse(owned.path.contains("/FluidAudio/"))
+        XCTAssertEqual(try Data(contentsOf: owned.appendingPathComponent("weights.bin")), Data("model".utf8))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: weight.path))
+        XCTAssertTrue(VoiceEngineModelDirectory.hasAdopted(legacy: legacy, modelsRoot: fixture.modelsRoot))
+
+        try VoiceEngineModelDirectory.discardOwnedCopy(of: legacy, modelsRoot: fixture.modelsRoot)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: owned.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: weight.path))
+
+        _ = VoiceEngineModelDirectory.adopt(legacy: legacy, modelsRoot: fixture.modelsRoot)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: owned.path))
+    }
+
+    private static func makeVoiceEngineFixture() throws -> (root: URL, modelsRoot: URL, legacy: URL) {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("voice-engine-models-\(UUID().uuidString)", isDirectory: true)
+        let modelsRoot = root
+            .appendingPathComponent("connectingCaptions", isDirectory: true)
+            .appendingPathComponent("Models", isDirectory: true)
+        let legacy = root
+            .appendingPathComponent("FluidAudio", isDirectory: true)
+            .appendingPathComponent("Models", isDirectory: true)
+        try FileManager.default.createDirectory(at: modelsRoot, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
+        return (root, modelsRoot, legacy)
+    }
+
     func testSupportFolderAndKeychainLeaveFluidVoiceAlone() {
         XCTAssertEqual(ConnectingCaptionsProduct.priorSupportFolderNames, ["fluidSubtitles"])
         XCTAssertTrue(AppSupportDirectory.shouldRenameLegacyFolder(named: "fluidSubtitles"))
