@@ -15,10 +15,12 @@ extension ContentView {
             LiveTranslationController.shared.reportListenFailure(TheaterAvailability.unsupportedCopy)
             return
         }
-        MicrophoneAccess.refresh(self.asr)
         if MicrophoneAccess.isDenied(self.asr.micStatus) {
+            self.asr.recordMicrophoneAccessRead(self.asr.micStatus)
             LiveTranslationController.shared.listenStartFailed()
-            LiveTranslationController.shared.reportListenFailure(MicrophoneAccess.deniedCopy)
+            LiveTranslationController.shared.reportListenFailure(
+                MicrophoneAccess.failureCopy(detail: self.asr.microphoneAccessDetail)
+            )
             return
         }
         let model = SettingsStore.shared.selectedSpeechModel
@@ -33,7 +35,9 @@ extension ContentView {
             let granted = await MicrophoneAccess.authorize(updating: self.asr)
             if !granted {
                 LiveTranslationController.shared.listenStartFailed()
-                LiveTranslationController.shared.reportListenFailure(MicrophoneAccess.deniedCopy)
+                LiveTranslationController.shared.reportListenFailure(
+                    MicrophoneAccess.failureCopy(detail: self.asr.microphoneAccessDetail)
+                )
                 return
             }
             let prepared = await TheaterSpeechSession.shared.prepareListen(kind: .captions, asr: self.asr)
@@ -41,6 +45,13 @@ extension ContentView {
                   LiveTranslationController.shared.isSessionActive,
                   LiveTranslationController.shared.listenKind == .captions
             else {
+                if prepared {
+                    TheaterSpeechSession.shared.clear(asr: self.asr)
+                    LiveTranslationController.shared.cancelSession()
+                    LiveTranslationController.shared.reportListenFailure(
+                        "Could not start listening. Try again."
+                    )
+                }
                 return
             }
             let startOutcome = await self.asr.start()
@@ -50,7 +61,7 @@ extension ContentView {
                 LiveTranslationController.shared.reportListenFailure(
                     MicrophoneAccess.isAuthorized(self.asr.micStatus)
                         ? "Could not start listening. Check the microphone and Voice Engine."
-                        : MicrophoneAccess.deniedCopy
+                        : MicrophoneAccess.failureCopy(detail: self.asr.microphoneAccessDetail)
                 )
             }
         }
@@ -75,7 +86,10 @@ extension ContentView {
             let prepared = await TheaterSpeechSession.shared.prepareListen(kind: .insert, asr: self.asr)
             guard prepared else {
                 let status = LiveTranslationController.shared.subscriber
-                let message = status.statusKind == .failure ? status.statusText : ""
+                let reported = status.statusKind == .failure ? status.statusText : ""
+                let message = reported.isEmpty
+                    ? "Could not start listening. Try again."
+                    : reported
                 QuickTranslateInsertController.presentNotice(message)
                 return
             }
@@ -83,7 +97,7 @@ extension ContentView {
             if startOutcome == .failed {
                 let message = MicrophoneAccess.isAuthorized(self.asr.micStatus)
                     ? "Could not start listening. Check the microphone and Voice Engine."
-                    : MicrophoneAccess.deniedCopy
+                    : MicrophoneAccess.failureCopy(detail: self.asr.microphoneAccessDetail)
                 TheaterSpeechSession.shared.clear(asr: self.asr)
                 LiveTranslationController.shared.cancelSession()
                 LiveTranslationController.shared.reportListenFailure(message)

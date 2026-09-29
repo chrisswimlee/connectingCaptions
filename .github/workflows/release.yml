@@ -94,6 +94,28 @@ jobs:
           spctl --assess --type execute --verbose "$app"
           stapler validate "$app"
 
+      - name: Sign the fluidSubtitles update alias
+        env:
+          CONNECTINGCAPTIONS_CODESIGN_IDENTITY: ${{ secrets.CONNECTINGCAPTIONS_CODESIGN_IDENTITY || secrets.FLUIDSUBTITLES_CODESIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          REQUIRE_NOTARIZATION: "1"
+        run: |
+          set -euo pipefail
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
+          zip="dist/Connecting-Captions-${version}.zip"
+          work="${RUNNER_TEMP}/legacy-update"
+          rm -rf "${work}"
+          mkdir -p "${work}"
+          ditto -x -k "${zip}" "${work}"
+          app="$(find "${work}" -maxdepth 2 -name 'Connecting Captions.app' -print -quit)"
+          if [ ! -d "${app:-}" ]; then
+            echo "Release app was not found for the fluidSubtitles update." >&2
+            exit 1
+          fi
+          ./scripts/legacy-fluidsubtitles-zip.sh "${app}" "dist/fluidsubtitles-${version}.zip"
+
       - name: Upload GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -103,18 +125,18 @@ jobs:
           zip="dist/Connecting-Captions-${version}.zip"
           # Stable name for https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip
           latest="dist/Connecting-Captions.zip"
-          if [ ! -f "${zip}" ]; then
-            echo "Expected release zip at ${zip}" >&2
+          legacy="dist/fluidsubtitles-${version}.zip"
+          if [ ! -f "${zip}" ] || [ ! -f "${legacy}" ]; then
+            echo "Expected ${zip} and ${legacy}" >&2
             exit 1
           fi
           cp "${zip}" "${latest}"
-          # Checksums stay on the versioned zip. The updater and Homebrew match that name.
-          (cd dist && shasum -a 256 "$(basename "$zip")" > SHA256SUMS)
+          (cd dist && shasum -a 256 "$(basename "$zip")" "$(basename "$legacy")" > SHA256SUMS)
           notes="$(python3 scripts/extract-changelog.py "${GITHUB_REF_NAME}")"
           if [ -z "$notes" ]; then
             echo "CHANGELOG.md has no notes for ${GITHUB_REF_NAME}." >&2
             exit 1
           fi
-          gh release create "${GITHUB_REF_NAME}" "${zip}" "${latest}" "dist/SHA256SUMS" \
+          gh release create "${GITHUB_REF_NAME}" "${zip}" "${latest}" "${legacy}" "dist/SHA256SUMS" \
             --title "Connecting Captions ${version}" \
             --notes "$notes"

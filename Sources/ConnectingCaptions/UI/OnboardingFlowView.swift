@@ -18,6 +18,7 @@ struct OnboardingFlowView: View {
 
     @ObservedObject var settings = SettingsStore.shared
     @ObservedObject var translationController = LiveTranslationController.shared
+    @ObservedObject var translationSubscriber = LiveTranslationController.shared.subscriber
 
     @Binding var currentStep: Int
     let accessibilityEnabled: Bool
@@ -363,6 +364,9 @@ struct OnboardingFlowView: View {
             self.playLandingWelcomeSoundIfNeeded()
         }
         .onChange(of: self.isMicrophoneReady) { _, isReady in
+            if isReady {
+                self.clearMicrophoneListenFailureIfGranted()
+            }
             guard self.step == .permissions else { return }
             if isReady {
                 self.refreshOnboardingMicrophones(startPreview: true)
@@ -511,11 +515,7 @@ struct OnboardingFlowView: View {
     }
 
     func handleMicrophoneAction() {
-        if self.asr.micStatus == .notDetermined {
-            self.asr.requestMicAccess()
-        } else {
-            self.asr.openSystemSettingsForMic()
-        }
+        self.asr.requestMicAccess()
     }
 
     func goBack() {
@@ -636,7 +636,7 @@ extension OnboardingFlowView {
             await AudioStartupGate.shared.waitUntilOpen()
             guard self.isOnboardingFlowVisible else { return }
 
-            self.asr.micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+            self.asr.recordMicrophoneAccessRead(await MicrophoneAccess.statusOffMain())
             if self.step == .permissions, self.isMicrophoneReady {
                 self.refreshOnboardingMicrophones(startPreview: true)
             }
@@ -766,6 +766,19 @@ extension OnboardingFlowView {
             self.previewedOnboardingInputUID = nil
             self.microphonePreviewTask = nil
         }
+    }
+
+    func openSpeechRecognitionSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    func clearMicrophoneListenFailureIfGranted() {
+        guard self.isMicrophoneReady else { return }
+        guard self.translationSubscriber.statusKind == .failure else { return }
+        guard MicrophoneAccess.isMicrophoneFailure(self.translationSubscriber.statusText) else { return }
+        self.translationSubscriber.reportStatus("", kind: .idle)
     }
 
     func suspendOnboardingMicrophonePreviewForDictation() {

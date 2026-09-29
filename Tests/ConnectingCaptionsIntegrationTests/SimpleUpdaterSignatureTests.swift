@@ -170,4 +170,48 @@ final class SimpleUpdaterSignatureTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         XCTAssertEqual(try UpdateSignaturePolicy.hexSHA256(ofFile: url), digest)
     }
+
+    func testPrefersTheVersionedConnectingCaptionsZip() {
+        let names = [
+            "Connecting-Captions.zip",
+            "fluidsubtitles-1.6.14.zip",
+            "Connecting-Captions-1.6.14.zip",
+            "SHA256SUMS",
+        ]
+        XCTAssertEqual(
+            UpdateAssetSelection.preferredZipName(in: names, version: "1.6.14", repo: "connectingCaptions"),
+            "Connecting-Captions-1.6.14.zip"
+        )
+        XCTAssertEqual(
+            UpdateAssetSelection.preferredZipName(
+                in: ["connectingcaptions-1.6.14.zip"],
+                version: "1.6.14",
+                repo: "connectingCaptions"
+            ),
+            "connectingcaptions-1.6.14.zip"
+        )
+        XCTAssertNil(
+            UpdateAssetSelection.preferredZipName(
+                in: ["fluidsubtitles-1.6.14.zip", "Connecting-Captions.zip"],
+                version: "1.6.14",
+                repo: "connectingCaptions"
+            )
+        )
+    }
+
+    func testLegacyBundleInstallsEvenWhenTheVersionMatches() {
+        XCTAssertTrue(
+            UpdateAssetSelection.installsDespiteSameVersion(
+                runningBundleIdentifier: "com.fluidsubtitles.app"
+            )
+        )
+        XCTAssertFalse(
+            UpdateAssetSelection.installsDespiteSameVersion(
+                runningBundleIdentifier: ConnectingCaptionsProduct.bundleIdentifier
+            )
+        )
+        XCTAssertFalse(
+            UpdateAssetSelection.installsDespiteSameVersion(runningBundleIdentifier: nil)
+        )
+    }
 }

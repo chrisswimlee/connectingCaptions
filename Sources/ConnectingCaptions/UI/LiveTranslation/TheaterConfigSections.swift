@@ -69,6 +69,21 @@ struct TheaterReadinessChecklist: View {
 
     private var asr: ASRService { self.appServices.asr }
 
+    private var microphoneActionTitle: String {
+        if MicrophoneAccess.isOpenedFromDownload { return "Show in Finder" }
+        return self.asr.micStatus == .notDetermined ? "Allow" : "Open Settings"
+    }
+
+    private var readinessGuidance: String {
+        guard self.snapshot.osSupported, self.snapshot.voiceEngineReady else {
+            return self.snapshot.nextAction
+        }
+        if !self.snapshot.microphoneAllowed, !self.asr.microphoneAccessDetail.isEmpty {
+            return self.asr.microphoneAccessDetail
+        }
+        return self.snapshot.nextAction
+    }
+
     private var snapshot: TheaterReadyGate.Snapshot {
         TheaterReadyGate.liveSnapshot(
             pack: self.controller.packAvailability,
@@ -85,7 +100,7 @@ struct TheaterReadinessChecklist: View {
                 self.readyRow(TheaterEngineCopy.translationTitle, done: self.snapshot.languagePackReady)
             }
             self.readyRow("Microphone", done: self.snapshot.microphoneAllowed)
-            Text(self.snapshot.nextAction)
+            Text(self.readinessGuidance)
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(self.theme.palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
@@ -101,14 +116,16 @@ struct TheaterReadinessChecklist: View {
                     .buttonStyle(.theaterText)
             }
             if !self.snapshot.microphoneAllowed {
-                Button(self.asr.micStatus == .notDetermined ? "Allow" : "Open Settings") {
-                    if self.asr.micStatus == .notDetermined {
-                        self.asr.requestMicAccess()
-                    } else {
-                        self.asr.openSystemSettingsForMic()
-                    }
+                Button(self.microphoneActionTitle) {
+                    self.asr.requestMicAccess()
                 }
                 .buttonStyle(.theaterText)
+                if MicrophoneAccess.isOpenedFromDownload {
+                    Text(MicrophoneAccess.moveToApplicationsCopy)
+                        .font(self.theme.typography.bodySmall)
+                        .foregroundStyle(self.theme.palette.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .task {

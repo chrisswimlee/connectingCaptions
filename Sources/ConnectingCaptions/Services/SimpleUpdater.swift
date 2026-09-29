@@ -13,7 +13,8 @@ enum SimpleUpdateError: Error, LocalizedError {
     case noSuitableRelease
     case noAsset
     case updateAlreadyInProgress
-    case downloadFailed
+    case downloadFailed(String)
+    case installFailed(String)
     case unzipFailed
     case notAnAppBundle
     case codesignMismatch
@@ -32,7 +33,10 @@ enum SimpleUpdateError: Error, LocalizedError {
         case .noSuitableRelease: return "No suitable release found."
         case .noAsset: return "No matching asset found in the latest release."
         case .updateAlreadyInProgress: return "An update is already being installed."
-        case .downloadFailed: return "Failed to download update."
+        case .downloadFailed(let reason):
+            return reason.isEmpty ? "Failed to download update." : "Failed to download update. \(reason)"
+        case .installFailed(let reason):
+            return "Could not replace the installed app. \(reason)"
         case .unzipFailed: return "Failed to extract the update archive."
         case .notAnAppBundle: return "Extracted content does not contain an app bundle."
         case .codesignMismatch: return "Downloaded app’s code signature does not match current app."
@@ -144,6 +148,7 @@ final class SimpleUpdater {
     private let rollbackBackupDirectoryName = "RollbackBackups"
     private var updateOperationGate = UpdateOperationGate()
     private var updateStatusWindow: NSWindow?
+    private var updateStatusDetail: NSTextField?
 
     var isUpdateInProgress: Bool {
         return self.updateOperationGate.isActive
@@ -365,8 +370,10 @@ final class SimpleUpdater {
             throw SimpleUpdateError.noSuitableRelease
         }
 
-        // Return whether update is available
-        return (latestVersion > current, latestTag)
+        let migrateLegacyBundle = UpdateAssetSelection.installsDespiteSameVersion(
+            runningBundleIdentifier: Bundle.main.bundleIdentifier
+        )
+        return (latestVersion > current || migrateLegacyBundle, latestTag)
     }
 
     func publishedRepository() throws -> (owner: String, repo: String) {
@@ -419,19 +426,22 @@ final class SimpleUpdater {
             throw SimpleUpdateError.noSuitableRelease
         }
 
-        // up to date
-        if !(latestVersion > current) {
+        let migrateLegacyBundle = UpdateAssetSelection.installsDespiteSameVersion(
+            runningBundleIdentifier: Bundle.main.bundleIdentifier
+        )
+        // Up to date, unless this process is still the fluidSubtitles bundle id.
+        if !(latestVersion > current), !migrateLegacyBundle {
             throw PMKError.cancelled // mimic AppUpdater semantics for up-to-date
         }
 
         let rawVersion = latestTag.hasPrefix("v") ? String(latestTag.dropFirst()) : latestTag
-        let asset = latest.assets.first { asset in
-            self.isReleaseZipAsset(asset, version: rawVersion, repo: repo)
-        } ?? latest.assets.first { asset in
-            self.isReleaseZipAsset(asset, version: rawVersion, repo: repo, requireZipType: false)
+        guard let assetName = UpdateAssetSelection.preferredZipName(
+            in: latest.assets.map(\.name),
+            version: rawVersion,
+            repo: repo
+        ), let asset = latest.assets.first(where: { $0.name == assetName }) else {
+            throw SimpleUpdateError.noAsset
         }
-
-        guard let asset = asset else { throw SimpleUpdateError.noAsset }
         guard let checksumAsset = latest.assets.first(where: {
             $0.name.caseInsensitiveCompare("SHA256SUMS") == .orderedSame ||
                 $0.name.caseInsensitiveCompare("SHA256SUMS.txt") == .orderedSame
@@ -450,16 +460,17 @@ final class SimpleUpdater {
         let downloadURL = tempDir.appendingPathComponent(asset.browser_download_url.lastPathComponent)
 
         do {
-            let (tmpFile, _) = try await URLSession.shared.download(from: asset.browser_download_url)
-            try FileManager.default.moveItem(at: tmpFile, to: downloadURL)
+            try await UpdateTransfer.download(from: asset.browser_download_url, to: downloadURL)
+        } catch let error as SimpleUpdateError {
+            throw error
         } catch {
-            throw SimpleUpdateError.downloadFailed
+            throw SimpleUpdateError.downloadFailed(error.localizedDescription)
         }
+        self.setUpdateStatus("Checking the download. \(ConnectingCaptionsProduct.displayName) will restart automatically.")
 
         let checksumText: String
         do {
-            let (data, _) = try await URLSession.shared.data(from: checksumAsset.browser_download_url)
-            checksumText = String(data: data, encoding: .utf8) ?? ""
+            checksumText = try await UpdateTransfer.text(from: checksumAsset.browser_download_url)
         } catch {
             throw SimpleUpdateError.checksumMissing
         }
@@ -485,6 +496,7 @@ final class SimpleUpdater {
             throw SimpleUpdateError.notAnAppBundle
         }
 
+        self.clearQuarantine(extractedBundleURL)
         try await self.verifyCodeSignature(for: extractedBundleURL)
         let newInfo = try await self.codeSigningInformation(for: extractedBundleURL)
         let newTeam = UpdateSignaturePolicy.teamID(fromCodesignOutput: newInfo)
@@ -514,12 +526,19 @@ final class SimpleUpdater {
         }
 
         self.createRollbackBackup(beforeRollback: false)
+        self.setUpdateStatus("Installing the update. \(ConnectingCaptionsProduct.displayName) will restart automatically.")
 
         // Replace and relaunch
-        try self.performSwapAndRelaunch(
-            installedAppURL: Bundle.main.bundleURL,
-            downloadedAppURL: extractedBundleURL
-        )
+        do {
+            try self.performSwapAndRelaunch(
+                installedAppURL: Bundle.main.bundleURL,
+                downloadedAppURL: extractedBundleURL
+            )
+        } catch let error as SimpleUpdateError {
+            throw error
+        } catch {
+            throw SimpleUpdateError.installFailed(error.localizedDescription)
+        }
         shouldKeepOperationActive = true
     }
 
@@ -568,6 +587,7 @@ final class SimpleUpdater {
         detail.textColor = .secondaryLabelColor
         detail.maximumNumberOfLines = 2
         content.addSubview(detail)
+        self.updateStatusDetail = detail
 
         let progress = NSProgressIndicator(frame: NSRect(x: 92, y: 24, width: 304, height: 6))
         progress.style = .bar
@@ -582,10 +602,15 @@ final class SimpleUpdater {
         self.updateStatusWindow = panel
     }
 
+    private func setUpdateStatus(_ text: String) {
+        self.updateStatusDetail?.stringValue = text
+    }
+
     private func resetUpdateOperation() {
         self.updateOperationGate.finish()
         self.updateStatusWindow?.close()
         self.updateStatusWindow = nil
+        self.updateStatusDetail = nil
     }
 
     private func fetchReleases(owner: String, repo: String) async throws -> [GHRelease] {
@@ -593,8 +618,12 @@ final class SimpleUpdater {
             throw SimpleUpdateError.invalidURL
         }
 
-        let (data, response) = try await URLSession.shared.data(from: releasesURL)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+        let data: Data
+        do {
+            data = try await UpdateTransfer.data(from: releasesURL)
+        } catch let error as SimpleUpdateError {
+            throw error
+        } catch {
             throw SimpleUpdateError.invalidResponse
         }
 
@@ -603,6 +632,16 @@ final class SimpleUpdater {
         } catch {
             throw SimpleUpdateError.jsonDecoding
         }
+    }
+
+    private func clearQuarantine(_ url: URL) {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/xattr")
+        proc.arguments = ["-dr", "com.apple.quarantine", url.path]
+        proc.standardOutput = FileHandle.nullDevice
+        proc.standardError = FileHandle.nullDevice
+        try? proc.run()
+        proc.waitUntilExit()
     }
 
     private func selectLatestRelease(from releases: [GHRelease], includePrerelease: Bool) -> GHRelease? {
@@ -854,26 +893,6 @@ final class SimpleUpdater {
         )
     }
 
-    private func isReleaseZipAsset(
-        _ asset: GHRelease.Asset,
-        version: String,
-        repo: String,
-        requireZipType: Bool = true
-    ) -> Bool {
-        if requireZipType {
-            let isZip = asset.content_type == "application/zip"
-                || asset.content_type == "application/x-zip-compressed"
-            guard isZip || asset.name.lowercased().hasSuffix(".zip") else { return false }
-        }
-        let base = (asset.name as NSString).deletingPathExtension.lowercased()
-        let prefixes = [ConnectingCaptionsProduct.releaseDownloadPrefix]
-            + ConnectingCaptionsProduct.legacyReleaseDownloadPrefixes
-            + [repo]
-        return prefixes.contains { prefix in
-            base == "\(prefix.lowercased())-\(version.lowercased())"
-        }
-    }
-
     private func unzip(at url: URL) async throws -> URL {
         let extractDir = url.deletingLastPathComponent()
             .appendingPathComponent("extract-\(UUID().uuidString)", isDirectory: true)
@@ -883,17 +902,29 @@ final class SimpleUpdater {
         proc.arguments = ["-o", url.path, "-d", extractDir.path]
 
         return try await withCheckedThrowingContinuation { cont in
+            let once = OnceResume()
             proc.terminationHandler = { process in
-                guard process.terminationStatus == 0,
-                      let appURL = UpdateSignaturePolicy.selectSoleTopLevelApp(in: extractDir),
-                      UpdateSignaturePolicy.isSafeExtractedApp(appURL, workDirectory: extractDir)
-                else {
-                    cont.resume(throwing: SimpleUpdateError.unzipFailed)
-                    return
+                once.run {
+                    guard process.terminationStatus == 0,
+                          let appURL = UpdateSignaturePolicy.selectSoleTopLevelApp(in: extractDir),
+                          UpdateSignaturePolicy.isSafeExtractedApp(appURL, workDirectory: extractDir)
+                    else {
+                        cont.resume(throwing: SimpleUpdateError.unzipFailed)
+                        return
+                    }
+                    cont.resume(returning: appURL)
                 }
-                cont.resume(returning: appURL)
             }
-            do { try proc.run() } catch { cont.resume(throwing: error) }
+            do { try proc.run() } catch {
+                once.run { cont.resume(throwing: error) }
+                return
+            }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 60) {
+                once.run {
+                    proc.terminate()
+                    cont.resume(throwing: SimpleUpdateError.unzipFailed)
+                }
+            }
         }
     }
 
@@ -902,14 +933,26 @@ final class SimpleUpdater {
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
         proc.arguments = ["--verify", "--deep", "--strict", bundleURL.path]
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            let once = OnceResume()
             proc.terminationHandler = { process in
-                if process.terminationStatus == 0 {
-                    cont.resume()
-                } else {
+                once.run {
+                    if process.terminationStatus == 0 {
+                        cont.resume()
+                    } else {
+                        cont.resume(throwing: SimpleUpdateError.codesignMismatch)
+                    }
+                }
+            }
+            do { try proc.run() } catch {
+                once.run { cont.resume(throwing: error) }
+                return
+            }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 60) {
+                once.run {
+                    proc.terminate()
                     cont.resume(throwing: SimpleUpdateError.codesignMismatch)
                 }
             }
-            do { try proc.run() } catch { cont.resume(throwing: error) }
         }
     }
 
@@ -927,14 +970,8 @@ final class SimpleUpdater {
         requirements.standardOutput = requirementsPipe
         requirements.standardError = Pipe()
 
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            details.terminationHandler = { _ in cont.resume() }
-            do { try details.run() } catch { cont.resume(throwing: error) }
-        }
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
-            requirements.terminationHandler = { _ in cont.resume() }
-            do { try requirements.run() } catch { cont.resume(throwing: error) }
-        }
+        try await self.waitForExit(details, timeoutError: SimpleUpdateError.codesignMismatch)
+        try await self.waitForExit(requirements, timeoutError: SimpleUpdateError.codesignMismatch)
 
         let detailText = String(data: detailsPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         let requirementText = String(
@@ -942,6 +979,25 @@ final class SimpleUpdater {
             encoding: .utf8
         ) ?? ""
         return detailText + "\n" + requirementText
+    }
+
+    private func waitForExit(_ process: Process, timeoutError: Error) async throws {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            let once = OnceResume()
+            process.terminationHandler = { _ in
+                once.run { cont.resume() }
+            }
+            do { try process.run() } catch {
+                once.run { cont.resume(throwing: error) }
+                return
+            }
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 60) {
+                once.run {
+                    process.terminate()
+                    cont.resume(throwing: timeoutError)
+                }
+            }
+        }
     }
 
     private func performSwapAndRelaunch(installedAppURL: URL, downloadedAppURL: URL) throws {
@@ -1009,12 +1065,26 @@ final class SimpleUpdater {
                     return
                 }
 
-                DebugLogger.shared.info("SimpleUpdater: Successfully relaunched app, terminating old instance", source: "SimpleUpdater")
-                // Give the new instance time to fully start before terminating
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    NSApp.terminate(nil)
-                }
+                DebugLogger.shared.info("SimpleUpdater: Relaunched app, leaving this copy", source: "SimpleUpdater")
+                // Quit goes through terminateLater and does not finish while this panel is up.
+                // The new copy closes this process. Exit so the download panel cannot stay.
+                exit(EXIT_SUCCESS)
             }
+        }
+    }
+}
+
+private final class OnceResume: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+
+    func run(_ body: () -> Void) {
+        self.lock.lock()
+        let first = self.done == false
+        self.done = true
+        self.lock.unlock()
+        if first {
+            body()
         }
     }
 }

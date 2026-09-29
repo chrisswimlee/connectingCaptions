@@ -32,6 +32,19 @@ struct WelcomeView: View {
         !SpokenLanguageResolver.isSameLanguagePair()
     }
 
+    private var microphoneStepDescription: String {
+        if self.asr.micStatus == .authorized {
+            return TheaterReadiness.gettingStartedMicrophoneReady
+        }
+        if MicrophoneAccess.isOpenedFromDownload {
+            return MicrophoneAccess.moveToApplicationsCopy
+        }
+        if !self.asr.microphoneAccessDetail.isEmpty {
+            return self.asr.microphoneAccessDetail
+        }
+        return TheaterReadiness.gettingStartedMicrophone
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -68,18 +81,14 @@ struct WelcomeView: View {
                             SetupStepView(
                                 step: 2,
                                 title: self.asr.micStatus == .authorized ? "Microphone allowed" : "Allow the microphone",
-                                description: self.asr.micStatus == .authorized
-                                    ? TheaterReadiness.gettingStartedMicrophoneReady
-                                    : TheaterReadiness.gettingStartedMicrophone,
+                                description: self.microphoneStepDescription,
                                 status: self.asr.micStatus == .authorized ? .completed : .pending,
                                 action: {
-                                    if self.asr.micStatus == .notDetermined {
-                                        self.asr.requestMicAccess()
-                                    } else if self.asr.micStatus == .denied {
-                                        self.asr.openSystemSettingsForMic()
-                                    }
+                                    self.asr.requestMicAccess()
                                 },
-                                actionButtonTitle: self.asr.micStatus == .notDetermined ? "Allow" : "Open Settings",
+                                actionButtonTitle: MicrophoneAccess.isOpenedFromDownload
+                                    ? "Show in Finder"
+                                    : (self.asr.micStatus == .notDetermined ? "Allow" : "Open Settings"),
                                 showActionButton: self.asr.micStatus != .authorized
                             )
 
@@ -161,7 +170,7 @@ struct WelcomeView: View {
             Task { @MainActor in
                 await AudioStartupGate.shared.scheduleOpenAfterInitialUISettled()
                 await AudioStartupGate.shared.waitUntilOpen()
-                self.asr.micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+                self.asr.recordMicrophoneAccessRead(await MicrophoneAccess.statusOffMain())
                 await self.asr.checkIfModelsExistAsync()
                 let source = SpokenLanguageResolver.sourceLanguage()
                 let target = SpokenLanguageResolver.targetLanguage()

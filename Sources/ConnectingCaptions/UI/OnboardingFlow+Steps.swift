@@ -435,6 +435,21 @@ extension OnboardingFlowView {
                             }
                             .frame(width: 608)
 
+                            if let voiceSetupFailureMessage = self.voiceSetupFailureMessage {
+                                Text(voiceSetupFailureMessage)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.orange)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.top, 14)
+                                if self.voiceSetupFailureOffersSettings {
+                                    Button("Open Speech Settings") {
+                                        self.openSpeechRecognitionSettings()
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .padding(.top, 8)
+                                }
+                            }
+
                             if self.isModelPreparationInProgress {
                                 Label("Getting this Mac ready to caption. This can take a minute.", systemImage: "clock.arrow.circlepath")
                                     .font(self.theme.typography.captionStrong)
@@ -525,11 +540,10 @@ extension OnboardingFlowView {
                                 self.permissionRow(
                                     stepNumber: 1,
                                     title: self.isMicrophoneReady ? "Microphone access allowed" : "Allow microphone",
-                                    subtitle: self.isMicrophoneReady
-                                        ? "Choose the microphone you want \(ConnectingCaptionsProduct.displayName) to use."
-                                        : "macOS will ask once. Click Allow so \(ConnectingCaptionsProduct.displayName) can hear you.",
+                                    subtitle: self.microphonePermissionSubtitle,
                                     systemImage: "mic.fill",
                                     isReady: self.isMicrophoneReady,
+                                    statusTitle: self.microphonePermissionStatusTitle,
                                     actionTitle: self.microphoneActionButtonTitle
                                 ) {
                                     self.handleMicrophoneAction()
@@ -665,6 +679,21 @@ extension OnboardingFlowView {
                                     .padding(.bottom, 12)
                             }
 
+                            if let playgroundListenFailure = self.playgroundListenFailure {
+                                Text(playgroundListenFailure)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.orange)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.bottom, 12)
+                                if MicrophoneAccess.isMicrophoneFailure(playgroundListenFailure) {
+                                    Button(self.microphoneActionButtonTitle) {
+                                        self.handleMicrophoneAction()
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .padding(.bottom, 12)
+                                }
+                            }
+
                             if TheaterAvailability.isSupported {
                             Button {
                                 if self.playgroundListenIsActive {
@@ -742,7 +771,54 @@ extension OnboardingFlowView {
         }
     }
 
+    var microphonePermissionSubtitle: String {
+        if self.isMicrophoneReady {
+            return "Choose the microphone you want \(ConnectingCaptionsProduct.displayName) to use."
+        }
+        if MicrophoneAccess.isOpenedFromDownload {
+            return MicrophoneAccess.moveToApplicationsCopy
+        }
+        if !self.asr.microphoneAccessDetail.isEmpty {
+            return self.asr.microphoneAccessDetail
+        }
+        return "macOS will ask once. Click Allow so \(ConnectingCaptionsProduct.displayName) can hear you."
+    }
+
+    var microphonePermissionStatusTitle: String {
+        if self.isMicrophoneReady {
+            return "Ready"
+        }
+        if MicrophoneAccess.isDenied(self.asr.micStatus) {
+            return "Denied"
+        }
+        if self.asr.microphoneAccessDetail == MicrophoneAccess.promptTimedOutCopy {
+            return "No reply"
+        }
+        return "Needed"
+    }
+
+    var playgroundListenFailure: String? {
+        guard self.translationSubscriber.statusKind == .failure else { return nil }
+        let text = self.translationSubscriber.statusText
+        return text.isEmpty ? nil : text
+    }
+
+    var voiceSetupFailureMessage: String? {
+        guard !self.isVoiceModelReady,
+              self.asr.errorTitle == "Voice Model Setup Failed",
+              !self.asr.errorMessage.isEmpty
+        else { return nil }
+        return self.asr.errorMessage
+    }
+
+    var voiceSetupFailureOffersSettings: Bool {
+        self.voiceSetupFailureMessage?.contains("Open Settings") == true
+    }
+
     var microphoneActionButtonTitle: String {
+        if MicrophoneAccess.isOpenedFromDownload {
+            return "Show in Finder"
+        }
         switch self.asr.micStatus {
         case .notDetermined:
             return "Allow"
@@ -857,6 +933,10 @@ extension OnboardingFlowView {
 
         self.modelPreparationTask?.cancel()
         self.preparingModelRouteID = route.id
+        if self.asr.errorTitle == "Voice Model Setup Failed" {
+            self.asr.errorMessage = ""
+            self.asr.showError = false
+        }
         self.selectOnboardingRoute(route)
 
         self.modelPreparationTask = Task { @MainActor in
@@ -867,6 +947,10 @@ extension OnboardingFlowView {
 
             do {
                 try await self.asr.ensureAsrReady()
+                if self.asr.errorTitle == "Voice Model Setup Failed" {
+                    self.asr.errorMessage = ""
+                    self.asr.showError = false
+                }
             } catch is CancellationError {
                 DebugLogger.shared.info("Cancelled onboarding voice model setup for \(route.model.displayName)", source: "OnboardingFlowView")
             } catch {
@@ -1393,7 +1477,8 @@ extension OnboardingFlowView {
                 Text(subtitle)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.primary.opacity(0.55))
-                    .lineLimit(2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer()
@@ -1421,7 +1506,8 @@ extension OnboardingFlowView {
             }
         }
         .padding(.horizontal, 18)
-        .frame(height: 88)
+        .padding(.vertical, 12)
+        .frame(minHeight: 88)
         .background(
             shape
                 .fill(Color.primary.opacity(isReady ? 0.045 : 0.070))

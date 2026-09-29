@@ -28,7 +28,12 @@ actor AudioStartupGate {
             // Safety delay for slower / loaded systems (e.g., long uptime, heavy background load).
             try? await Task.sleep(nanoseconds: delayNanoseconds)
 
-            await self.open()
+            let pending = await self.markOpen()
+            // Resume off this MainActor task. A waiter that continues on the
+            // main thread must not run nested inside the task that opened the gate.
+            Task.detached {
+                pending.resume()
+            }
         }
     }
 
@@ -36,17 +41,36 @@ actor AudioStartupGate {
     func waitUntilOpen() async {
         if self.isOpen { return }
 
-        await withCheckedContinuation { cont in
-            self.waiters.append(cont)
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            if self.isOpen {
+                cont.resume()
+            } else {
+                self.waiters.append(cont)
+            }
         }
     }
 
-    private func open() {
-        guard self.isOpen == false else { return }
+    private func markOpen() -> GateWaiters {
+        guard self.isOpen == false else { return GateWaiters([]) }
         self.isOpen = true
 
         let pending = self.waiters
         self.waiters.removeAll(keepingCapacity: false)
-        pending.forEach { $0.resume() }
+        return GateWaiters(pending)
+    }
+}
+
+/// Resumes gate waiters away from both the audio actor and the main thread.
+private final class GateWaiters: @unchecked Sendable {
+    private let resumeAll: @Sendable () -> Void
+
+    init(_ pending: [CheckedContinuation<Void, Never>]) {
+        self.resumeAll = {
+            pending.forEach { $0.resume() }
+        }
+    }
+
+    func resume() {
+        self.resumeAll()
     }
 }

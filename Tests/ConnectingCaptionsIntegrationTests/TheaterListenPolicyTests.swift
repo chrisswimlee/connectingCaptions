@@ -60,6 +60,61 @@ final class TheaterListenPolicyTests: XCTestCase {
         XCTAssertEqual(MicrophoneAccess.deniedCopy, "Allow the microphone in System Settings.")
     }
 
+    func testMicrophoneReadTimeoutKeepsTheLastRealAnswer() {
+        let unanswered = MicrophoneAccess.resolvedDetail(
+            read: nil,
+            keeping: "",
+            currentStatus: .notDetermined
+        )
+        XCTAssertEqual(unanswered.status, .notDetermined)
+        XCTAssertEqual(unanswered.detail, "")
+
+        let staleUndetermined = MicrophoneAccess.resolvedDetail(
+            read: .notDetermined,
+            keeping: "",
+            currentStatus: .authorized
+        )
+        XCTAssertEqual(staleUndetermined.status, .authorized)
+        XCTAssertEqual(staleUndetermined.detail, "")
+
+        let stillAllowed = MicrophoneAccess.resolvedDetail(
+            read: nil,
+            keeping: "",
+            currentStatus: .authorized
+        )
+        XCTAssertEqual(stillAllowed.status, .authorized)
+        XCTAssertEqual(stillAllowed.detail, "")
+
+        let stillDenied = MicrophoneAccess.resolvedDetail(
+            read: nil,
+            keeping: "",
+            currentStatus: .denied
+        )
+        XCTAssertEqual(stillDenied.status, .denied)
+        XCTAssertEqual(stillDenied.detail, MicrophoneAccess.deniedSettingsCopy)
+
+        let refused = MicrophoneAccess.resolvedDetail(
+            read: .denied,
+            keeping: MicrophoneAccess.promptTimedOutCopy,
+            currentStatus: .notDetermined
+        )
+        XCTAssertEqual(refused.status, .denied)
+        XCTAssertEqual(refused.detail, MicrophoneAccess.deniedSettingsCopy)
+
+        let allowedAgain = MicrophoneAccess.resolvedDetail(
+            read: .authorized,
+            keeping: MicrophoneAccess.deniedSettingsCopy,
+            currentStatus: .denied
+        )
+        XCTAssertEqual(allowedAgain.status, .authorized)
+        XCTAssertEqual(allowedAgain.detail, "")
+        XCTAssertEqual(
+            MicrophoneAccess.failureCopy(detail: MicrophoneAccess.promptTimedOutCopy),
+            MicrophoneAccess.promptTimedOutCopy
+        )
+        XCTAssertTrue(MicrophoneAccess.isMicrophoneFailure(MicrophoneAccess.deniedSettingsCopy))
+    }
+
     func testJunkGateDropsBoilerplateAndPhraseLoops() {
         XCTAssertTrue(CaptionJunkGate.shouldDrop("Thanks for watching."))
         XCTAssertTrue(CaptionJunkGate.shouldDrop("감사합니다 감사합니다 감사합니다"))

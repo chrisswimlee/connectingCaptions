@@ -7,7 +7,9 @@ nonisolated enum ConnectingCaptionsProduct {
     static let bundleFileName = "Connecting Captions"
     /// GitHub Release zip: `Connecting-Captions-{version}.zip`
     static let releaseDownloadPrefix = "Connecting-Captions"
-    /// Earlier release zips the updater still accepts.
+    /// Earlier Connecting Captions zip names this updater still accepts.
+    /// fluidSubtitles 1.6.12 looks up `fluidsubtitles-{version}.zip` itself. That file is
+    /// signed as `com.fluidsubtitles.app` and is not a zip this build installs.
     static let legacyReleaseDownloadPrefixes = ["connectingcaptions"]
     static let shortName = "Captions"
     static let bundleIdentifier = "com.connectingcaptions.app"

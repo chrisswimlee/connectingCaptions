@@ -39,14 +39,15 @@ final class AppleSpeechProvider: TranscriptionProvider {
             self.isReady = true
             DebugLogger.shared.info("AppleSpeechProvider authorized and ready", source: "AppleSpeechProvider")
         case .denied:
-            throw NSError(domain: "AppleSpeechProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Speech recognition permission denied"])
+            throw NSError(domain: "AppleSpeechProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: "Speech recognition permission denied. Open Settings and turn Speech Recognition on."])
         case .restricted:
-            throw NSError(domain: "AppleSpeechProvider", code: 2, userInfo: [NSLocalizedDescriptionKey: "Speech recognition is restricted on this device"])
+            throw NSError(domain: "AppleSpeechProvider", code: 2, userInfo: [NSLocalizedDescriptionKey: "Speech recognition is restricted on this device."])
         case .notDetermined:
-            // Should not happen after requestAuthorization returns, but handled for safety
             self.isReady = false
+            throw NSError(domain: "AppleSpeechProvider", code: 7, userInfo: [NSLocalizedDescriptionKey: "Speech recognition permission did not finish. Open Settings and turn Speech Recognition on."])
         @unknown default:
             self.isReady = false
+            throw NSError(domain: "AppleSpeechProvider", code: 8, userInfo: [NSLocalizedDescriptionKey: "Speech recognition permission is unavailable. Open Settings and turn Speech Recognition on."])
         }
     }
 

@@ -111,6 +111,8 @@ final class ASRService: ObservableObject {
     @Published var partialTranscription: String = ""
     @Published var wordBoostStatusText: String = "Word boost: off"
     @Published var micStatus: AVAuthorizationStatus = .notDetermined
+    /// Why the microphone row is blocked. Empty when access is allowed or still unasked.
+    @Published var microphoneAccessDetail: String = ""
     @Published var isAsrReady: Bool = false
     @Published var isDownloadingModel: Bool = false
     @Published var isLoadingModel: Bool = false // True when loading cached model into memory (not downloading)
@@ -1528,13 +1530,15 @@ final class ASRService: ObservableObject {
         await AudioStartupGate.shared.waitUntilOpen()
         guard self.isTerminating == false else { return }
 
-        // Check microphone permission (deferred from init to avoid AVFCapture race condition)
-        self.micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        self.micPermissionGranted = (self.micStatus == .authorized)
+        // Read permission off the main thread. A stuck audio service must not
+        // freeze setup before the user can click Allow.
+        self.recordMicrophoneAccessRead(await MicrophoneAccess.statusOffMain())
 
         let initialInputSnapshot = await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                let devices = AudioDevice.listInputDevicesRefreshingLiveness()
+                // Do not probe device-is-alive here. That call can sit inside
+                // Core Audio and block the microphone prompt on the main thread.
+                let devices = AudioDevice.listInputDevices()
                 let defaultInputUID = AudioDevice.getDefaultInputDevice()?.uid
                 continuation.resume(returning: (devices, defaultInputUID))
             }
@@ -1630,29 +1634,57 @@ final class ASRService: ObservableObject {
         DebugLogger.shared.debug("Models exist on disk: \(self.modelsExistOnDisk)", source: "ASRService")
     }
 
+    func recordMicrophoneAccessRead(_ read: AVAuthorizationStatus?) {
+        let resolved = MicrophoneAccess.resolvedDetail(
+            read: read,
+            keeping: self.microphoneAccessDetail,
+            currentStatus: self.micStatus
+        )
+        self.micStatus = resolved.status
+        self.micPermissionGranted = resolved.status == .authorized
+        self.microphoneAccessDetail = resolved.detail
+    }
+
     func requestMicAccess() {
-        guard self.isRequestingMicrophoneAccess == false else { return }
+        if MicrophoneAccess.isOpenedFromDownload {
+            self.microphoneAccessDetail = MicrophoneAccess.moveToApplicationsCopy
+            self.errorMessage = MicrophoneAccess.moveToApplicationsCopy
+            MicrophoneAccess.revealDownloadedApp()
+            return
+        }
+
+        // A second click while the system sheet is up should bring that sheet
+        // forward. The privacy check itself runs off the main thread.
+        guard self.isRequestingMicrophoneAccess == false else {
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
         self.isRequestingMicrophoneAccess = true
+        NSApp.activate(ignoringOtherApps: true)
         Task { @MainActor [weak self] in
-            await AudioStartupGate.shared.scheduleOpenAfterInitialUISettled()
-            await AudioStartupGate.shared.waitUntilOpen()
+            let current = await MicrophoneAccess.statusOffMain()
             guard let self else { return }
-            guard self.isTerminating == false else {
+            self.recordMicrophoneAccessRead(current)
+            if self.micStatus == .authorized {
                 self.isRequestingMicrophoneAccess = false
                 return
             }
-
-            AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
-                guard let self else { return }
-                Task { @MainActor in
-                    self.isRequestingMicrophoneAccess = false
-                    self.micPermissionGranted = granted
-                    self.micStatus = granted ? .authorized : .denied
-                    if granted {
-                        await self.prewarmConfiguredAudioCaptureIfPossible(reason: "permission_granted")
-                    }
-                }
+            // A missed status read is not a denial. Still ask. Opening Settings
+            // before the prompt means the app never appears in the microphone list.
+            if MicrophoneAccess.isDenied(self.micStatus) {
+                self.isRequestingMicrophoneAccess = false
+                self.openSystemSettingsForMic()
+                return
             }
+            let granted = await MicrophoneAccess.requestAccessOffMain()
+            self.isRequestingMicrophoneAccess = false
+            guard let granted else {
+                MicrophoneAccess.notePromptTimedOut(self)
+                self.openSystemSettingsForMic()
+                return
+            }
+            await MicrophoneAccess.applyPromptResult(granted, to: self)
+            MicrophoneAccess.prewarmAfterGrant(self)
         }
     }
 

@@ -412,7 +412,7 @@ struct ContentView: View {
                 self.audioObserver.startObserving()
                 await self.asr.initialize()
                 self.menuBarManager.configure(asrService: self.appServices.asr)
-                self.refreshDevices()
+                self.refreshDevices(refreshLiveness: false)
 
                 if self.selectedOutputUID.isEmpty, let defOut = AudioDevice.getDefaultOutputDevice()?.uid {
                     self.selectedOutputUID = defOut
@@ -1067,7 +1067,7 @@ struct ContentView: View {
                 menuBarManager: self.menuBarManager,
                 startRecording: self.startCaptionListening,
                 stopListening: { await self.stopTheaterListening() },
-                refreshDevices: self.refreshDevices,
+                refreshDevices: { self.refreshDevices() },
                 openAccessibilitySettings: self.openAccessibilitySettings,
                 restartApp: self.restartApp,
                 revealAppInFinder: self.revealAppInFinder,
@@ -1084,11 +1084,15 @@ struct ContentView: View {
 
     // Audio settings merged into SettingsView
 
-    func refreshDevices() {
+    func refreshDevices(refreshLiveness: Bool = true) {
         // Query CoreAudio off the main thread — during device topology changes, synchronous
         // CoreAudio calls on main can deadlock while the HAL is still settling.
+        // Startup skips the liveness probe so a stuck input cannot hold Core Audio
+        // while setup is asking for the microphone.
         DispatchQueue.global(qos: .userInitiated).async {
-            let inputs = AudioDevice.listInputDevicesRefreshingLiveness()
+            let inputs = refreshLiveness
+                ? AudioDevice.listInputDevicesRefreshingLiveness()
+                : AudioDevice.listInputDevices()
             let outputs = AudioDevice.listOutputDevices()
             let defaultInputUID = AudioDevice.getDefaultInputDevice()?.uid
             DispatchQueue.main.async {

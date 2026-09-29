@@ -4,6 +4,11 @@ All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
 
+- Setup Allow asks for the microphone immediately. A slow permission check still asks, and it does not mark the rest of the app as failed. Quit leaves even when that prompt, or an update alert, has the main thread stuck. A copy opened from the download says to move the app into Applications first.
+- After the new app opens, this copy leaves. The new copy closes the one still showing “Downloading the update,” so Quit is not stuck on that panel.
+- A stalled download reports the error and tries once more. The transfer gives up if the server sends nothing for a minute, or the file is not done in ten minutes.
+- fluidSubtitles 1.6.12 only installs a zip signed as `com.fluidsubtitles.app`. The release job re-signs `fluidsubtitles-{version}.zip`. The Connecting Captions zip is a different app, so the same bytes fail that check.
+
 ## [1.6.14] — 2026-09-29
 
 - The menu bar mark and the Theater task bar use the linked CC. The name shows on the Pop-up bar only while it is idle.

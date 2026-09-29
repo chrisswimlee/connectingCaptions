@@ -591,7 +591,9 @@ final class AudioHardwareObserver: ObservableObject {
         self.inputAvailabilityRefreshGeneration &+= 1
         let generation = self.inputAvailabilityRefreshGeneration
         DispatchQueue.global(qos: .utility).async { [weak self] in
-            let devices = AudioDevice.listInputDevicesRefreshingLiveness()
+            // Register listeners without probing device-is-alive. That probe
+            // can hold Core Audio while setup is asking for the microphone.
+            let devices = AudioDevice.listInputDevices()
             DispatchQueue.main.async { [weak self] in
                 guard let self,
                       self.inputAvailabilityRefreshGeneration == generation

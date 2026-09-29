@@ -19,8 +19,7 @@ extension ASRService {
     ) async -> AudioCaptureStartOutcome {
         DebugLogger.shared.info("🎤 START() called - beginning recording session", source: "ASRService")
 
-        self.micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        self.micPermissionGranted = self.micStatus == .authorized
+        self.recordMicrophoneAccessRead(await MicrophoneAccess.statusOffMain())
         guard self.micStatus == .authorized else {
             DebugLogger.shared.error("❌ START() blocked - mic not authorized", source: "ASRService")
             return .failed

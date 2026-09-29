@@ -49,13 +49,13 @@ struct LiveTranslationHomeView: View {
             .fluidPageContent()
             .onAppear {
                 self.controller.alignSpokenEngineWithTheater()
-                MicrophoneAccess.refresh(self.asr)
+                Task { await MicrophoneAccess.refresh(self.asr) }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                MicrophoneAccess.refresh(self.asr)
+                Task { await MicrophoneAccess.refresh(self.asr) }
             }
             .onChange(of: self.settings.theaterSessionMode) { _, _ in
-                MicrophoneAccess.refresh(self.asr)
+                Task { await MicrophoneAccess.refresh(self.asr) }
             }
         }
     }
@@ -842,10 +842,10 @@ struct TheaterListenButton: View {
             .accessibilityIdentifier(self.isListening ? self.stopIdentifier : self.listenIdentifier)
         }
         .onAppear {
-            MicrophoneAccess.refresh(self.asr)
+            Task { await MicrophoneAccess.refresh(self.asr) }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            MicrophoneAccess.refresh(self.asr)
+            Task { await MicrophoneAccess.refresh(self.asr) }
         }
     }
 

@@ -25,6 +25,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Bring up file logging + crash handlers immediately during launch.
         _ = FileLogger.shared
+        UpdateHandoff.closePreviousCopy()
         TypingService.startKeyboardLayoutTracking()
         _ = TranscriptionHistoryStore.shared
         // Must be read during the launch callback - the current Apple Event identifies
@@ -66,22 +67,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let reply = TerminationReply()
+        // If setup has the main thread stuck, the task below never runs and
+        // AppKit waits on terminateLater. Leave the process if it is still here.
+        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 8) {
+            reply.forceExitIfNeeded()
+        }
         Task { @MainActor in
             LiveTranslationController.shared.flushArchive()
             await TranscriptionHistoryStore.shared.finishPendingWrites()
             if let error = TranscriptionHistoryStore.shared.persistenceError {
-                let alert = NSAlert()
-                alert.messageText = "History could not be saved"
-                alert.informativeText = error
-                alert.addButton(withTitle: "Keep Open")
-                alert.addButton(withTitle: "Quit Anyway")
-                if alert.runModal() != .alertSecondButtonReturn {
-                    sender.reply(toApplicationShouldTerminate: false)
-                    return
-                }
+                DebugLogger.shared.warning(
+                    "Quitting with unsaved history: \(error)",
+                    source: "AppDelegate"
+                )
             }
             await self.shutdownRuntimesForTermination()
-            sender.reply(toApplicationShouldTerminate: true)
+            reply.reply(sender, terminate: true)
         }
         return .terminateLater
     }
@@ -453,5 +455,26 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         alert.alertStyle = .informational
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+}
+
+/// `terminateLater` replies once. A stuck setup must not be able to answer twice.
+private final class TerminationReply: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didReply = false
+
+    func reply(_ application: NSApplication, terminate: Bool) {
+        self.lock.lock()
+        let shouldReply = self.didReply == false
+        self.didReply = true
+        self.lock.unlock()
+        guard shouldReply else { return }
+        application.reply(toApplicationShouldTerminate: terminate)
+    }
+
+    func forceExitIfNeeded() {
+        // A reply can be accepted while a system prompt still holds the process.
+        // If this process is still alive, Quit did not finish.
+        exit(EXIT_SUCCESS)
     }
 }

@@ -470,7 +470,7 @@ final class LiveTranslationController: ObservableObject {
         self.isStartingListen = true
         guard self.onStartCaptionListening != nil else {
             self.isStartingListen = false
-            self.trace("listen failed reason=noStartHandler kind=captions", level: .warning)
+            self.reportListenFailure("Could not start listening. Open \(ConnectingCaptionsProduct.displayName) and try again.")
             return
         }
         self.onStartCaptionListening?()
@@ -508,7 +508,7 @@ final class LiveTranslationController: ObservableObject {
         self.isStartingListen = true
         guard self.onStartInsertListening != nil else {
             self.isStartingListen = false
-            self.trace("listen failed reason=noStartHandler kind=insert", level: .warning)
+            self.reportListenFailure("Could not start listening. Open \(ConnectingCaptionsProduct.displayName) and try again.")
             return
         }
         self.onStartInsertListening?()
@@ -564,7 +564,9 @@ final class LiveTranslationController: ObservableObject {
         let granted = await MicrophoneAccess.authorize(updating: AppServices.shared.asr)
         if !granted {
             self.trace("listen blocked reason=microphone", level: .warning)
-            self.subscriber.reportFailure(MicrophoneAccess.deniedCopy)
+            self.subscriber.reportFailure(
+                MicrophoneAccess.failureCopy(detail: AppServices.shared.asr.microphoneAccessDetail)
+            )
             self.refreshPresenter()
             return false
         }

@@ -179,15 +179,8 @@ changelog.write_text(text[: match.start()] + replacement + text[match.end() :], 
 
 readme = Path("README.md")
 readme_text = readme.read_text(encoding="utf-8")
-linked, count = re.subn(
-    r"\[Download [0-9.]+\]\(https://github.com/chrisswimlee/connectingCaptions/releases/tag/v[0-9.]+\)",
-    f"[Download {version}](https://github.com/chrisswimlee/connectingCaptions/releases/tag/v{version})",
-    readme_text,
-    count=1,
-)
-if count != 1:
-    raise SystemExit("README.md download link was not updated")
-readme.write_text(linked, encoding="utf-8")
+if "releases/latest/download/Connecting-Captions.zip" not in readme_text:
+    raise SystemExit("README.md download link must stay on the latest Connecting-Captions.zip")
 
 project = Path("connectingCaptions.xcodeproj/project.pbxproj")
 project_text = project.read_text(encoding="utf-8")
