@@ -2110,7 +2110,10 @@ final class LiveTranslationSubscriberTests: XCTestCase {
         XCTAssertEqual(subscriber.committedSourceLines, ["Today we trained the model"])
         XCTAssertFalse(subscriber.sourceDraft.contains("Today we trained the model Then"))
     }
+}
 
+@MainActor
+extension LiveTranslationSubscriberTests {
     func testEndOfUtteranceCommitsARealClauseAndEventuallyPrintsAThinLeftover() async {
         let settings = SettingsStore.shared
         let originalSource = settings.translationSourceLanguageID
