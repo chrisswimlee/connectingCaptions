@@ -665,10 +665,25 @@ extension ASRService {
         let retained = self.audioBuffer.getRetained()
         guard retained.count >= 16_000 else { return fallback }
 
+        let provider = self.transcriptionProvider
+        let samples: [Float]
+        if provider.streamingPreviewMode == .trailingWindow {
+            let prepared = PauseIntervalAudio.preparingForDecode(
+                retained,
+                floorRMS: self.audioCapturePipeline.speechFloorRMS(),
+                minimumSamples: 16_000
+            )
+            if prepared.isPauseOnly {
+                return fallback
+            }
+            samples = prepared.samples
+        } else {
+            samples = retained
+        }
+
         do {
-            let provider = self.transcriptionProvider
             let result = try await self.transcriptionExecutor.run { [provider] in
-                try await provider.transcribeStreaming(retained)
+                try await provider.transcribeStreaming(samples)
             }
             let newText = self.cleanedLiveTranscript(result.text)
                 .trimmingCharacters(in: .whitespacesAndNewlines)

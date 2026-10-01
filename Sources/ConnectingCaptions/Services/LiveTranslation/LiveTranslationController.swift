@@ -155,6 +155,11 @@ final class LiveTranslationController: ObservableObject {
         self.applyPendingThermalDowngradeIfNeeded()
     }
 
+    func markPauseSkip() {
+        guard self.isSessionActive else { return }
+        self.updateTrace { $0.pauseSkips += 1 }
+    }
+
     func handleEndOfUtterance() {
         guard self.isSessionActive else { return }
         self.subscriber.handleEndOfUtterance()
@@ -973,7 +978,8 @@ final class LiveTranslationController: ObservableObject {
                 lastTranslation: self.subscriber.committedLines.last ?? "",
                 pendingWaitMilliseconds: board.oldestInFlightWaitMs
             ),
-            inboxLines: self.subscriber.inboxLines
+            inboxLines: self.subscriber.inboxLines,
+            inboxOpenTail: self.subscriber.inboxOpenTail
         )
     }
 

@@ -10,11 +10,9 @@ private struct PendingCaptionGrowth: Equatable {
 
 // Session owner. Heard speech becomes a board row only through `advance`.
 // A partial prints a sentence once speech continues past its ending. A lone
-// finished sentence waits for the next line when it is still the whole draft.
-// A new partial can update that hold. Silence and end of utterance confirm a
-// finished leftover. Pause, an open tail, and Stop
-// confirm, then commit the leftover. `enqueueCommit` is the only new-row
-// publisher. LectureCaptionLog.commit peels a leftover after the newest line once.
+// finished sentence prints after its wording stops changing. A revision
+// replaces that hold. Silence, Pause, and Stop confirm a finished leftover.
+// `enqueueCommit` is the only new-row publisher.
 
 @MainActor
 final class LiveTranslationSubscriber: ObservableObject {
@@ -23,8 +21,9 @@ final class LiveTranslationSubscriber: ObservableObject {
     private(set) var sourceDraft: String = ""
     private(set) var translatedDraft: String = ""
     @Published private(set) var boardState = TheaterBoardState()
-    /// Last few heard lines that are not on the board yet.
+    /// Heard lines not on the board yet. `inboxOpenTail` is the last line still being spoken.
     @Published private(set) var inboxLines: [String] = []
+    @Published private(set) var inboxOpenTail = false
     var committedLines: [String] { self.boardState.translatedLines }
     @Published private(set) var lastLatencyMilliseconds: Int?
     @Published private(set) var lastLatencySample = LiveTranslationLatencySample()
@@ -49,7 +48,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     private var tailSettleTask: Task<Void, Never>?
     private var eouHoldTask: Task<Void, Never>?
     private var pauseRevisionTask: Task<Void, Never>?
-    /// The lone finished sentence held until the next line arrives.
+    /// The lone finished sentence held until its wording stops changing.
     private var settledPrintTask: Task<Void, Never>?
     private var settledPrintSentence = ""
     /// Smoothed gap between partials while talking. Sizes the lone-sentence settle.
@@ -74,6 +73,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     /// Last voiced packet. A late ASR tick after this goes quiet must still
     /// flush leftover — skipped silence ticks can miss while a chunk is busy.
     private var lastVoicedUptime: TimeInterval?
+    private var lastSilenceHoldAt: Date?
     private var didAutoRetryFailure = false
     private var commitTasks: [Task<Void, Never>] = []
     /// Separates captions that became ready behind one slow earlier sentence.
@@ -524,6 +524,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.didPauseReviseThisUtterance = false
         self.didAutoRetryFailure = false
         self.lastVoicedUptime = nil
+        self.lastSilenceHoldAt = nil
         self.heldLiveSpoken = ""
         self.previousPartialLeftover = ""
         self.llmEngine.resetListenEchoTally()
@@ -569,6 +570,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.didPauseReviseThisUtterance = false
         self.didAutoRetryFailure = false
         self.lastVoicedUptime = nil
+        self.lastSilenceHoldAt = nil
         self.heldLiveSpoken = ""
         self.previousPartialLeftover = ""
         self.llmEngine.resetListenEchoTally()
@@ -677,6 +679,10 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     func noteSilenceHold() {
         guard !self.liveSpeechHeld else { return }
+        self.lastSilenceHoldAt = Date()
+        // Silence confirm owns this leftover. The revision wait must not print
+        // the pre-confirm wording first, or each draft becomes its own row.
+        self.cancelSettledPrint()
         if self.eouHoldTask != nil { return }
         // The caption that closes this utterance still needs speech-start.
         // Resetting here made that line publish with no end-to-end time.
@@ -995,10 +1001,10 @@ final class LiveTranslationSubscriber: ObservableObject {
     }
 
     /// Mid-talk print peels a finished sentence once speech continues past its
-    /// ending. That following speech is the confirmation, so the first sentence
-    /// does not wait for the next sentence to arrive again. A lone period still
-    /// waits for a second update or for silence. An unpunctuated tail stays
-    /// invisible. Pause, end of utterance, and Stop use `commitNextSettledUnit`.
+    /// ending. A lone finished sentence stays off the board until that wording
+    /// stops changing, then prints. A later revision replaces the hold instead
+    /// of printing another row. An unpunctuated tail stays invisible. Pause,
+    /// end of utterance, and Stop use `commitNextSettledUnit`.
     private func commitCompletedSentencesWhileTalking(
         remaining initial: String,
         confirmed: String,
@@ -1028,8 +1034,10 @@ final class LiveTranslationSubscriber: ObservableObject {
             ) else {
                 break
             }
+            // The held wording was revised. Print the newest wording only; the
+            // held one never reached the board.
             let held = self.settledPrintSentence
-            let secondLineArrived = !held.isEmpty
+            let revisedHold = !held.isEmpty
                 && TranslationClauseSegmenter.shouldReviseCommitted(
                     previous: held,
                     incoming: next.unit,
@@ -1043,7 +1051,7 @@ final class LiveTranslationSubscriber: ObservableObject {
                 unit: next.unit,
                 rest: next.rest,
                 languageID: languageID
-            )) || secondLineArrived else {
+            )) || revisedHold else {
                 break
             }
             horizon = TranslationClauseSegmenter.leftoverTail(
@@ -1096,10 +1104,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.scheduleSettledPrint(languageID: languageID)
     }
 
-    /// The draft is one finished sentence and nothing follows it. Remember it,
-    /// but do not print it yet. The next line may be the corrected wording.
-    /// A following sentence, a second agreeing tick, or silence prints the
-    /// latest wording. A lowercase continuation never counts as that line.
+    /// The draft is one finished sentence and nothing follows it. Hold the
+    /// latest wording. A revision restarts this wait. When the wording stays
+    /// still, print that finished version. Do not wait for another sentence.
     private func scheduleSettledPrint(languageID: String) {
         let open = self.sourceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let next = TranslationClauseSegmenter.nextCompletedSentence(open, languageID: languageID),
@@ -1112,8 +1119,44 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
         let sentence = next.unit.trimmingCharacters(in: .whitespacesAndNewlines)
         self.settledPrintTask?.cancel()
-        self.settledPrintTask = nil
         self.settledPrintSentence = sentence
+        let delay = LiveTranslationTiming.loneSentenceSettleNanoseconds(
+            partialCadence: self.partialCadence
+        )
+        let generation = self.generation
+        self.settledPrintTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delay)
+            guard !Task.isCancelled, let self else { return }
+            self.commitFinishedSentence(sentence, generation: generation)
+        }
+    }
+
+    /// The held sentence stayed still through the revision wait. Print that
+    /// wording once; a revision of the newest row updates it in place.
+    private func commitFinishedSentence(_ sentence: String, generation: UInt64) {
+        guard generation == self.generation else { return }
+        self.settledPrintTask = nil
+        self.settledPrintSentence = ""
+        let languageID = SpokenLanguageResolver.listenLanguageID(for: sentence)
+        let open = self.sourceDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let next = TranslationClauseSegmenter.nextCompletedSentence(open, languageID: languageID),
+              TranslationClauseSegmenter.looksComplete(next.unit, languageID: languageID),
+              TranslationClauseSegmenter.isSameClause(next.unit, sentence)
+        else { return }
+        let unit = next.unit.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rest = next.rest.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !self.laterLineRevises(unit, rest: rest, languageID: languageID),
+           !self.replaceNewestWithRevision(unit, languageID: languageID),
+           !self.absorbIntoNewestRow(unit, languageID: languageID),
+           !self.shouldSkipSettledUnit(unit)
+        {
+            self.enqueueCommit(unit)
+        }
+        self.sourceDraft = rest
+        self.heldLiveSpoken = rest
+        self.previousPartialLeftover = rest
+        self.lastHeardText = rest
+        self.scheduleSettledPrint(languageID: languageID)
     }
 
     /// The sentence after this one is a close correction of it. Keep this
@@ -1314,7 +1357,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         incoming: String,
         languageID: String
     ) -> Bool {
-        TranslationClauseSegmenter.isInPlaceGrowth(previous: previous, incoming: incoming)
+        TranslationClauseSegmenter.continuesSamePaintedLine(previous: previous, incoming: incoming, languageID: languageID)
             || TranslationClauseSegmenter.isTailRevisionGrowth(previous: previous, incoming: incoming)
             || self.correctsNewest(previous: previous, incoming: incoming, languageID: languageID)
     }
@@ -1343,23 +1386,25 @@ final class LiveTranslationSubscriber: ObservableObject {
     /// A lowercase leftover, or a last-word correction, belongs on the newest
     /// painted row. A new utterance after a long quiet is left alone.
     private static let continuationMergeWindow: TimeInterval = 8
+    private static let connectiveContinuationWindow: TimeInterval = 20
 
     private func absorbIntoNewestRow(_ unit: String, languageID: String) -> Bool {
         guard let last = self.captionLog.entries.last else {
             return self.absorbIntoUnpublishedCommit(unit, languageID: languageID)
         }
         // The painted line can still be the short first words while a longer
-        // growth is translating. Compare against that growth, or the suffix
-        // prints beside the sentence it already belongs to.
+        // growth is translating. Compare against that growth.
         let source = self.pendingGrowthSource(for: last.id) ?? last.source
         if self.continuesNewestClause(previous: source, incoming: unit, languageID: languageID) {
             self.schedulePaintedGrowth(id: last.id, source: unit)
             return true
         }
         let stillGrowing = self.pendingGrowthSource(for: last.id) != nil
-        let recent = stillGrowing
-            || Date().timeIntervalSince(last.committedAt) <= Self.continuationMergeWindow
-        guard recent else {
+        let age = Date().timeIntervalSince(last.committedAt)
+        let utteranceQuiet = self.lastSilenceHoldAt.map { $0 > last.committedAt } ?? false
+        let recent = stillGrowing || age <= Self.continuationMergeWindow
+        let connective = utteranceQuiet == false && age <= Self.connectiveContinuationWindow
+        guard recent || connective else {
             return self.absorbIntoUnpublishedCommit(unit, languageID: languageID)
         }
         if TranslationClauseSegmenter.wordsAlreadyPrinted(unit, in: source) {
@@ -1372,6 +1417,12 @@ final class LiveTranslationSubscriber: ObservableObject {
             languageID: languageID
         ), !TranslationClauseSegmenter.isSameClause(merged, source) {
             self.schedulePaintedGrowth(id: last.id, source: merged)
+            return true
+        }
+        if (recent || connective),
+           let appended = TranslationClauseSegmenter.rowContinuation(row: source, unit: unit, languageID: languageID)
+        {
+            self.schedulePaintedGrowth(id: last.id, source: appended)
             return true
         }
         return self.absorbIntoUnpublishedCommit(unit, languageID: languageID)
@@ -1873,15 +1924,15 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     /// Heard lines still waiting to print. A source already on the board is omitted.
     private func refreshInbox() {
-        let languageID = SpokenLanguageResolver.listenLanguageID(for: self.sourceDraft)
-        let next = TheaterInbox.lines(
+        let next = TheaterInbox.snapshot(
             waiting: self.orderedPendingSources,
             open: self.sourceDraft,
             printed: self.boardState.sourceLines,
-            languageID: languageID
+            languageID: SpokenLanguageResolver.listenLanguageID(for: self.sourceDraft)
         )
-        guard next != self.inboxLines else { return }
-        self.inboxLines = next
+        guard next.lines != self.inboxLines || next.openTail != self.inboxOpenTail else { return }
+        self.inboxLines = next.lines
+        self.inboxOpenTail = next.openTail
     }
 
     private static func translatingStatus(for source: String) -> String {
@@ -2601,7 +2652,7 @@ final class LiveTranslationSubscriber: ObservableObject {
             return true
         }
         if let last = self.captionLog.entries.last?.source,
-           TranslationClauseSegmenter.isInPlaceGrowth(previous: last, incoming: candidate)
+           TranslationClauseSegmenter.continuesSamePaintedLine(previous: last, incoming: candidate, languageID: languageID)
         {
             return true
         }
@@ -2697,13 +2748,6 @@ final class LiveTranslationSubscriber: ObservableObject {
             try? await Task.sleep(nanoseconds: delay)
             guard !Task.isCancelled, let self else { return }
             self.tailSettleTask = nil
-            // A genuinely new sentence since the pause means the thought
-            // went on — do not force-print this stale tail over it. But a
-            // skipped "silence" tick can still land here with the same
-            // leftover re-decoded a word differently (breath, mic noise);
-            // an exact string match would drop the flush over nothing and
-            // strand this fragment until the next utterance, same as a
-            // dropped growth tick must not cancel the pause hold above.
             // A genuinely new sentence since the pause means the thought
             // went on — do not force-print this stale tail over it. But a
             // skipped "silence" tick can still land here with the same

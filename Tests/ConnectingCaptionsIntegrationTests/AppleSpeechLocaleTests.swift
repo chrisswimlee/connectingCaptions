@@ -120,6 +120,61 @@ final class AppleSpeechLocaleTests: XCTestCase {
         XCTAssertEqual(settings.selectedAppleSpeechLocaleIdentifier, "th-TH")
     }
 
+    /// A Whisper user moved onto Apple Speech must not keep a stale Apple locale.
+    func testPinningToAppleAlsoMatchesTheLocaleToISpeak() throws {
+        try XCTSkipUnless(SettingsStore.SpeechModel.appleSpeechOnly)
+        let settings = SettingsStore.shared
+        let originalModel = settings.selectedSpeechModel
+        let originalSource = settings.translationSourceLanguageID
+        let originalLocale = settings.selectedAppleSpeechLocaleIdentifier
+        defer {
+            settings.selectedSpeechModel = originalModel
+            settings.translationSourceLanguageID = originalSource
+            settings.selectedAppleSpeechLocaleIdentifier = originalLocale
+        }
+
+        settings.translationSourceLanguageID = "ko"
+        settings.selectedAppleSpeechLocaleIdentifier = "en-US"
+        settings.selectedSpeechModel = .whisperSmall
+        settings.pinSpeechModelToAppleIfNeeded()
+        XCTAssertEqual(settings.selectedAppleSpeechLocaleIdentifier, "ko-KR")
+        XCTAssertTrue(SpokenLanguageResolver.voiceEngineSupportsSource(settings: settings))
+    }
+
+    func testVoiceEngineDefaultsToAnalyzerOtherwiseAppleSpeech() throws {
+        try XCTSkipUnless(SettingsStore.SpeechModel.appleSpeechOnly)
+        let expected = SettingsStore.SpeechModel.defaultModel
+        XCTAssertTrue(expected == .appleSpeechAnalyzer || expected == .appleSpeech)
+        if SettingsStore.SpeechModel.availableModels.contains(.appleSpeechAnalyzer) {
+            XCTAssertEqual(expected, .appleSpeechAnalyzer)
+        } else {
+            XCTAssertEqual(expected, .appleSpeech)
+        }
+
+        let settings = SettingsStore.shared
+        let originalModel = settings.selectedSpeechModel
+        let originalSource = settings.translationSourceLanguageID
+        defer {
+            settings.selectedSpeechModel = originalModel
+            settings.translationSourceLanguageID = originalSource
+        }
+
+        settings.selectedSpeechModel = .appleSpeech
+        SpokenLanguageResolver.setSourceLanguage(try XCTUnwrap(TranslationLanguageCatalog.language(id: "ko")), settings: settings)
+        SpokenLanguageResolver.setSourceLanguage(try XCTUnwrap(TranslationLanguageCatalog.language(id: "da")), settings: settings)
+        XCTAssertEqual(settings.selectedSpeechModel, .appleSpeech)
+
+        settings.selectedSpeechModel = .parakeetTDTv2
+        settings.pinSpeechModelToAppleIfNeeded()
+        XCTAssertEqual(settings.selectedSpeechModel, expected)
+        XCTAssertFalse(SettingsStore.SpeechModel.availableModels.contains { $0.provider != .apple })
+
+        settings.selectedSpeechModel = .appleSpeech
+        settings.pinSpeechModelToAppleIfNeeded()
+        XCTAssertEqual(settings.selectedSpeechModel, .appleSpeech)
+        XCTAssertTrue(VoiceEngineLanguageCatalog.supports(.appleSpeech, languageID: "da"))
+    }
+
     func testAppleSpeechEnUSIsTheSameLanguageAsISpeakEnglish() {
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel

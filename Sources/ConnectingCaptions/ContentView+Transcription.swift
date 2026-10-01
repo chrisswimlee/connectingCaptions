@@ -57,6 +57,8 @@ extension ContentView {
             )
         }
 
+        self.exportCaptionSessionIfNeeded(kind: kind, route: route)
+
         if shouldPersistOutputs, kind == .insert {
             let typingTarget = self.resolveTypingTargetPID()
             let targetBundleID = typingTarget.pid.flatMap {
@@ -104,6 +106,22 @@ extension ContentView {
             textReadyAt: ProcessInfo.processInfo.systemUptime
         )
         _ = expectedOverlayLifecycleID
+    }
+
+    /// Caption Listen only. Insert stays out, and an empty session writes nothing.
+    /// History being off does not skip this.
+    private func exportCaptionSessionIfNeeded(kind: TranslationListenKind, route: DictationOutputRoute) {
+        guard route == .normal, kind == .captions, SettingsStore.shared.theaterAutoExportSession else { return }
+        let pairs = LiveTranslationController.shared.subscriber.captionPairs
+        guard !pairs.isEmpty else { return }
+        do {
+            _ = try TheaterCaptionExport.writeSessionFiles(pairs: pairs)
+        } catch {
+            DebugLogger.shared.warning(
+                "Could not save the session transcript: \(error.localizedDescription)",
+                source: "TheaterCaptionExport"
+            )
+        }
     }
 
     func processDictationPromptTest(_ transcribedText: String) async {

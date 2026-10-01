@@ -130,7 +130,8 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertNotEqual(model, .parakeetTDT)
     }
 
-    func testSourceLanguageFollowsTheVoiceEngine() {
+    func testSourceLanguageFollowsTheVoiceEngine() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalLocale = settings.selectedAppleSpeechLocaleIdentifier
@@ -326,7 +327,8 @@ final class LiveTranslationGlossaryTests: XCTestCase {
     }
 
     @MainActor
-    func testFinishedLinePolishIsAvailableWhenMLXIsEnabled() {
+    func testFinishedLinePolishIsAvailableWhenMLXIsEnabled() throws {
+        try XCTSkipIf(TheaterTranslationEngineKind.appleTranslationOnly, "Translation Engine is Apple Translation only")
         let settings = SettingsStore.shared
         let original = settings.mlxRunnerEnabled
         defer { settings.mlxRunnerEnabled = original }
@@ -459,7 +461,8 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertNil(SpokenLanguageResolver.theaterEngineHint(settings: settings))
     }
 
-    func testThaiWhisperMatchShowsHintNotMismatch() {
+    func testThaiWhisperMatchShowsHintNotMismatch() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalWhisper = settings.selectedWhisperLanguageCode
@@ -581,7 +584,8 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertNil(SpokenLanguageResolver.theaterEngineHint(settings: settings))
     }
 
-    func testKoreanWhisperMatchHasNoMismatch() {
+    func testKoreanWhisperMatchHasNoMismatch() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalWhisper = settings.selectedWhisperLanguageCode
@@ -723,7 +727,8 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertTrue(TranslationEngineError.timeout.isTimeout)
     }
 
-    func testEitherWayStaysOffUnlessWhisperHearsBothSides() {
+    func testEitherWayStaysOffUnlessWhisperHearsBothSides() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalSource = settings.translationSourceLanguageID
         let originalTarget = settings.translationTargetLanguageID
@@ -1187,5 +1192,67 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         settings.clearTheaterTalkPack()
         XCTAssertFalse(settings.hasTheaterTalkPack)
         XCTAssertFalse(TranslationGlossary.protectedTerms(from: settings).contains("Nemotron"))
+    }
+
+    func testTalkPackReadsPowerPointSlideAndNotes() throws {
+        let data = try Self.powerpointArchive(files: [
+            "ppt/slides/slide1.xml": """
+            <p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+              <a:p><a:r><a:t>Nemotron</a:t></a:r><a:r><a:t> hears </a:t></a:r><a:r><a:t>Nemotron</a:t></a:r></a:p>
+              <a:p><a:r><a:t>Welcome</a:t></a:r></a:p>
+            </p:sld>
+            """,
+            "ppt/notesSlides/notesSlide1.xml": "<p:notes><a:t>PyTorch</a:t></p:notes>",
+            "word/document.xml": "<a:t>EvilToken</a:t>",
+        ])
+        let document = try TheaterTalkPack.document(from: data, fileName: "deck.pptx")
+        XCTAssertTrue(document.terms.contains("Nemotron"), "terms=\(document.terms)")
+        XCTAssertTrue(document.terms.contains("PyTorch"), "terms=\(document.terms)")
+        XCTAssertFalse(document.terms.contains("Welcome"))
+        XCTAssertFalse(document.terms.contains("EvilToken"))
+    }
+
+    func testTalkPackRejectsAnOversizedPowerPoint() {
+        let data = Data(repeating: 0, count: 32)
+        XCTAssertThrowsError(
+            try TheaterTalkPack.document(from: data, fileName: "huge.pptx", maxArchiveBytes: 16)
+        ) { error in
+            XCTAssertEqual(error as? TheaterTalkPack.LoadError, .unreadable)
+        }
+    }
+
+    func testTalkPackRejectsAPictureOnlyPowerPoint() throws {
+        let data = try Self.powerpointArchive(files: [
+            "ppt/slides/slide1.xml": "<p:sld xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"><p:pic/></p:sld>",
+        ])
+        XCTAssertThrowsError(try TheaterTalkPack.document(from: data, fileName: "pictures.pptx")) { error in
+            XCTAssertEqual(error as? TheaterTalkPack.LoadError, .empty)
+        }
+    }
+
+    private static func powerpointArchive(files: [String: String]) throws -> Data {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("connectingCaptions-pptx-test-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for (path, body) in files {
+            let url = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try body.write(to: url, atomically: true, encoding: .utf8)
+        }
+        let zip = root.appendingPathComponent("deck.pptx")
+        let roots = Array(Set(files.keys.compactMap { ($0 as NSString).pathComponents.first })).sorted()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        process.currentDirectoryURL = root
+        process.arguments = ["-r", "-X", zip.lastPathComponent] + roots
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        return try Data(contentsOf: zip)
     }
 }

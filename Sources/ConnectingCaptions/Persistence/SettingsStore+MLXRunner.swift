@@ -26,7 +26,10 @@ extension SettingsStore {
 
     /// Local MLX runner for finished Korean / English / Thai captions.
     var mlxRunnerEnabled: Bool {
-        get { self.defaults.bool(forKey: MLXRunnerDefaults.enabled) }
+        get {
+            if TheaterTranslationEngineKind.appleTranslationOnly { return false }
+            return self.defaults.bool(forKey: MLXRunnerDefaults.enabled)
+        }
         set {
             objectWillChange.send()
             self.defaults.set(newValue, forKey: MLXRunnerDefaults.enabled)
@@ -38,6 +41,15 @@ extension SettingsStore {
     var theaterTranslationEngine: TheaterTranslationEngineKind {
         get { self.mlxRunnerEnabled ? .localLLM : .apple }
         set { self.mlxRunnerEnabled = newValue == .localLLM }
+    }
+
+    /// Clears a saved local-LLM pick while `appleTranslationOnly` is on.
+    func pinTranslationEngineToAppleIfNeeded() {
+        guard TheaterTranslationEngineKind.appleTranslationOnly else { return }
+        guard self.defaults.bool(forKey: MLXRunnerDefaults.enabled) else { return }
+        objectWillChange.send()
+        self.defaults.set(false, forKey: MLXRunnerDefaults.enabled)
+        DebugLogger.shared.info("Translation Engine pinned to Apple Translation", source: "SettingsStore")
     }
 
     var mlxRunnerModelID: String {

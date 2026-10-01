@@ -1,6 +1,6 @@
 # Commercial license
 
-Personal, student, and evaluation use is free under GPLv3. Theater Listen stays unlocked.
+connectingCaptions is free for everyone under GPLv3, work use included. Theater Listen stays unlocked. A commercial license is optional.
 
 If IT or legal need a vendor they can sanction — a named license, a security contact, or an SLA — request a commercial license.
 
@@ -28,7 +28,7 @@ GPLv3 still lets a firm run the free zip. A commercial license does not forbid w
 - Fleet settings backup and restore for caption policy only
 - An on-device audit log. It records license, seat, and Listen start or stop. It does not record captions
 
-The key does not lock Talk notes, the dictionary, export, or Listen. A refused seat still listens. Personal use of the free zip stays free.
+The key does not lock Talk notes, the dictionary, export, or Listen. A refused seat still listens. The free zip stays free for everyone.
 
 ## How a key works
 

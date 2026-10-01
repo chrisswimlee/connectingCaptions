@@ -74,6 +74,61 @@ final class LiveTranslationQualityTests: XCTestCase {
         XCTAssertTrue(vtt.contains("00:00:04.000 --> 00:00:08.000"))
     }
 
+    func testMarkdownUsesTheSameCommitTimesAsVTT() throws {
+        let start = Date(timeIntervalSince1970: 1_700_000_000)
+        let later = start.addingTimeInterval(3.5)
+        let pairs = [
+            CaptionHistoryPair(source: "Hello.", translated: "안녕.", wasPolished: false, committedAt: start),
+            CaptionHistoryPair(source: "World.", translated: "세상.", wasPolished: false, committedAt: later),
+        ]
+        let markdown = TheaterCaptionExport.markdown(pairs: pairs)
+        let vtt = TheaterCaptionExport.vtt(pairs: pairs)
+        XCTAssertTrue(markdown.contains("Times are when each caption was accepted, not when the word was spoken."))
+        XCTAssertTrue(markdown.contains("## 00:00:00.000"))
+        XCTAssertTrue(markdown.contains("## 00:00:03.500"))
+        XCTAssertTrue(markdown.contains("안녕.\nHello."))
+        XCTAssertTrue(markdown.contains("세상.\nWorld."))
+        XCTAssertTrue(vtt.contains("00:00:00.000 --> 00:00:03.500"))
+        XCTAssertTrue(vtt.contains("00:00:03.500 --> 00:00:07.000"))
+
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("connectingCaptions-export-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let written = try TheaterCaptionExport.writeSessionFiles(pairs: pairs, directory: folder, now: start)
+        XCTAssertEqual(written.count, 2)
+        let markdownFile = try String(contentsOf: written[0], encoding: .utf8)
+        let vttFile = try String(contentsOf: written[1], encoding: .utf8)
+        XCTAssertEqual(markdownFile, markdown)
+        XCTAssertEqual(vttFile, vtt)
+        XCTAssertTrue(written[0].lastPathComponent.hasSuffix(".md"))
+        XCTAssertTrue(written[1].lastPathComponent.hasSuffix(".vtt"))
+    }
+
+    func testEmptySessionWritesNoExportFiles() throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("connectingCaptions-export-empty-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let written = try TheaterCaptionExport.writeSessionFiles(pairs: [], directory: folder)
+        XCTAssertTrue(written.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+    }
+
+    func testLanguagePackDownloadTimesOutAfterTheLimit() {
+        let started = Date(timeIntervalSince1970: 1_700_000_000)
+        XCTAssertFalse(
+            LanguagePackDownloadTiming.timedOut(
+                started: started,
+                now: started.addingTimeInterval(LanguagePackDownloadTiming.timeoutSeconds - 1)
+            )
+        )
+        XCTAssertTrue(
+            LanguagePackDownloadTiming.timedOut(
+                started: started,
+                now: started.addingTimeInterval(LanguagePackDownloadTiming.timeoutSeconds)
+            )
+        )
+    }
+
     func testProductLanguagesAreTheAppleAndVoiceOverlap() {
         XCTAssertEqual(
             VoiceEngineLanguageCatalog.productLanguageIDs,
@@ -361,13 +416,14 @@ final class LiveTranslationQualityTests: XCTestCase {
 
     func testEngineCopyKeepsVoiceAndTranslationSeparate() {
         XCTAssertTrue(TheaterEngineCopy.voicePurpose.contains("speech into text"))
-        XCTAssertEqual(TheaterEngineCopy.voiceEngineName(.appleSpeech), "Apple Speech")
+        XCTAssertEqual(TheaterEngineCopy.voiceEngineName(.appleSpeech), "Apple Speech (older)")
+        XCTAssertEqual(TheaterEngineCopy.voiceEngineName(.appleSpeechAnalyzer), "Apple Speech Analyzer (newer)")
         XCTAssertEqual(TheaterEngineCopy.voiceEngineName(.parakeetTDT), "Parakeet TDT v3")
         XCTAssertEqual(TheaterEngineCopy.voiceEngineName(.parakeetRealtime), "Parakeet Flash")
-        XCTAssertEqual(
-            TheaterEngineCopy.voiceEngineDetail(.appleSpeech),
-            "Supported languages · Built-in"
-        )
+        XCTAssertTrue(TheaterEngineCopy.voiceEngineDetail(.appleSpeech).contains("included for years"))
+        XCTAssertTrue(TheaterEngineCopy.voiceEngineDetail(.appleSpeechAnalyzer).contains("macOS 26"))
+        XCTAssertTrue(TheaterEngineCopy.voiceEngineDetail(.whisperLarge).contains("when you stop"))
+        XCTAssertTrue(TheaterEngineCopy.voiceEngineDetail(.whisperBase).contains("while you talk"))
         XCTAssertTrue(TheaterEngineCopy.voiceEngineDetail(.whisperBase).contains("~81.0 MiB"))
         XCTAssertEqual(TheaterEngineCopy.translationName(), "Apple Translation")
         XCTAssertTrue(TheaterEngineCopy.translationPurpose.lowercased().contains("not a chat model"))
@@ -417,8 +473,13 @@ final class LiveTranslationQualityTests: XCTestCase {
         let settings = SettingsStore.shared
         let previous = settings.mlxRunnerEnabled
         settings.theaterTranslationEngine = .localLLM
-        XCTAssertTrue(settings.mlxRunnerEnabled)
-        XCTAssertEqual(TheaterEngineCopy.translationName(settings: settings), "Local small LLM (experimental)")
+        if TheaterTranslationEngineKind.appleTranslationOnly {
+            XCTAssertFalse(settings.mlxRunnerEnabled)
+            XCTAssertEqual(TheaterEngineCopy.translationName(settings: settings), "Apple Translation")
+        } else {
+            XCTAssertTrue(settings.mlxRunnerEnabled)
+            XCTAssertEqual(TheaterEngineCopy.translationName(settings: settings), "Local small LLM (experimental)")
+        }
         settings.theaterTranslationEngine = .apple
         XCTAssertFalse(settings.mlxRunnerEnabled)
         settings.mlxRunnerEnabled = previous

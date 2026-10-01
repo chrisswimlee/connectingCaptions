@@ -12,7 +12,6 @@ import SwiftUI
 enum SettingsSearchTarget: Hashable {
     case liveTranslation
     case theaterAppearance
-    case setupWizard
     case translateInsertShortcut
     case captionListenShortcut
     case general
@@ -71,7 +70,7 @@ enum SettingsSearchTarget: Hashable {
 
     var section: SettingsSection {
         switch self {
-        case .liveTranslation, .theaterAppearance, .setupWizard, .captionListenShortcut:
+        case .liveTranslation, .theaterAppearance, .captionListenShortcut:
             return .translation
         case .translateInsertShortcut:
             return .speakAndType
@@ -83,10 +82,18 @@ enum SettingsSearchTarget: Hashable {
              .accentColor,
              .transcriptionSounds,
              .automaticUpdates,
-             .commercialLicense,
-             .accessibilityPermission,
-             .transcriptionHistory,
-             .historyRetention,
+             .commercialLicense:
+            return .general
+
+        case .accessibilityPermission:
+            return .speakAndType
+
+        case .transcriptionHistory, .historyRetention, .audioHistory, .audioStorage:
+            return .dataAndDiagnostics
+
+        case .dictation,
+             .pauseMedia,
+             .textFormatting,
              .globalHotkey,
              .dictionarySuggestions,
              .primaryDictationShortcuts,
@@ -96,18 +103,12 @@ enum SettingsSearchTarget: Hashable {
              .copyToClipboard,
              .textInsertionMode,
              .spokenSend,
-             .audioHistory,
-             .audioStorage,
              .usageStreak,
-             .skipSilentRecordings:
-            return .general
-
-        case .dictation,
-             .pauseMedia,
-             .textFormatting:
+             .skipSilentRecordings,
+             .aiEnhancementFailures:
             return .dictation
 
-        case .notifications, .aiEnhancementFailures, .microphoneChanges:
+        case .notifications, .microphoneChanges:
             return .notifications
 
         case .audio, .inputDevicePriority, .outputDevice, .microphonePermission:
@@ -184,7 +185,9 @@ enum SettingsSearchIndex {
             terms: [
                 "translate theater captions language pair apple translation I speak show as",
                 "voice transcription translate mode",
-                "voice engine speech to text translation engine apple translation local small llm mlx experimental",
+                "voice engine speech to text apple speech analyzer language packs apple translation download",
+                "save transcript markdown vtt session export when listen stops",
+                "translation engine language packs",
             ]
         ),
         .init(
@@ -192,24 +195,16 @@ enum SettingsSearchIndex {
             title: "Theater Window",
             terms: [
                 "caption font size spoken line source translation theater window captions only dark light appearance theme",
-                "setup wizard original language spoken line under each delivered sentence",
+                "original language spoken line under each delivered sentence",
                 "caption font size spoken line source translation theater window captions only dark light appearance theme",
                 "popup pop-up transparent overlay board slides keynote see-through caption bar caption plate",
                 "menu bar theater font size plate theme position overlay tools",
                 "screen share screenshots zoom meet slides window capture projector OBS",
-                "also hear questions whisper auto detect setup languages Q&A either way speak captions",
+                "speak captions",
                 "clear captions board archive wipe reset high contrast",
-                "talk notes notes pdf rtf markdown json glossary names",
+                "talk notes notes pdf pptx powerpoint deck rtf markdown json glossary names",
                 "pace cue teleprompter behind caught up last print",
                 "voice transcription translate mode",
-            ]
-        ),
-        .init(
-            target: .setupWizard,
-            title: "Setup Wizard",
-            terms: [
-                "setup wizard first run theater captions spoken line original language app language",
-                "spoken line after a pause while talking sentence ready show as I speak Korean English Thai Japanese",
             ]
         ),
         .init(
@@ -220,7 +215,10 @@ enum SettingsSearchIndex {
         .init(
             target: .translateInsertShortcut,
             title: "Speak and type",
-            terms: ["speak and type insert section listen and type hotkey shortcut speak translate type into app quick bar release"]
+            terms: [
+                "speak and type insert section listen and type hotkey shortcut speak translate type into app quick bar release",
+                "accessibility permission system settings authorize typing",
+            ]
         ),
         .init(target: .general, title: "General", terms: ["app settings preferences startup menu bar dock"]),
         .init(
@@ -396,7 +394,7 @@ enum SettingsSearchIndex {
         .init(
             target: .dataAndDiagnostics,
             title: "Data & Diagnostics",
-            terms: ["backup restore debug logs experimental storage troubleshooting"]
+            terms: ["backup restore debug logs storage troubleshooting"]
         ),
         .init(
             target: .backupAndRestore,
@@ -441,6 +439,7 @@ enum SettingsSearchIndex {
             return lhs.result.score > rhs.result.score
         }
         .map(\.result)
+        .filter { SettingsSection.productSections.contains($0.section) }
     }
 
     static func matchingSections(for query: String) -> [SettingsSection] {

@@ -46,7 +46,7 @@ nonisolated enum CommercialSeat {
             case .notRequired, .accepted:
                 return nil
             case let .refused(reason):
-                return "\(reason.explanation) Personal use stays free. Listen stays unlocked."
+                return "\(reason.explanation) The app stays free under GPLv3. Listen stays unlocked."
             }
         }
     }

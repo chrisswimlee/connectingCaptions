@@ -104,7 +104,13 @@ struct TheaterReadinessChecklist: View {
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(self.theme.palette.warning)
                 .fixedSize(horizontal: false, vertical: true)
-            if !self.snapshot.voiceEngineReady, let openVoiceEngine {
+            if self.snapshot.voiceEngineNeedsRealign {
+                Button("Match I speak") {
+                    self.controller.alignSpokenEngineWithTheater()
+                }
+                .buttonStyle(.theaterText)
+                .accessibilityIdentifier("theater.readiness.matchISpeak")
+            } else if !self.snapshot.voiceEngineReady, let openVoiceEngine {
                 Button("Voice Engine", action: openVoiceEngine)
                     .buttonStyle(.theaterText)
             }
@@ -112,7 +118,7 @@ struct TheaterReadinessChecklist: View {
                !self.snapshot.languagePackReady,
                let openTranslationEngine
             {
-                Button("Translation Engine", action: openTranslationEngine)
+                Button("Language packs", action: openTranslationEngine)
                     .buttonStyle(.theaterText)
             }
             if !self.snapshot.microphoneAllowed {

@@ -21,6 +21,10 @@ extension SettingsStore {
         /// Flip to `true` in a future round to re-enable Qwen without deleting implementation.
         static let qwenPreviewEnabled = false
 
+        /// Voice Engine is Apple Speech only for now. Other engines keep their
+        /// implementation; flip to `false` to offer them again.
+        static let appleSpeechOnly = true
+
         // MARK: - FluidAudio Models (Apple Silicon Only)
 
         case parakeetTDT = "parakeet-tdt"
@@ -214,6 +218,9 @@ extension SettingsStore {
         /// Returns models available for the current Mac's architecture and OS
         static var availableModels: [SpeechModel] {
             allCases.filter { model in
+                if Self.appleSpeechOnly, model.provider != .apple {
+                    return false
+                }
                 if model == .whisperLargeTurbo, !CPUArchitecture.isAppleSilicon {
                     return false
                 }
@@ -976,6 +983,22 @@ extension SettingsStore {
             paths.removeValue(forKey: model.rawValue)
         }
         self.defaults.set(paths, forKey: Keys.externalCoreMLArtifactsDirectories)
+    }
+
+    /// Moves a saved non-Apple Voice Engine onto Apple Speech while `appleSpeechOnly` is on.
+    /// Leaves Analyzer vs older Apple Speech as the user's pick.
+    func pinSpeechModelToAppleIfNeeded() {
+        guard SpeechModel.appleSpeechOnly else { return }
+        let current = self.selectedSpeechModel
+        if current.provider == .apple, SpeechModel.availableModels.contains(current) {
+            return
+        }
+        let target = SpeechModel.defaultModel
+        self.selectedSpeechModel = target
+        // The Apple locale may still be whatever it was before Whisper or
+        // Parakeet. Point it at I speak, or Theater starts out mismatched.
+        SpokenLanguageResolver.pinAppleSpeechToSpokenSource(settings: self)
+        DebugLogger.shared.info("Voice Engine pinned to Apple: \(current.rawValue) -> \(target.rawValue)", source: "SettingsStore")
     }
 
     /// Migrates old TranscriptionProviderOption + WhisperModelSize settings to new SpeechModel

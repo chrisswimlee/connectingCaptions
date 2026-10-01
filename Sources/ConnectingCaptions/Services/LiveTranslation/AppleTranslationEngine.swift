@@ -182,10 +182,18 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         @unknown default:
             resolved = .unknown
         }
-        if resolved == .installed || resolved == .unsupported {
-            self.packStatusByPair[key] = resolved
-        }
+        self.packStatusByPair[key] = resolved
         return resolved
+    }
+
+    /// Synchronous, cache-only read. Never queries `LanguageAvailability` and
+    /// never triggers a download — safe to call while building a menu.
+    func cachedPackAvailability(
+        source: TranslationLanguage,
+        target: TranslationLanguage
+    ) -> TranslationPackAvailability {
+        if source.id == target.id { return .installed }
+        return self.packStatusByPair[Self.packCacheKey(source: source, target: target)] ?? .unknown
     }
 
     /// Synchronous, cache-only read. Never queries `LanguageAvailability` and

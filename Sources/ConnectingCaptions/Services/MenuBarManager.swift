@@ -569,14 +569,6 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         preferencesItem.keyEquivalentModifierMask = [.command]
         menu.addItem(preferencesItem)
 
-        let customDictionaryItem = NSMenuItem(
-            title: "Custom Dictionary",
-            action: #selector(openCustomDictionary),
-            keyEquivalent: ""
-        )
-        customDictionaryItem.target = self
-        menu.addItem(customDictionaryItem)
-
         let microphoneSubmenu = NSMenu(title: "Microphone")
         let microphoneMenuItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
         microphoneMenuItem.submenu = microphoneSubmenu
@@ -970,10 +962,6 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
 
     @objc private func openPreferences() {
         self.openNavigationDestination(.settings)
-    }
-
-    @objc private func openCustomDictionary() {
-        self.openNavigationDestination(.customDictionary)
     }
 
     @objc private func openLiveTranslation() {

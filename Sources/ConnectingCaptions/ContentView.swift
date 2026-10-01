@@ -723,27 +723,16 @@ struct ContentView: View {
     }
 
     func navigateToApp(_ destination: SidebarItem) {
-        if destination == .aiEnhancements {
-            self.settingsAISection = .providers
-            self.openSettings(.aiProviders)
-            return
-        }
-        if destination == .cleanupStyles {
-            self.settingsAISection = .advancedPrompts
-            self.openSettings(.aiProviders)
-            return
-        }
-
         self.clearShortcutRecordingMode()
         self.resetSettingsSearch()
         self.settingsNavigation.leaveForApp()
-        self.selectedSidebarItem = destination
+        self.selectedSidebarItem = destination.advertisedDestination
     }
 
     func openSettings(_ section: SettingsSection) {
         self.clearShortcutRecordingMode()
         self.resetSettingsSearch()
-        self.settingsNavigation.present(section, returningTo: self.selectedSidebarItem)
+        self.settingsNavigation.present(section.advertisedDestination, returningTo: self.selectedSidebarItem)
     }
 
     func closeSettings() {

@@ -30,21 +30,16 @@ struct LiveTranslationHomeView: View {
                 }
                 if TheaterAvailability.isSupported {
                     self.stageCard
-                    if self.settings.theaterListenUsed {
-                        TheaterEngineCards(
-                            openVoiceEngine: self.openVoiceEngine,
-                            openTranslationEngine: self.openTranslationEngine,
-                            showsPurpose: false
-                        )
-                        if self.settings.theaterSessionMode.showsTranslation {
-                            TheaterTalkPackCard()
-                        }
+                    if self.settings.theaterListenUsed, self.settings.theaterSessionMode.showsTranslation {
+                        TheaterTalkPackCard()
                     }
                     if self.readySnapshot.needsAttention {
                         self.readinessCard
                     }
                 }
-                CommercialLicenseStatusCard(compact: true)
+                if self.settings.isCommerciallyLicensed || self.settings.commercialLicenseRecord != nil {
+                    CommercialLicenseStatusCard(compact: true)
+                }
             }
             .fluidPageContent()
             .onAppear {
@@ -68,7 +63,9 @@ struct LiveTranslationHomeView: View {
         ThemedCard(style: .prominent, hoverEffect: false) {
             VStack(alignment: .leading, spacing: 16) {
                 TheaterCaptionStackPreview(
-                    message: TheaterReadiness.boardIdle,
+                    message: self.settings.theaterListenUsed
+                        ? TheaterReadiness.boardAfterFirstCaption
+                        : TheaterReadiness.boardIdle,
                     lines: TheaterBoardPreview.current(
                         session: self.settings.theaterSessionMode,
                         spokenMode: self.settings.theaterSpokenLineMode
@@ -141,6 +138,17 @@ struct LiveTranslationHomeView: View {
                 )
                 .disabled(self.settings.theaterLinePrint == .atOnce)
                 .opacity(self.settings.theaterLinePrint == .atOnce ? 0.45 : 1)
+            }
+            TheaterSettingRow(
+                title: "Save transcript",
+                detail: TheaterReadiness.autoExportSession
+            ) {
+                Toggle("Save transcript", isOn: self.$settings.theaterAutoExportSession)
+                    .toggleStyle(.switch)
+                    .tint(self.theme.palette.accent)
+                    .labelsHidden()
+                    .accessibilityLabel("Save transcript")
+                    .accessibilityIdentifier("theater.home.autoExport")
             }
         }
     }
@@ -267,7 +275,6 @@ struct LiveTranslationSettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             self.theaterAppearanceCard
                 .settingsSearchTarget(.theaterAppearance)
-                .settingsSearchTarget(.setupWizard)
 
             TranslateListenShortcutCard(
                 recordListenShortcut: self.recordListenShortcut,
@@ -278,12 +285,12 @@ struct LiveTranslationSettingsView: View {
 
             ThemedCard(style: .standard, hoverEffect: false) {
                 VStack(alignment: .leading, spacing: 8) {
-                    FluidSectionHeader(title: TheaterEngineCopy.translationTitle, systemImage: "translate")
-                    Text(TheaterEngineCopy.translationPurpose)
+                    FluidSectionHeader(title: "Language packs", systemImage: "arrow.down.circle")
+                    Text("Apple Translation downloads a pack when I speak and Show as differ.")
                         .font(self.theme.typography.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    Text("Open Setup → Translation Engine to pick Apple Translation or try the experimental local LLM.")
+                    Text("Open Setup → Language packs to see what is installed and download the rest.")
                         .font(self.theme.typography.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -304,25 +311,6 @@ struct LiveTranslationSettingsView: View {
         ThemedCard(style: .standard, hoverEffect: false) {
             VStack(alignment: .leading, spacing: 14) {
                 FluidSectionHeader(title: "Theater Window", systemImage: "rectangle.on.rectangle")
-
-                HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(TheaterSetupWizard.title)
-                            .font(self.theme.typography.bodyStrong)
-                            .foregroundStyle(self.settingsTitleText)
-                        Text(TheaterSetupWizard.welcomeDetail)
-                            .font(self.theme.typography.bodySmall)
-                            .foregroundStyle(self.settingsSecondaryText)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Spacer()
-                    Button("Open") {
-                        self.settings.startSetupWizard()
-                    }
-                    .buttonStyle(.theaterText)
-                    .controlSize(.small)
-                    .accessibilityIdentifier("theater.settings.setupWizard")
-                }
 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -411,47 +399,6 @@ struct LiveTranslationSettingsView: View {
                         .labelsHidden()
                         .accessibilityLabel("Presenter shortcuts")
                         .accessibilityIdentifier("theater.settings.presenterHotkeys")
-                }
-
-                if self.settings.selectedSpeechModel.isWhisperModel {
-                    self.settingsToggleRow(
-                        title: "Also hear questions",
-                        description: TheaterReadiness.alsoHearOtherLanguages
-                    ) {
-                        Toggle(
-                            "Also hear questions",
-                            isOn: self.$settings.theaterAlsoHearOtherLanguages
-                        )
-                        .toggleStyle(.switch)
-                        .tint(self.theme.palette.accent)
-                        .labelsHidden()
-                        .accessibilityLabel("Also hear questions")
-                    }
-
-                    self.settingsToggleRow(
-                        title: "Either way",
-                        description: SpokenLanguageResolver.dynamicPairingControlCopy()
-                    ) {
-                        Toggle(
-                            "Either way",
-                            isOn: Binding(
-                                get: { SpokenLanguageResolver.isDynamicPairingEnabled() },
-                                set: { self.controller.applyDynamicPairing($0) }
-                            )
-                        )
-                        .toggleStyle(.switch)
-                        .tint(self.theme.palette.accent)
-                        .labelsHidden()
-                        .disabled(!SpokenLanguageResolver.dynamicPairingAvailable())
-                        .accessibilityLabel("Either way")
-                        .accessibilityIdentifier("theater.settings.eitherWay")
-                    }
-                } else if self.settings.theaterSessionMode.showsTranslation {
-                    Text(TheaterReadiness.dynamicPairingHint(isWhisper: false))
-                        .font(self.theme.typography.bodySmall)
-                        .foregroundStyle(self.settingsSecondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("theater.settings.eitherWayNeedsWhisper")
                 }
 
                 self.settingsToggleRow(

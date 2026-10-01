@@ -19,7 +19,7 @@ Ready starter tickets live in [.github/GOOD_FIRST_ISSUES.md](.github/GOOD_FIRST_
 
 Leave these FluidVoice-era files alone unless the accepted issue is about that engine or shell:
 
-- `ASRService.swift` and `ASRService+*.swift`
+- `ASRService.swift` and `ASRService+*.swift` — Theater may skip a pause-only decode and leave a quiet stretch out of a trailing-window tick. That lives in `PauseIntervalAudio` and is called from `ASRService+DevicesAndStreaming.swift`, `ASRService+Start.swift`, and `ASRService+Stop.swift`. Other ASR work still belongs upstream.
 - `ContentView.swift` (routing goes in `ContentView+*.swift`)
 - `MenuBarManager.swift`
 - `CustomDictionaryView.swift`
@@ -42,7 +42,7 @@ cp xcconfig/Local.xcconfig.example xcconfig/Local.xcconfig
 
 Launch `DerivedData/Build/Products/Debug/Connecting Captions Debug.app`. Keep using that product so macOS can keep Accessibility and Microphone. An unsigned or ad-hoc rebuild can drop those grants; allow **Connecting Captions Debug** again in System Settings → Privacy & Security.
 
-3. First run selects **Apple Speech** on this Mac (Analyzer on macOS 26, otherwise Apple Speech) and ends when a sentence appears. **Setup Wizard** opens only from the sidebar. Use **Parakeet Flash** only for faster English (Show other models). Do not start with Nemotron Thai.
+3. First run selects **Apple Speech Analyzer** on macOS 26, otherwise **Apple Speech**, and ends when a sentence appears. Setup is **Voice Engine** and **Language packs**.
 
 4. Allow the microphone. Pick **Voice** for the language you speak or **Translate** for captions. Press **Listen** and speak one sentence. A language pack downloads only when I speak and Show as differ. Theater Listen does not ask for Screen Recording.
 
@@ -72,8 +72,6 @@ xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions
   CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM=
 ```
 
-Optional experimental first-print sharpening uses a local MLX runner. Install Python 3.12 (`brew install python@3.12`), then set `FLUID_PYTHON` if it is not on `PATH`.
-
 ## Where to edit
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing Theater or the speech engine.
@@ -81,7 +79,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing Theater or the
 | Area | Path | Role |
 | --- | --- | --- |
 | Live translation | `Sources/ConnectingCaptions/Services/LiveTranslation/` | Clause split, Apple Translation, Theater archive, latency HUD, optional MLX |
-| Theater UI | `Sources/ConnectingCaptions/UI/LiveTranslation/` | Home, Theater window, presenter chrome, Setup Wizard |
+| Theater UI | `Sources/ConnectingCaptions/UI/LiveTranslation/` | Home, Theater window, presenter chrome |
 | Speech engine | `ASRService.swift` plus `ASRService+*.swift` | Microphone audio → transcript. Reads `SpeechCapturePolicy`. Keep this as the engine, not the product. |
 | Theater Listen | `ContentView+TheaterListen.swift`, `TheaterSpeechSession.swift` | Caption and insert start/stop. Do not start Theater as dictation. |
 | Dictation insert | `TypingService`, `GlobalHotkeyManager`, `QuickTranslateInsert` | Listen, then type uses the app captured at start and shows that line on a bar. Type the board uses the frontmost field. |

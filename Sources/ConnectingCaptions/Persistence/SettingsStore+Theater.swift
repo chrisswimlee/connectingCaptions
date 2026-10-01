@@ -21,6 +21,7 @@ extension SettingsStore {
         static let spokenLineMode = "TheaterSpokenLineMode"
         static let linePrint = "TheaterLinePrint"
         static let printGap = "TheaterPrintGap"
+        static let autoExportSession = "TheaterAutoExportSession"
         static let captionSpacing = "TheaterCaptionSpacing"
         static let lastTranslateTarget = "TheaterLastTranslateTargetLanguageID"
         static let backingBar = "TheaterBackingBar"
@@ -131,6 +132,15 @@ extension SettingsStore {
         set {
             objectWillChange.send()
             self.defaults.set(TheaterCaptionSpacing.resolved(newValue), forKey: TheaterDefaults.captionSpacing)
+        }
+    }
+
+    /// When a caption Listen stops, write Markdown and VTT. Off until turned on.
+    var theaterAutoExportSession: Bool {
+        get { self.defaults.bool(forKey: TheaterDefaults.autoExportSession) }
+        set {
+            objectWillChange.send()
+            self.defaults.set(newValue, forKey: TheaterDefaults.autoExportSession)
         }
     }
 

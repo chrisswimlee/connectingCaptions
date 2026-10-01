@@ -50,7 +50,7 @@ nonisolated enum ConnectingCaptionsProduct {
     static let licenseKeychainAccount = "connectingCaptionsCommercialLicense"
     static let workNoticeTitle = "For work"
     static let workNotice =
-        "Personal, student, and evaluation use is free. If IT or legal need a named license or an SLA, request a commercial license."
+        "Free for everyone under GPLv3, work use included. If IT or legal need a named license or an SLA, request a commercial license."
 
     static var commercialLicenseMailURL: URL {
         var components = URLComponents()

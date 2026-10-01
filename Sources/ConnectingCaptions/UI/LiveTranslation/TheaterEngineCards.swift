@@ -46,7 +46,7 @@ struct TheaterEngineCards: View {
                     accessibilityIdentifier: "theater.translationEngine"
                 ) {
                     if self.showsTranslationCustomize, let openTranslationEngine {
-                        Button(TheaterEngineCopy.translationTitle, action: openTranslationEngine)
+                        Button("Language packs", action: openTranslationEngine)
                             .buttonStyle(.theaterText)
                             .accessibilityIdentifier("theater.customizeTranslationEngine")
                     }

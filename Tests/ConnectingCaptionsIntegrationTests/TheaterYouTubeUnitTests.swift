@@ -243,4 +243,204 @@ final class TheaterYouTubeUnitTests: XCTestCase {
         )
         XCTAssertEqual(decision, .skip(.rejoinsPrinted))
     }
+
+    func testAndAlexaJoinsTheSiriLine() {
+        let row = "Many people don't realize AI already impacts us, powering many tools we use daily from search engines that predict what we're looking for to voice assistance like Siri."
+        let tail = "and Alexa, and even recommendations on Netflix."
+        let merged = TranslationClauseSegmenter.appendedContinuation(row: row, unit: tail)
+        let key = TranslationClauseSegmenter.normalizedKey(merged ?? "")
+        XCTAssertTrue(key.contains("like siri and alexa"), merged ?? "nil")
+        XCTAssertTrue(key.hasSuffix("recommendations on netflix"), merged ?? "nil")
+        XCTAssertNil(
+            TranslationClauseSegmenter.appendedContinuation(
+                row: row,
+                unit: "Then they're a new generative AI tools like chat GPT."
+            )
+        )
+    }
+
+    func testAShorterCopyOfAPrintedSentenceDoesNotPrintAgain() {
+        let printed = "Then they're a new generative AI tools like chat GPT, which expand the horizon of a true computer assistant, AI systems."
+        let shorter = "Then they're a new generative AI tools like chat GPT, which expand the horizon of a true computer assistant."
+        let onTheBoard = TheaterBoardAdmission.decide(
+            shorter,
+            languageID: "en",
+            phase: .propose,
+            context: TheaterBoardAdmission.Context(peelSources: [
+                "Many people don't realize AI already impacts us.",
+                printed,
+            ])
+        )
+        XCTAssertEqual(onTheBoard, .skip(.printedThisListen))
+
+        let scrolledOff = TheaterBoardAdmission.decide(
+            shorter,
+            languageID: "en",
+            phase: .propose,
+            context: TheaterBoardAdmission.Context(
+                peelSources: ["As AI evolves, ethical considerations grow, questions about privacy, autonomy and job displacement challenge us to use AI responsibly."],
+                commitIdentities: [TranslationClauseSegmenter.clauseIdentity(printed)]
+            )
+        )
+        XCTAssertEqual(scrolledOff, .skip(.printedThisListen))
+
+        let fresh = "Questions about privacy, autonomy and job displacement challenge us to use AI responsibly."
+        XCTAssertEqual(
+            TheaterBoardAdmission.decide(
+                fresh,
+                languageID: "en",
+                phase: .propose,
+                context: TheaterBoardAdmission.Context(commitIdentities: [TranslationClauseSegmenter.clauseIdentity(printed)])
+            ),
+            .admit
+        )
+    }
+
+    func testTheArticleReplacesTheSameEnglishLine() {
+        XCTAssertTrue(
+            TranslationClauseSegmenter.isLeadingArticleRevision(
+                previous: "Epstein files.",
+                incoming: "The Epstein Files.",
+                languageID: "en"
+            )
+        )
+        XCTAssertFalse(
+            TranslationClauseSegmenter.isLeadingArticleRevision(
+                previous: "Epstein files.",
+                incoming: "The Epstein files are out.",
+                languageID: "en"
+            )
+        )
+        XCTAssertFalse(
+            TranslationClauseSegmenter.isLeadingArticleRevision(
+                previous: "Epstein files.",
+                incoming: "The Epstein Files.",
+                languageID: "ko"
+            )
+        )
+    }
+
+    func testAnAbbreviationPeriodDoesNotEndTheEnglishSentence() {
+        let joined = TranslationClauseSegmenter.split(
+            "whose alleged crimes have implicated a web of high profile individuals across U.S. politics in Hollywood.",
+            languageID: "en"
+        )
+        XCTAssertEqual(joined.completed.count, 1, joined.completed.joined(separator: " | "))
+        XCTAssertTrue(
+            TranslationClauseSegmenter.normalizedKey(joined.completed[0]).contains("us politics in hollywood"),
+            joined.completed[0]
+        )
+
+        let tail = TranslationClauseSegmenter.abbreviationContinuation(
+            row: "individuals across U.S.",
+            unit: "politics in Hollywood."
+        )
+        XCTAssertTrue(
+            TranslationClauseSegmenter.normalizedKey(tail ?? "").contains("us politics"),
+            tail ?? "nil"
+        )
+
+        let otherHand = TranslationClauseSegmenter.split(
+            "We trained the model. on the other hand it failed.",
+            languageID: "en"
+        )
+        XCTAssertEqual(otherHand.completed.count, 2, otherHand.completed.joined(separator: " | "))
+    }
+
+    func testAShortNounPhraseTakesAnLyAdverb() {
+        let merged = TranslationClauseSegmenter.adverbialContinuation(
+            row: "The Epstein Files.",
+            unit: "Deeply shrouded in controversy and secrecy."
+        )
+        let key = TranslationClauseSegmenter.normalizedKey(merged ?? "")
+        XCTAssertTrue(key.contains("epstein files deeply shrouded"), merged ?? "nil")
+        XCTAssertNil(
+            TranslationClauseSegmenter.adverbialContinuation(
+                row: "The Epstein Files.",
+                unit: "Investigators found more documents."
+            )
+        )
+        XCTAssertNil(
+            TranslationClauseSegmenter.englishRowContinuation(
+                row: "The Epstein Files.",
+                unit: "Deeply shrouded in controversy and secrecy.",
+                languageID: "ko"
+            )
+        )
+    }
+
+    func testDespiteKeepsItsMainClauseInEnglishOnly() {
+        let joined = TranslationClauseSegmenter.split(
+            "Despite over 250 victims, and clear evidence of a large scale sex trafficking ring. The full extent of the criminal network remains obscured.",
+            languageID: "en"
+        )
+        XCTAssertEqual(joined.completed.count, 1, joined.completed.joined(separator: " | "))
+        XCTAssertTrue(
+            TranslationClauseSegmenter.normalizedKey(joined.completed[0]).contains("full extent"),
+            joined.completed[0]
+        )
+
+        let because = TranslationClauseSegmenter.split("Because I said so.", languageID: "en")
+        XCTAssertEqual(because.completed.count, 1, because.completed.joined(separator: " | "))
+
+        let then = TranslationClauseSegmenter.split(
+            "Because I said so. Then I came back.",
+            languageID: "en"
+        )
+        XCTAssertEqual(then.completed.count, 2, then.completed.joined(separator: " | "))
+
+        let korean = TranslationClauseSegmenter.split(
+            "Despite the rain. The match continued.",
+            languageID: "ko"
+        )
+        XCTAssertEqual(korean.completed.count, 2, korean.completed.joined(separator: " | "))
+
+        let koreanTalk = TranslationClauseSegmenter.split(
+            "모델을 학습했습니다. 그리고 적용했습니다.",
+            languageID: "ko"
+        )
+        XCTAssertEqual(koreanTalk.completed.count, 2, koreanTalk.completed.joined(separator: " | "))
+    }
+
+    func testABecauseLineWithItsMainClauseDoesNotTakeTheNextSentence() {
+        let split = TranslationClauseSegmenter.split(
+            "Because it rained all day, we stayed home. We played cards.",
+            languageID: "en"
+        )
+        XCTAssertEqual(split.completed.count, 2, split.completed.joined(separator: " | "))
+
+        XCTAssertNil(
+            TranslationClauseSegmenter.subordinateContinuation(
+                row: "Because the model was trained on far too much data, it overfits.",
+                unit: "We fixed that last week."
+            )
+        )
+        XCTAssertNotNil(
+            TranslationClauseSegmenter.subordinateContinuation(
+                row: "Despite over 250 victims, and clear evidence of a large scale ring.",
+                unit: "The full extent remains obscured."
+            )
+        )
+    }
+
+    func testAJoinedSentenceKeepsANameCapitalized() {
+        let split = TranslationClauseSegmenter.split(
+            "Despite the delay. Biden signed the bill.",
+            languageID: "en"
+        )
+        XCTAssertEqual(split.completed.count, 1, split.completed.joined(separator: " | "))
+        XCTAssertTrue(split.completed[0].contains("Biden"), split.completed[0])
+
+        let common = TranslationClauseSegmenter.split(
+            "Despite the delay. The files came out.",
+            languageID: "en"
+        )
+        XCTAssertTrue(common.completed.first?.contains(", the files") == true, common.completed.first ?? "nil")
+
+        let merged = TranslationClauseSegmenter.subordinateContinuation(
+            row: "Although the team worked through the whole weekend again.",
+            unit: "Apple still shipped it late."
+        )
+        XCTAssertTrue(merged?.contains(", Apple still") == true, merged ?? "nil")
+    }
 }

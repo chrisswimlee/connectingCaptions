@@ -141,35 +141,11 @@ extension OnboardingFlowView {
                             }
                             .frame(width: 320)
 
-                            Text("Translate follows I speak into Show as. Same language needs no download.")
+                            Text("Translate follows I speak into Show as. Same language needs no download. A different pair downloads its pack when you press Listen.")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(Color.primary.opacity(0.44))
+                                .multilineTextAlignment(.center)
                                 .padding(.top, 18)
-
-                            if SpokenLanguageResolver.sourceLanguage().id
-                                != SpokenLanguageResolver.targetLanguage().id
-                            {
-                                if self.languagePackIsInstalled {
-                                    Text("Language pack ready")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundStyle(Color.primary.opacity(0.56))
-                                        .padding(.top, 10)
-                                } else {
-                                    if !self.languagePackAvailability.isEmpty {
-                                        Text(self.languagePackAvailability)
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundStyle(Color.primary.opacity(0.56))
-                                            .padding(.top, 10)
-                                    }
-                                    Button("Download language pack") {
-                                        Task {
-                                            await self.refreshLanguagePackAvailability(requestDownload: true)
-                                        }
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .padding(.top, self.languagePackAvailability.isEmpty ? 10 : 6)
-                                }
-                            }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.top, 30)
@@ -372,7 +348,7 @@ extension OnboardingFlowView {
                             FluidOnboardingCompactAppIconMark(size: 66)
                                 .padding(.bottom, 22)
 
-                            Text("Choose your\nvoice engine")
+                            Text("Voice Engine\nis ready")
                                 .font(.system(size: 28, weight: .semibold))
                                 .foregroundStyle(Color.primary)
                                 .multilineTextAlignment(.center)
@@ -467,7 +443,7 @@ extension OnboardingFlowView {
                                     .padding(.top, 14)
                             }
 
-                            Text("You can switch models later in Voice Engine settings.")
+                            Text("Voice Engine can switch the newer or older Apple Speech later.")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(Color.primary.opacity(0.44))
                                 .padding(.top, self.isModelPreparationInProgress ? 8 : 18)
@@ -531,7 +507,7 @@ extension OnboardingFlowView {
                                 .lineSpacing(4)
                                 .padding(.bottom, 16)
 
-                            Text("Microphone is required. Accessibility is only if you want a translation typed into another app.")
+                            Text("macOS will ask once. Theater captions need the microphone.")
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(Color.primary.opacity(0.62))
                                 .padding(.bottom, 28)
@@ -558,31 +534,6 @@ extension OnboardingFlowView {
                                         onSelect: { self.selectOnboardingMicrophone(uid: $0) }
                                     )
                                     .transition(.opacity.combined(with: .move(edge: .top)))
-                                }
-
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text("Optional — type into another app")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(Color.primary.opacity(0.42))
-
-                                    self.permissionRow(
-                                        stepNumber: 2,
-                                        title: self.accessibilityPermissionTitle,
-                                        subtitle: self.accessibilityPermissionSubtitle,
-                                        systemImage: "keyboard.fill",
-                                        isReady: self.isAccessibilityReady,
-                                        statusTitle: self.accessibilityPermissionStatusTitle,
-                                        actionTitle: self.accessibilityPermissionActionTitle
-                                    ) {
-                                        self.openAccessibilitySettings()
-                                    }
-
-                                    if !self.isAccessibilityReady {
-                                        Text("Skip this unless you want a translation typed into another app. Theater captions do not need it.")
-                                            .font(.system(size: 12, weight: .medium))
-                                            .foregroundStyle(Color.primary.opacity(0.42))
-                                            .padding(.top, 2)
-                                    }
                                 }
                             }
                             .frame(width: 560)
@@ -761,7 +712,8 @@ extension OnboardingFlowView {
             }
         }
         .task {
-            await self.refreshLanguagePackAvailability()
+            let differs = !SpokenLanguageResolver.isSameLanguagePair()
+            await self.refreshLanguagePackAvailability(requestDownload: differs)
         }
         .onChange(of: self.settings.translationSourceLanguageID) { _, _ in
             Task { await self.refreshLanguagePackAvailability() }

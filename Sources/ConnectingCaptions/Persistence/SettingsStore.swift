@@ -68,6 +68,8 @@ final class SettingsStore: ObservableObject {
         self.migrateCaptionAccentIfNeeded()
         self.migrateOverlayBottomOffsetTo50IfNeeded()
         self.migratePrivateAIContextDefaultTo4KIfNeeded()
+        self.pinSpeechModelToAppleIfNeeded()
+        self.pinTranslationEngineToAppleIfNeeded()
         self.refreshLaunchAtStartupStatus(clearError: true, logMismatch: false)
     }
 

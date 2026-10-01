@@ -326,7 +326,7 @@ final class LiveTranslationLatencyTests: XCTestCase {
         trace.utteranceEnds = 1
         XCTAssertEqual(
             trace.endLine(outcome: "finished chars=40", now: 12.5, lines: 3),
-            "session finished chars=40 kind=captions token=4 elapsedMs=2500 partials=12 silenceHolds=2 utteranceEnds=1 lines=3"
+            "session finished chars=40 kind=captions token=4 elapsedMs=2500 partials=12 silenceHolds=2 pauseSkips=0 utteranceEnds=1 lines=3"
         )
         XCTAssertFalse(trace.endLine(outcome: "abandoned", now: 11, lines: 0).contains("hello"))
         XCTAssertEqual(LiveTranslationTrace.packLabel(.supported), "supported")

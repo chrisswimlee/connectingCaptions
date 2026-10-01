@@ -676,13 +676,11 @@ struct PresenterCaptionView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 VStack(alignment: .leading, spacing: 1) {
-                    ForEach(Array(self.visibleInboxLines.enumerated()), id: \.offset) { _, line in
-                        Text(line)
-                            .font(.system(size: 10, weight: .regular))
-                            .foregroundStyle(self.captionColors.chrome.opacity(0.78))
-                            .lineLimit(1)
-                            .truncationMode(.head)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    ForEach(Array(self.visibleInboxLines.enumerated()), id: \.offset) { index, line in
+                        self.inboxLine(
+                            line,
+                            isOpen: self.model.inboxOpenTail && index == self.visibleInboxLines.count - 1
+                        )
                     }
                 }
             }
@@ -704,6 +702,22 @@ struct PresenterCaptionView: View {
         .accessibilityValue(self.model.inboxLines.joined(separator: " "))
         .accessibilityIdentifier("theater.inbox")
         .theaterTag(TheaterChromeHelp.inbox)
+    }
+
+    /// The open tail is dimmer than a finished sentence waiting its turn.
+    /// The ellipsis is chrome and is not part of the speech string.
+    private func inboxLine(_ line: String, isOpen: Bool) -> some View {
+        HStack(spacing: 3) {
+            Text(line)
+                .font(.system(size: 10, weight: .regular))
+                .foregroundStyle(self.captionColors.chrome.opacity(isOpen ? 0.48 : 0.78))
+                .lineLimit(1)
+                .truncationMode(.head)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if isOpen {
+                TheaterInboxOpenMark(color: self.captionColors.chrome.opacity(0.48))
+            }
+        }
     }
 
     private var showsFlowChoices: Bool {
@@ -1490,7 +1504,7 @@ struct PresenterCaptionView: View {
                 // While the area under the buttons has room, new text grows
                 // downward and lines already printed stay put. Once the area
                 // is full, the newest line stays at the bottom and older lines
-                // slide up.
+                // slide up. That slide eases unless Reduce Motion is on.
                 // The opening spacer is a real scroll target. Scrolling the
                 // line itself to the top tucked its first glyphs under the clip.
                 .defaultScrollAnchor((pinsToBottom && !showOpening) ? .bottom : .top, for: .sizeChanges)
@@ -1523,7 +1537,7 @@ struct PresenterCaptionView: View {
                         layouts: layouts,
                         viewportHeight: geometry.size.height,
                         boardHeight: boardHeight,
-                        animated: false
+                        animated: self.easesFullBoardSlide
                     )
                 }
                 .onChange(of: geometry.size.height) { oldHeight, newHeight in
@@ -1547,7 +1561,7 @@ struct PresenterCaptionView: View {
                         layouts: layouts,
                         viewportHeight: geometry.size.height,
                         boardHeight: newHeight,
-                        animated: false
+                        animated: self.easesFullBoardSlide
                     )
                 }
                 .onAppear {
@@ -1566,6 +1580,12 @@ struct PresenterCaptionView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// New lines ease when the board is full. First appearance and a window
+    /// resize stay instant, and Reduce Motion keeps every scroll instant.
+    private var easesFullBoardSlide: Bool {
+        !self.reduceMotion
     }
 
     private func scrollLiveCaption(
@@ -1698,6 +1718,28 @@ struct PresenterCaptionView: View {
 
     private var insertIsEmpty: Bool {
         !self.controller.subscriber.hasPendingInsertText
+    }
+}
+
+/// Trailing mark for an open task-bar line. Reduce Motion keeps it still.
+private struct TheaterInboxOpenMark: View {
+    var color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 0.55, paused: self.reduceMotion)) { context in
+            Text("…")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(self.color)
+                .opacity(self.markOpacity(at: context.date))
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func markOpacity(at date: Date) -> Double {
+        if self.reduceMotion { return 0.85 }
+        let tick = Int(date.timeIntervalSinceReferenceDate / 0.55)
+        return tick.isMultiple(of: 2) ? 0.9 : 0.28
     }
 }
 

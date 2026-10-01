@@ -236,6 +236,39 @@ extension ASRService {
             self.benchmarkLog("silence_gate eligible=false skip=false reason=streaming_preview")
         }
 
+        // Theater's fuller pass. A trailing-window engine must not see the
+        // pause, and the pad below must borrow room tone instead of zeros.
+        // Streaming engines keep the raw buffer so their sample cursor matches.
+        if theaterListen, self.transcriptionProvider.streamingPreviewMode == .trailingWindow {
+            let prepared = PauseIntervalAudio.preparingForDecode(
+                pcm,
+                floorRMS: self.audioCapturePipeline.speechFloorRMS(),
+                minimumSamples: 16_000
+            )
+            if prepared.isPauseOnly {
+                let preview = ASRService.textForTheaterListen(
+                    committedPreviewText.isEmpty ? self.partialTranscription : committedPreviewText
+                ).trimmingCharacters(in: .whitespacesAndNewlines)
+                if preview.isEmpty {
+                    self.abortStreamingWavWriter()
+                    DebugLogger.shared.info(
+                        "Final ASR result | provider=\(self.transcriptionProvider.name) | samples=\(pcm.count) | textChars=0 | confidence=nil | reason=pause",
+                        source: "ASRService"
+                    )
+                    if shouldResumeMedia {
+                        await MediaPlaybackService.shared.resumeIfWePaused(true)
+                        DebugLogger.shared.info("🎵 Resumed system media after a pause", source: "ASRService")
+                    }
+                    self.benchmarkLog(
+                        "stop_end result=empty totalMs=\(self.elapsedMilliseconds(since: stopStartedAt)) reason=pause"
+                    )
+                    return ""
+                }
+            } else {
+                pcm = prepared.samples
+            }
+        }
+
         // Pad sub-1s buffers with trailing silence so short utterances (e.g.
         // "yes", "stop") still transcribe. whisper.cpp asserts on buffers
         // shorter than 1s; every other provider handles silence padding

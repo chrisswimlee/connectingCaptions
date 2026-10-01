@@ -117,6 +117,10 @@ final class TheaterSpeechSession: SpeechCapturePolicy {
         LiveTranslationController.shared.markSilenceHold()
     }
 
+    func markPauseSkip() {
+        LiveTranslationController.shared.markPauseSkip()
+    }
+
     func handleEndOfUtterance() {
         LiveTranslationController.shared.handleEndOfUtterance()
     }

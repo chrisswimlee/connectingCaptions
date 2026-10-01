@@ -45,11 +45,15 @@ nonisolated enum TranslationClauseSegmenter {
     }
 
     static func split(_ text: String, languageID: String) -> Split {
-        let trimmed = self.joinOpenIfClause(
+        var prepared = self.joinOpenIfClause(
             self.absorbUnfinishedEllipsis(
                 text.trimmingCharacters(in: .whitespacesAndNewlines)
             )
         )
+        if self.languageCode(from: languageID) == "en" {
+            prepared = self.joinDanglingSubordinator(prepared)
+        }
+        let trimmed = prepared
         guard !trimmed.isEmpty else { return Split(completed: [], tail: "") }
 
         var completed: [String] = []
@@ -188,8 +192,9 @@ nonisolated enum TranslationClauseSegmenter {
         case "th":
             return self.hasEnding(trimmed, endings: Self.thaiInternalEndings)
         case "ja":
-            return self.hasJapanesePredicateEnding(trimmed)
-                || self.hasEnding(trimmed, endings: Self.japaneseConnectiveEndings)
+            // Short から / ので tags stay in the tail. A long connective
+            // already counts as complete via isCaptionReadyConnective.
+            return false
         default:
             return false
         }
@@ -526,6 +531,81 @@ nonisolated enum TranslationClauseSegmenter {
         return output
     }
 
+    /// "Despite the delay. The files came out." is still one sentence when
+    /// more speech follows the period. "Because I said so." with nothing
+    /// after it stays its own line. Then / Next still open the next one.
+    /// Korean, Japanese, and Thai do not use these English words.
+    fileprivate static let danglingSubordinators: Set<String> = [
+        "although", "because", "despite", "unless", "whereas", "whether",
+    ]
+
+    fileprivate static func joinDanglingSubordinator(_ text: String) -> String {
+        var output = ""
+        var clause = ""
+        var joinedMainClause = false
+        var index = text.startIndex
+        while index < text.endIndex {
+            if text[index] == ".",
+               !joinedMainClause,
+               !self.periodContinuesAbbreviation(in: text, at: index),
+               !self.isDecimalPoint(in: text, at: index),
+               !self.isPartOfEllipsis(in: text, at: index),
+               self.clauseStartsWithDanglingSubordinator(clause),
+               !self.subordinateClauseHasMainClause(clause),
+               let continued = self.subordinatorContinuation(in: text, after: index)
+            {
+                let lowered = self.lowercasedJoinedWord(continued.text)
+                output.append(", ")
+                output += lowered
+                clause.append(", ")
+                clause += lowered
+                joinedMainClause = true
+                index = continued.next
+                continue
+            }
+            let character = text[index]
+            output.append(character)
+            if self.endsKeptClause(in: text, at: index),
+               !self.periodContinuesAbbreviation(in: text, at: index)
+            {
+                clause = ""
+                joinedMainClause = false
+            } else {
+                clause.append(character)
+            }
+            index = text.index(after: index)
+        }
+        return output
+    }
+
+    /// The dot in "U.S" is still that abbreviation. The dot after "U.S." is not.
+    fileprivate static func periodContinuesAbbreviation(in text: String, at index: String.Index) -> Bool {
+        guard text[index] == "." else { return false }
+        let next = text.index(after: index)
+        guard next < text.endIndex else { return false }
+        return text[next].isLetter
+    }
+
+    static func clauseStartsWithDanglingSubordinator(_ clause: String) -> Bool {
+        guard let first = self.tokens(clause).first else { return false }
+        return Self.danglingSubordinators.contains(self.tokenKey(first))
+    }
+
+    fileprivate static func subordinatorContinuation(
+        in text: String,
+        after period: String.Index
+    ) -> (text: String, next: String.Index)? {
+        let next = text.index(after: period)
+        guard next < text.endIndex else { return nil }
+        let word = self.firstWord(in: text, from: next)
+        guard !word.text.isEmpty else { return nil }
+        let key = self.tokenKey(word.text)
+        if Self.englishSentenceStarters.contains(key) || Self.englishSoftSentenceStarters.contains(key) {
+            return nil
+        }
+        return (word.text, word.next)
+    }
+
     fileprivate static func ellipsisEnd(in text: String, at index: String.Index) -> String.Index? {
         if text[index] == "…" {
             return text.index(after: index)
@@ -552,7 +632,7 @@ nonisolated enum TranslationClauseSegmenter {
     }
 
     /// A capital after an open ellipsis is the window restarting, not a name.
-    fileprivate static func lowercasedContinuation(_ word: String) -> String {
+    static func lowercasedContinuation(_ word: String) -> String {
         guard word.count > 1, let first = word.first, first.isUppercase else { return word }
         let rest = word.dropFirst()
         guard rest.allSatisfy(\.isLowercase) else { return word }
@@ -746,6 +826,30 @@ nonisolated enum TranslationClauseSegmenter {
         guard !unitKeys.isEmpty, endsWithUnit || self.contains(merged, clause: unit) else {
             return nil
         }
+        return merged
+    }
+
+    /// "…like Siri." then "and Alexa, and even recommendations on Netflix."
+    /// The window has already dropped the opening, so there is nothing to
+    /// overlap. and / but / or / so still belong on that line. Then / Next
+    /// open the next one.
+    static func appendedContinuation(row: String, unit: String) -> String? {
+        let row = row.trimmingCharacters(in: .whitespacesAndNewlines)
+        let unit = unit.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard self.startsContinuation(unit) else { return nil }
+        guard let first = self.tokens(unit).first else { return nil }
+        let key = self.tokenKey(first)
+        guard Self.englishConnectives.contains(key),
+              !Self.englishSoftSentenceStarters.contains(key)
+        else { return nil }
+        let rowWords = self.tokens(row).map(self.tokenKey).filter { !$0.isEmpty }
+        guard rowWords.count >= 4 else { return nil }
+        if self.wordsAlreadyPrinted(unit, in: row) { return nil }
+        let stem = self.stripTerminalPunctuation(row)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !stem.isEmpty else { return nil }
+        let merged = stem + " " + unit
+        guard !self.isSameClause(merged, row) else { return nil }
         return merged
     }
 
@@ -1493,6 +1597,7 @@ extension TranslationClauseSegmenter {
 
     fileprivate static let japaneseEndings: [String] = [
         "ました", "ましたか", "です", "でした", "ません", "ます", "でしょうか",
+        "ですか", "ますか", "ですよ", "ますよ", "でしたか", "ませんか",
     ]
 
     fileprivate static let japaneseConnectiveEndings: [String] = [
@@ -1511,7 +1616,7 @@ extension TranslationClauseSegmenter {
 
     fileprivate static let shortThaiEndings: Set<String> = ["นะ", "สิ"]
 
-    fileprivate static func isBoundary(in text: String, at index: String.Index, languageID _: String) -> Bool {
+    fileprivate static func isBoundary(in text: String, at index: String.Index, languageID: String) -> Bool {
         let character = text[index]
         let next = text.index(after: index)
         let atEnd = next == text.endIndex
@@ -1527,6 +1632,13 @@ extension TranslationClauseSegmenter {
             if self.isPartOfTrailingOpenEllipsis(in: text, at: index) {
                 return false
             }
+            if character == ".",
+               self.languageCode(from: languageID) == "en",
+               self.isEnglishAbbreviationPeriod(in: text, at: index),
+               self.firstWord(in: text, from: next).text.first?.isLowercase == true
+            {
+                return false
+            }
             if atEnd || followedBySpace || self.isTerminal(text[next]) {
                 return true
             }
@@ -1536,11 +1648,34 @@ extension TranslationClauseSegmenter {
         return false
     }
 
+    /// "U.S." and "Mr." keep their period. The bare word "us." does not.
+    fileprivate static func isEnglishAbbreviationPeriod(in text: String, at index: String.Index) -> Bool {
+        guard text[index] == "." else { return false }
+        var start = index
+        while start > text.startIndex {
+            let previous = text.index(before: start)
+            if text[previous].isWhitespace { break }
+            start = previous
+        }
+        return self.isEnglishAbbreviationToken(String(text[start...index]))
+    }
+
+    static func isEnglishAbbreviationToken(_ token: String) -> Bool {
+        let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasSuffix(".") else { return false }
+        let body = String(trimmed.dropLast())
+        let letters = body.lowercased().filter(\.isLetter)
+        if letters == "us" || letters == "usa" || letters == "uk" {
+            return body.contains(".")
+        }
+        return ["mr", "mrs", "ms", "dr", "st", "jr", "sr"].contains(letters)
+    }
+
     /// ASR often restitches "Hello.Then we" with no space after the period.
     /// Treat that as a sentence break so leftover cannot dump as one line.
     /// "and" / "but" / "so" stay in the sentence. A capital And is still this
     /// caption; only a real period, or Then / Next, opens the next line.
-    fileprivate static let englishSentenceStarters: Set<String> = [
+    static let englishSentenceStarters: Set<String> = [
         "then", "now", "next", "also", "after",
         "later", "still", "however", "therefore", "meanwhile", "finally",
         "first", "second", "plus", "afterward", "afterwards",
@@ -1548,7 +1683,7 @@ extension TranslationClauseSegmenter {
 
     /// Analyzer often starts the next sentence in lowercase. Only `then` /
     /// `next` — lowercase `and` / `but` / `so` are still this caption.
-    fileprivate static let englishSoftSentenceStarters: Set<String> = [
+    static let englishSoftSentenceStarters: Set<String> = [
         "then", "next",
     ]
 
@@ -1561,7 +1696,7 @@ extension TranslationClauseSegmenter {
         "그걸", "그것을", "그게", "그건", "이제", "이번에는",
     ]
 
-    fileprivate static let japaneseSentenceStarters: [String] = [
+    static let japaneseSentenceStarters: [String] = [
         "そして", "それから", "次に", "また",
     ]
 
@@ -1625,7 +1760,11 @@ extension TranslationClauseSegmenter {
                 let rest = String(folded[range.lowerBound...])
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 let unitLetters = self.stripped(unit).filter { !$0.isWhitespace }
-                let isFinished = self.looksComplete(unit, languageID: languageID) || unitLetters.count >= 16
+                // また is also the adverb "again". A 16-letter cut there
+                // prints half a Japanese sentence, then prints it again.
+                let isFinished = self.languageCode(from: languageID) == "ja"
+                    ? self.looksComplete(unit, languageID: languageID)
+                    : self.looksComplete(unit, languageID: languageID) || unitLetters.count >= 16
                 if isFinished,
                    !self.isTooThinToCommit(unit, languageID: languageID),
                    !rest.isEmpty
@@ -1685,10 +1824,7 @@ extension TranslationClauseSegmenter {
     }
 
     fileprivate static func hasJapanesePredicateEnding(_ text: String) -> Bool {
-        if let last = text.last, last == "か" || last == "だ" || last == "よ" {
-            return true
-        }
-        return self.hasEnding(text, endings: Self.japaneseEndings)
+        self.hasEnding(text, endings: Self.japaneseEndings)
     }
 
     fileprivate static func hasEnding(_ text: String, endings: [String]) -> Bool {
@@ -1806,8 +1942,7 @@ extension TranslationClauseSegmenter {
             // not close the clause when a preposition or conjunction follows.
             return !Self.thaiRemainderContinuesClause(rest)
         case "ja":
-            let first = String(rest.prefix(1))
-            return !["か", "よ", "ね", "が"].contains(first)
+            return !self.japaneseRemainderContinuesClause(rest)
         default:
             return true
         }
@@ -2490,13 +2625,22 @@ extension TranslationClauseSegmenter {
     /// Speech after a period starts another sentence when it opens like one.
     /// A lowercase continuation ("on the other hand") stays on this line.
     /// "and" / "but" / "so" stay on this line too. "Then" / "Next" open the next one.
+    /// Other listen languages do not mark the next sentence with an English capital.
     static func continuesAsNewSentence(_ rest: String, languageID: String) -> Bool {
         let rest = rest.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !rest.isEmpty else { return false }
-        if self.isCompactScript(languageID) { return true }
+        if self.isCompactScript(languageID) {
+            if self.languageCode(from: languageID) == "ja" {
+                return !self.japaneseRemainderContinuesClause(rest)
+            }
+            return true
+        }
         let words = self.tokens(rest)
         guard words.count >= 2, let first = words.first else { return false }
         let key = self.tokenKey(first)
+        if self.languageCode(from: languageID) != "en" {
+            return !Self.englishConnectives.contains(key)
+        }
         if Self.englishSoftSentenceStarters.contains(key) { return true }
         if Self.englishConnectives.contains(key) { return false }
         if first.first?.isUppercase == true { return true }
@@ -2553,14 +2697,14 @@ extension TranslationClauseSegmenter {
         return (textTokens[index...].joined(separator: " "), consumed)
     }
 
-    fileprivate static let thinEnglishStarters: Set<String> = [
+    static let thinEnglishStarters: Set<String> = [
         "a", "an", "and", "as", "at", "because", "but", "for", "from", "he",
         "here", "i", "if", "in", "it", "its", "just", "like", "my", "now",
         "of", "on", "or", "our", "she", "so", "the", "then", "there", "they",
         "this", "that", "to", "uh", "um", "we", "well", "when", "with", "your",
     ]
 
-    fileprivate static let thinEnglishAuxiliaries: Set<String> = [
+    static let thinEnglishAuxiliaries: Set<String> = [
         "am", "are", "be", "been", "being", "can", "could", "did", "do", "does",
         "had", "has", "have", "is", "shall", "should", "was", "were", "will", "would",
     ]
@@ -2623,11 +2767,11 @@ extension TranslationClauseSegmenter {
     fileprivate static let tokenTrimSet = CharacterSet.punctuationCharacters
         .union(.whitespacesAndNewlines)
 
-    fileprivate static func tokens(_ text: String) -> [String] {
+    static func tokens(_ text: String) -> [String] {
         text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
     }
 
-    fileprivate static func tokenKey(_ token: String) -> String {
+    static func tokenKey(_ token: String) -> String {
         token.lowercased().trimmingCharacters(in: Self.tokenTrimSet)
     }
 

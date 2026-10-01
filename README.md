@@ -18,14 +18,14 @@ By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
 [Download](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://chrisswimlee.com/connectingCaptions/license/)
 
-**For work:** if IT or legal need a named commercial license or an SLA, [request one](https://chrisswimlee.com/connectingCaptions/license/). Personal and evaluation use stays free.
+**For work:** if IT or legal need a named commercial license or an SLA, [request one](https://chrisswimlee.com/connectingCaptions/license/). The app stays free for everyone, work use included.
 
 ---
 
 ## Theater captions
 
 1. Use **macOS 15** or later on Apple Silicon. First run uses Apple Speech (Analyzer on macOS 26). Same-language captions need no translation pack.
-2. First run is Welcome, your languages, one Voice Engine, the microphone, then **Listen**. It ends when a sentence appears. **Setup Wizard** stays in the sidebar until you open it. **Spoken line** is Off or On the board. On the board prints the original under Show-as when the sentence is ready. Line print defaults to at once. **Voice Engine** and **Translation Engine** are Setup tabs. Voice Engine sharpens speech into text. Translation Engine is Apple Translation on this Mac (not a chat model). An experimental local LLM can sharpen the first print. A language pack downloads only when I speak and Show as differ.
+2. First run is Welcome, your languages, the microphone, then **Listen**. It ends when a sentence appears. **Spoken line** is Off or On the board. On the board prints the original under Show-as when the sentence is ready. Line print defaults to at once. **Voice Engine** and **Language packs** are Setup tabs. Voice Engine is Apple Speech on this Mac. Translation Engine is Apple Translation (not a chat model). A language pack downloads only when I speak and Show as differ.
 3. Allow the microphone. **Listen** stays off until Voice Engine and (for Translate) the pack are green.
 4. Optional: import notes or a deck on Theater Home for this talk. Names stay on this Mac. Speak one sentence. **Listen, then type** unlocks after that first caption. **Type the board** types captions already printed. **Copy** always takes everything on screen. **Clear** wipes the board. Talk notes stay. Listen can keep going.
 
@@ -50,31 +50,25 @@ The systems write-up is [docs/APPLE_SILICON_STREAMING.md](docs/APPLE_SILICON_STR
 
 ## Features
 
-- **Languages** — I speak and Show as are the setup list. Translate follows I speak into Show as. The same language needs no pack. Apple Speech hears that list. Other engines hear a subset: Parakeet Flash is English, and the Voice Engine card says what each model hears.
+- **Languages** — I speak and Show as are the setup list. Translate follows I speak into Show as. The same language needs no pack. Apple Speech hears that list.
 - **Theater captions** — a floating window you turn on and close. Use **Pop-up** for a solid board or **Overlay** so only caption text sits on slides. Change Overlay font, size, and plate from the menu-bar Theater menu. On-screen `mic · e2e · ASR · MT` clock. Screenshots and a whole-screen Zoom or Meet share include Theater. Share the slides window when remote viewers should not see captions. Pause holds capture and drops a leftover; Resume does not bring that leftover back. Minimize hides Theater; Listen stays. Clear wipes the board. Talk notes stay. Lines past the latest 48 leave the board. Translate shows Behind or Caught up so you do not outrun the caption. A sentence appears once when it is accepted. The board is not a text field.
-- **Voice / Translate** — Voice Engine sharpens speech into text. Translate uses Apple Translation on this Mac for the pair you set. A Setup tab can add an experimental local LLM for first-print sharpening. Press the mode control to switch. Both use the microphone.
+- **Voice / Translate** — Voice Engine is Apple Speech. Translate uses Apple Translation on this Mac for the pair you set. Press the mode control to switch. Both use the microphone.
 - **Translate into an app** — a separate shortcut from dictation; types this listen’s translation into the app you clicked, including a trailing fragment. Korean, Japanese, and Thai depend on that app’s input method. Accessibility is required.
 - **On-device translation** — Apple Translation language packs, processed locally
-- **Multiple speech models** — Nemotron, Parakeet, Cohere, Apple Speech, and Whisper
-- **Local-first** — voice and text stay on your Mac unless you opt in to a cloud AI provider
+- **Apple Speech** — Analyzer on macOS 26, otherwise the older Apple Speech. No download.
+- **Local-first** — voice and text stay on your Mac. Theater does not send captions to a cloud API.
 - **Menu bar access** — start, stop, and open settings from the menu bar
 
 ---
 
 ## Supported Models
 
-I speak and Show as are the setup list: every language both Apple Translation and a Voice Engine can use. Apple Speech hears that list with no download. Other engines hear a subset, and the card says which. Upstream weights may include more languages; this app does not expose those.
+I speak and Show as are the setup list: every language both Apple Translation and Apple Speech can use. No Voice Engine download.
 
 | Model | Best for | Hears here | Download size | Hardware |
 | --- | --- | --- | --- | --- |
-| Nemotron Speech 3.5 — Ultra Fast Low Latency | Streaming Korean, English, Thai, or Japanese | Korean, English, Thai, Japanese (Thai experimental) | ~670 MB | Apple Silicon |
-| Nemotron 3.5 Multilingual | Higher-accuracy Korean, English, Thai, or Japanese | Korean, English, Thai, Japanese (Thai experimental) | ~530 MB | Apple Silicon |
-| [Parakeet Flash (Beta)](https://huggingface.co/nvidia/parakeet_realtime_eou_120m-v1) | Lowest-latency live English. Korean, Japanese, and Thai Listen need another Voice Engine. | English | ~250 MB | Apple Silicon |
-| Parakeet TDT v3 | Fast English. Korean, Japanese, and Thai Listen need another Voice Engine. | English | ~500 MB | Apple Silicon |
-| Parakeet TDT v2 | Fastest English-only | English | ~500 MB | Apple Silicon |
-| Cohere Transcribe | High-accuracy English, Korean, and Japanese | English, Korean, Japanese | ~1.4 GB | Apple Silicon |
-| Apple Speech | Zero-download native macOS speech | Setup languages | Built-in | Apple Silicon + Intel |
-| Whisper Tiny / Base / Small / Medium / Large | Broad compatibility, including Intel Macs | Setup languages | ~75 MB to ~2.9 GB | Apple Silicon + Intel |
+| Apple Speech Analyzer | Newer on-device speech on macOS 26 | Speech Analyzer languages on this Mac | Built-in | Apple Silicon + Intel |
+| Apple Speech | The recognizer macOS has included for years | Setup languages | Built-in | Apple Silicon + Intel |
 
 ---
 
@@ -94,7 +88,7 @@ brew install --cask connectingcaptions
 
 **Build from source (Xcode).** Permissions stay across rebuilds. See [Building from Source](#building-from-source).
 
-The app is unsandboxed (Hardened Runtime on). Theater needs microphone access. Insert-into-another-app needs Accessibility. Voice models and Apple Translation packs download on first use; they are not inside the zip.
+The app is unsandboxed (Hardened Runtime on). Theater needs microphone access. Insert-into-another-app needs Accessibility. Apple Translation packs download on first use when I speak and Show as differ; they are not inside the zip.
 
 Maintainers: push a tag like `preview-1.6.12-1` (`git tag preview-1.6.12-1 && git push origin preview-1.6.12-1`) and the Preview workflow publishes that commit as a pre-release (`./build.sh preview`). A signed release needs a Developer ID: `./build.sh release` with `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD`, then a `v*` tag such as `v1.6.12` runs `.github/workflows/release.yml`. Hosted CI cannot prove a live Theater listen.
 
@@ -103,8 +97,8 @@ Maintainers: push a tag like `preview-1.6.12-1` (`git tag preview-1.6.12-1 && gi
 ## Requirements
 
 - macOS 15.0 (Sequoia) or later. Theater Listen, Voice, Translate, and language swap work on 15. Apple Speech Analyzer needs macOS 26.
-- Apple Silicon Mac for Theater streaming (Parakeet, Nemotron, Cohere). Whisper and Apple Speech can run on Intel for dictation; that is not the Theater path
-- ~1 GB disk space for a voice model
+- Apple Silicon Mac for Theater. Apple Speech also runs on Intel, but that is not the Theater path
+- Disk space for an Apple Translation pack when I speak and Show as differ
 - Microphone access for Theater and dictation
 - Accessibility permissions if you want a translation typed into other apps
 - Download the Apple Translation pack once before a cross-language Listen. Same-language captions do not need a pack.
@@ -187,7 +181,7 @@ This release does not send analytics, feedback, or update checks to a third-part
 
 ## Commercial license
 
-Personal, student, and evaluation use is free under GPLv3. Theater Listen stays unlocked.
+connectingCaptions is free for everyone under GPLv3, work use included. Theater Listen stays unlocked. A commercial license is optional.
 
 Firms that need a vendor they can sanction — a named license, a security contact, or a written SLA — request a commercial license:
 

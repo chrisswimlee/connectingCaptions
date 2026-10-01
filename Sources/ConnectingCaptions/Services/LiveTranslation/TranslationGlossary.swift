@@ -324,7 +324,7 @@ enum SpokenLanguageResolver {
         case .whisperTiny, .whisperBase, .whisperSmall, .whisperMedium, .whisperLargeTurbo, .whisperLarge:
             return "whisper:\(settings.selectedWhisperLanguageCode ?? "auto")"
         case .appleSpeech, .appleSpeechAnalyzer:
-            return "apple:\(settings.selectedAppleSpeechLocaleIdentifier)"
+            return "\(settings.selectedSpeechModel.rawValue):\(settings.selectedAppleSpeechLocaleIdentifier)"
         case .cohereTranscribeSixBit:
             return "cohere:\(settings.selectedCohereLanguage.rawValue)"
         case .nemotronOffline, .nemotronStreaming, .nemotronStreaming320:
@@ -587,8 +587,9 @@ nonisolated enum LiveTranslationTiming {
     static let firstPrintSharpenNanoseconds: UInt64 = 700_000_000
     /// Brief hold after end-of-utterance so the last ASR tick can land.
     static let eouHoldNanoseconds: UInt64 = 400_000_000
-    /// Legacy cadence helper kept for tests. A lone finished sentence now waits
-    /// for the next line, a second agreeing tick, or silence before it prints.
+    /// Quiet gap after the last wording of a lone finished sentence. A revision
+    /// restarts it. The sentence prints when this gap passes, without waiting
+    /// for the next sentence.
     static let loneSentencePrintNanoseconds: UInt64 = 220_000_000
     /// Partials are de-duplicated, so a quiet gap only means the engine re-heard
     /// the same text once it outlasts that engine's own update cadence (0.2–1 s).

@@ -48,6 +48,8 @@
 		FTMB00000000000000000002 /* LiveTranslationMailboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTMB00000000000000000001 /* LiveTranslationMailboxTests.swift */; };
 		FTMN00000000000000000002 /* TheaterMinimizeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTMN00000000000000000001 /* TheaterMinimizeTests.swift */; };
 		FTMX00000000000000000002 /* MLXRunnerCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTMX00000000000000000001 /* MLXRunnerCatalogTests.swift */; };
+		FTJA00000000000000000002 /* LiveTranslationJapaneseClauseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTJA00000000000000000001 /* LiveTranslationJapaneseClauseTests.swift */; };
+		FTPA00000000000000000002 /* PauseIntervalAudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTPA00000000000000000001 /* PauseIntervalAudioTests.swift */; };
 		FTQI00000000000000000002 /* QuickTranslateInsertTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTQI00000000000000000001 /* QuickTranslateInsertTests.swift */; };
 		FTQT00000000000000000002 /* LiveTranslationQualityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTQT00000000000000000001 /* LiveTranslationQualityTests.swift */; };
 		FTRP00000000000000000002 /* TheaterRepeatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTRP00000000000000000001 /* TheaterRepeatTests.swift */; };
@@ -136,6 +138,8 @@
 		FTMB00000000000000000001 /* LiveTranslationMailboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationMailboxTests.swift; sourceTree = "<group>"; };
 		FTMN00000000000000000001 /* TheaterMinimizeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterMinimizeTests.swift; sourceTree = "<group>"; };
 		FTMX00000000000000000001 /* MLXRunnerCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLXRunnerCatalogTests.swift; sourceTree = "<group>"; };
+		FTJA00000000000000000001 /* LiveTranslationJapaneseClauseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationJapaneseClauseTests.swift; sourceTree = "<group>"; };
+		FTPA00000000000000000001 /* PauseIntervalAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseIntervalAudioTests.swift; sourceTree = "<group>"; };
 		FTQI00000000000000000001 /* QuickTranslateInsertTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTranslateInsertTests.swift; sourceTree = "<group>"; };
 		FTQT00000000000000000001 /* LiveTranslationQualityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationQualityTests.swift; sourceTree = "<group>"; };
 		FTRP00000000000000000001 /* TheaterRepeatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterRepeatTests.swift; sourceTree = "<group>"; };
@@ -269,6 +273,8 @@
 				FTMA00000000000000000001 /* LiveTranslationMockASRTests.swift */,
 				FTMN00000000000000000001 /* TheaterMinimizeTests.swift */,
 				FTRP00000000000000000001 /* TheaterRepeatTests.swift */,
+				FTJA00000000000000000001 /* LiveTranslationJapaneseClauseTests.swift */,
+				FTPA00000000000000000001 /* PauseIntervalAudioTests.swift */,
 				FTSE00000000000000000001 /* SpeechEnergyGateTests.swift */,
 				FTTE00000000000000000001 /* TypingEventSourceTests.swift */,
 				FTYT00000000000000000001 /* TheaterYouTubeReplayTests.swift */,
@@ -544,6 +550,8 @@
 				FTMA00000000000000000002 /* LiveTranslationMockASRTests.swift in Sources */,
 				FTMN00000000000000000002 /* TheaterMinimizeTests.swift in Sources */,
 				FTRP00000000000000000002 /* TheaterRepeatTests.swift in Sources */,
+				FTJA00000000000000000002 /* LiveTranslationJapaneseClauseTests.swift in Sources */,
+				FTPA00000000000000000002 /* PauseIntervalAudioTests.swift in Sources */,
 				FTSE00000000000000000002 /* SpeechEnergyGateTests.swift in Sources */,
 				FTTE00000000000000000002 /* TypingEventSourceTests.swift in Sources */,
 				FTYT00000000000000000002 /* TheaterYouTubeReplayTests.swift in Sources */,

@@ -36,7 +36,7 @@ extension ContentView {
             },
             openTranslationEngine: {
                 self.settings.completeSetupWizard()
-                self.navigateToApp(.translationEngine)
+                self.navigateToApp(.languagePacks)
             }
         )
     }

@@ -16,6 +16,8 @@ final class PresenterCaptionModel: ObservableObject {
     @Published var statusKind: TheaterStatusKind = .idle
     /// Heard lines that have not printed on the board yet.
     @Published var inboxLines: [String] = []
+    /// The last inbox line is still open. The board does not draw it.
+    @Published var inboxOpenTail = false
     @Published var isListening: Bool = false
     @Published var isPaused: Bool = false
     @Published var canRetryTranslation: Bool = false

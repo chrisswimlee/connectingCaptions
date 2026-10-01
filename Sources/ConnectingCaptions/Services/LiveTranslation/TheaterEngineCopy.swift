@@ -1,8 +1,11 @@
 import Foundation
 
-/// Apple Translation is the caption engine. A local small LLM is optional
-/// first-print sharpening; Apple stays the fallback.
+/// Apple Translation is the caption engine.
 enum TheaterTranslationEngineKind: String, CaseIterable, Identifiable {
+    /// Translation Engine is Apple Translation only for now. The local LLM
+    /// keeps its implementation; flip to `false` to offer it again.
+    static let appleTranslationOnly = true
+
     case apple
     case localLLM
 
@@ -26,7 +29,7 @@ enum TheaterTranslationEngineKind: String, CaseIterable, Identifiable {
 }
 
 /// User-facing copy that keeps Voice Engine (speech to text) separate from
-/// Translation Engine (Apple Translation, optional local LLM).
+/// Translation Engine (Apple Translation).
 enum TheaterEngineCopy {
     static let voiceTitle = "Voice Engine"
     static let voicePurpose = "Sharpens speech into text for the language you speak."
@@ -42,8 +45,8 @@ enum TheaterEngineCopy {
         case .cohereTranscribeSixBit: return "Cohere Transcribe"
         case .nemotronOffline: return "Nemotron 3.5"
         case .nemotronStreaming, .nemotronStreaming320: return "Nemotron Speech 3.5"
-        case .appleSpeech: return "Apple Speech"
-        case .appleSpeechAnalyzer: return "Apple Speech Analyzer"
+        case .appleSpeech: return "Apple Speech (older)"
+        case .appleSpeechAnalyzer: return "Apple Speech Analyzer (newer)"
         case .whisperTiny: return "Whisper Tiny"
         case .whisperBase: return "Whisper Base"
         case .whisperSmall: return "Whisper Small"
@@ -54,12 +57,19 @@ enum TheaterEngineCopy {
     }
 
     static func voiceEngineDetail(_ model: SettingsStore.SpeechModel) -> String {
-        "\(model.languageSupport) · \(model.downloadSize)"
+        switch model {
+        case .appleSpeech:
+            return "Prints while you talk. The recognizer macOS has included for years. Hears the languages already on this Mac. No download."
+        case .appleSpeechAnalyzer:
+            return "Prints while you talk. The recognizer added in macOS 26. Hears the Speech Analyzer languages installed on this Mac."
+        default:
+            let when = model.supportsStreaming ? "Prints while you talk" : "Prints when you stop"
+            return "\(when). \(model.languageSupport) · \(model.downloadSize)"
+        }
     }
 
     static let translationTitle = "Translation Engine"
-    static let translationPurpose =
-        "Apple Translation on this Mac, not a chat model. Optional experimental local LLM to sharpen the first print."
+    static let translationPurpose = "Apple Translation on this Mac, not a chat model."
 
     static func translationName(settings: SettingsStore = .shared) -> String {
         settings.theaterTranslationEngine.displayName

@@ -7,6 +7,7 @@ struct LiveTranslationSessionTrace: Equatable {
     var startedUptime: TimeInterval
     var partials = 0
     var silenceHolds = 0
+    var pauseSkips = 0
     var utteranceEnds = 0
     var loggedFirstBuffer = false
     var loggedSpeechStart = false
@@ -17,7 +18,7 @@ struct LiveTranslationSessionTrace: Equatable {
 
     func endLine(outcome: String, now: TimeInterval, lines: Int) -> String {
         let elapsedMs = Int((max(0, now - self.startedUptime) * 1000).rounded())
-        return "session \(outcome) kind=\(self.kind) token=\(self.token) elapsedMs=\(elapsedMs) partials=\(self.partials) silenceHolds=\(self.silenceHolds) utteranceEnds=\(self.utteranceEnds) lines=\(lines)"
+        return "session \(outcome) kind=\(self.kind) token=\(self.token) elapsedMs=\(elapsedMs) partials=\(self.partials) silenceHolds=\(self.silenceHolds) pauseSkips=\(self.pauseSkips) utteranceEnds=\(self.utteranceEnds) lines=\(lines)"
     }
 }
 

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Notes, a PDF, or a JSON name list for Translate. Names stay on the Mac.
+/// Notes, a PDF, a PowerPoint deck, or a JSON name list for Translate. Names stay on the Mac.
 struct TheaterTalkPackCard: View {
     @Environment(\.theme) private var theme
     @ObservedObject private var settings = SettingsStore.shared
@@ -168,6 +168,8 @@ struct TheaterTalkPackCard: View {
             .plainText,
             UTType(filenameExtension: "md") ?? .plainText,
             .pdf,
+            UTType(filenameExtension: "pptx") ?? .data,
+            UTType(filenameExtension: "pptm") ?? .data,
             .json,
             .rtf,
         ]

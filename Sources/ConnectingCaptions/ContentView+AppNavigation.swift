@@ -32,23 +32,8 @@ extension ContentView {
                 self.sidebarNavigationLink(.speakAndType, title: "Speak and type", systemImage: "text.cursor")
 
                 self.sidebarSectionHeader("Setup")
-                Button {
-                    self.settings.startSetupWizard()
-                } label: {
-                    self.sidebarRowLabel(
-                        title: TheaterSetupWizard.title,
-                        systemImage: "checklist",
-                        isSelected: false
-                    )
-                }
-                .buttonStyle(.plain)
-                .sidebarOptionHover(isSelected: false, reduceMotion: self.accessibilityReduceMotion)
-                .help(TheaterSetupWizard.welcomeDetail)
-                .accessibilityLabel(TheaterSetupWizard.title)
-                .accessibilityIdentifier("sidebar.setupWizard")
                 self.sidebarNavigationLink(.voiceEngine, title: "Voice Engine", systemImage: "waveform")
-                self.sidebarNavigationLink(.translationEngine, title: "Translation Engine", systemImage: "translate")
-                self.sidebarNavigationLink(.customDictionary, title: "Custom Dictionary", systemImage: "text.book.closed.fill")
+                self.sidebarNavigationLink(.languagePacks, title: "Language packs", systemImage: "arrow.down.circle")
 
                 self.sidebarSectionHeader("Activity")
                 self.sidebarNavigationLink(.history, title: "History", systemImage: "clock.arrow.circlepath")
@@ -323,7 +308,7 @@ extension ContentView {
                     self.navigateToApp(.voiceEngine)
                 },
                 openTranslationEngine: {
-                    self.navigateToApp(.translationEngine)
+                    self.navigateToApp(.languagePacks)
                 }
             ))
         case .speakAndType:
@@ -340,20 +325,12 @@ extension ContentView {
                 appServices: self.appServices,
                 theme: self.theme
             ))
-        case .translationEngine:
-            return AnyView(TranslationEngineSettingsScreen(theme: self.theme))
-        case .aiEnhancements, .cleanupStyles:
-            return AnyView(AIEnhancementSettingsScreen(
-                menuBarManager: self.menuBarManager,
-                theme: self.theme,
-                selectedConfigurationSection: self.aiEnhancementConfigurationSectionBinding,
-                activeShortcutRecordingTarget: self.$activeShortcutRecordingTarget,
-                shortcutRecordingMessage: self.$shortcutRecordingMessage
-            ))
-        case .customDictionary:
-            return AnyView(CustomDictionaryView())
+        case .translationEngine, .languagePacks:
+            return AnyView(LanguagePacksScreen(theme: self.theme))
+        case .aiEnhancements, .cleanupStyles, .customDictionary:
+            return AnyView(self.welcomeView)
         case .stats:
-            return AnyView(self.statsView)
+            return AnyView(TranscriptionHistoryView())
         case .feedback:
             return AnyView(FeedbackView())
         case .changelog:

@@ -54,6 +54,7 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
     let historySize: Int = 2
     let silenceThreshold: CGFloat = 0.04
     var speechEnergyGate = SpeechEnergyGate()
+    var sustainedSpeech = SustainedSpeechRun()
 
     static let hostTicksPerSecond: Double = {
         var info = mach_timebase_info_data_t()
@@ -97,6 +98,7 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
             self.lastInputSampleEnd = nil
             self.resetCaptureHealthLocked()
             self.speechEnergyGate.reset()
+            self.sustainedSpeech.reset()
             self.recordingEnabled = true
         }
         if enabled == false {
@@ -112,6 +114,7 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
             self.resetCaptureHealthLocked()
             self.levelHistory.removeAll(keepingCapacity: true)
             self.smoothedLevel = 0.0
+            self.sustainedSpeech.reset()
         }
         self.lock.unlock()
     }
@@ -126,6 +129,9 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
         self.lock.lock()
         let wasPaused = self.capturePaused
         self.capturePaused = paused
+        if paused {
+            self.sustainedSpeech.reset()
+        }
         if wasPaused, paused == false {
             self.lastInputSampleEnd = nil
             self.resetResamplerLocked()
@@ -138,6 +144,12 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
         self.lock.lock()
         defer { self.lock.unlock() }
         return self.lastInputSampleEnd
+    }
+
+    func speechFloorRMS() -> Float? {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        return self.speechEnergyGate.floorRMS
     }
 
     var isCapturePaused: Bool {
@@ -343,8 +355,15 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
         )
         self.lock.lock()
         let voiced = self.speechEnergyGate.isVoiced(rms: measurement.rms)
+        let speechHostTime = self.sustainedSpeech.speechHostTime(
+            voiced: voiced,
+            samples: mono16k.count,
+            hostTime: acceptedHostTime
+        )
         self.lock.unlock()
-        self.onSpeechEnergy(acceptedHostTime, voiced)
+        if let speechHostTime {
+            self.onSpeechEnergy(speechHostTime, true)
+        }
         if let health = self.captureHealthDiagnostic(
             sampleCount: mono16k.count,
             rms: measurement.rms,

@@ -98,10 +98,9 @@ enum TheaterBoardAdmission {
         }
         // Lines older than the peel window are not in `peelSources`. A full
         // sentence heard again word for word is a replay of the talk, not new speech.
+        // A shorter copy of a sentence already printed is the same replay.
         if phase == .propose,
-           TranslationClauseSegmenter.normalizedKey(cleaned).split(separator: " ").count
-               >= Self.minimumWordsForListenRepeat,
-           context.commitIdentities.contains(TranslationClauseSegmenter.clauseIdentity(cleaned))
+           Self.alreadyPrinted(cleaned, rows: context.peelSources, identities: context.commitIdentities)
         {
             return .skip(.printedThisListen)
         }
@@ -117,6 +116,31 @@ enum TheaterBoardAdmission {
 
     /// Short replies ("Okay.", "Yeah, sure.") really do repeat in a talk.
     static let minimumWordsForListenRepeat = 4
+
+    /// A shortened replay is a long sentence. Four words still repeat for real.
+    static let minimumWordsForShortenedReplay = 8
+
+    private static func alreadyPrinted(
+        _ incoming: String,
+        rows: [String],
+        identities: Set<String>
+    ) -> Bool {
+        let key = TranslationClauseSegmenter.normalizedKey(incoming)
+        let words = key.split(separator: " ")
+        if words.count >= Self.minimumWordsForListenRepeat,
+           identities.contains(TranslationClauseSegmenter.clauseIdentity(incoming))
+        {
+            return true
+        }
+        guard words.count >= Self.minimumWordsForShortenedReplay else { return false }
+        if rows.contains(where: {
+            TranslationClauseSegmenter.shouldIgnoreAsStalePrefix(previous: $0, incoming: incoming)
+        }) {
+            return true
+        }
+        let prefix = "n:" + key + " "
+        return identities.contains { $0.hasPrefix(prefix) }
+    }
 
     /// An earlier row said again, or the same row with more words at its end.
     /// A close sentence ("model" → "modal") after a newer row is the next

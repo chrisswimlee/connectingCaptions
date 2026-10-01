@@ -114,9 +114,9 @@ struct OnboardingFlowView: View {
             case .language:
                 return "Pick the language you speak, then the one you want."
             case .voiceModel:
-                return "Apple Speech is ready on this Mac. Other engines stay under Show other models."
+                return "Apple Speech is ready on this Mac. Nothing to download."
             case .permissions:
-                return "Microphone is required. Accessibility is only if you want a translation typed into other apps."
+                return "Theater captions need the microphone."
             case .playground:
                 return TheaterReadiness.openTheaterPressListen
             }
@@ -124,15 +124,25 @@ struct OnboardingFlowView: View {
     }
 
     var step: Step {
-        Step(rawValue: self.currentStep) ?? .voiceModel
+        Step(rawValue: self.currentStep) ?? .language
+    }
+
+    var visibleSteps: [Step] {
+        [.landing, .language, .permissions, .playground]
+    }
+
+    var visibleStepIndex: Int {
+        self.visibleSteps.firstIndex(of: self.step) ?? 0
     }
 
     var progressValue: Double {
-        Double(self.step.rawValue) / Double(Step.allCases.count - 1)
+        let count = self.visibleSteps.count
+        guard count > 1 else { return 0 }
+        return Double(self.visibleStepIndex) / Double(count - 1)
     }
 
     var compactProgressValue: Double {
-        Double(self.step.rawValue + 1) / Double(Step.allCases.count)
+        Double(self.visibleStepIndex + 1) / Double(self.visibleSteps.count)
     }
 
     var selectedOnboardingLanguage: VoiceEngineLanguage {
@@ -185,14 +195,8 @@ struct OnboardingFlowView: View {
     }
 
     var recommendedModelReasonText: String {
-        let model = self.preferredOnboardingRoute?.model ?? .appleSpeech
-        let name = self.onboardingModelTitle(for: model)
-        switch model {
-        case .appleSpeech, .appleSpeechAnalyzer:
-            return "\(name) is ready on this Mac. Other engines are under Show other models."
-        default:
-            return "\(name) hears the language you speak. Other engines are under Show other models."
-        }
+        let model = self.preferredOnboardingRoute?.model ?? SettingsStore.SpeechModel.defaultModel
+        return "\(self.onboardingModelTitle(for: model)) is ready on this Mac."
     }
 
     var playgroundContinueTitle: String {
@@ -250,10 +254,11 @@ struct OnboardingFlowView: View {
     }
 
     var isVoiceModelReady: Bool {
-        guard let route = self.selectedOnboardingRoute else {
-            return false
+        if let route = self.selectedOnboardingRoute {
+            return self.isOnboardingRouteReady(route)
         }
-        return self.isOnboardingRouteReady(route)
+        return self.settings.selectedSpeechModel == .appleSpeech
+            || self.settings.selectedSpeechModel == .appleSpeechAnalyzer
     }
 
     var isModelPreparationInProgress: Bool {
@@ -306,7 +311,7 @@ struct OnboardingFlowView: View {
         case .landing:
             return true
         case .language:
-            return !self.selectedLanguageRoutes.isEmpty
+            return VoiceEngineLanguageCatalog.language(id: self.selectedLanguageID) != nil
         case .voiceModel:
             return self.isVoiceModelReady
         case .permissions:
@@ -349,10 +354,12 @@ struct OnboardingFlowView: View {
         .onAppear {
             self.isOnboardingFlowVisible = true
             self.syncOnboardingSelectionFromSettings()
+            self.skipVoiceModelIfNeeded()
             self.playLandingWelcomeSoundIfNeeded()
             self.refreshOnboardingMicrophoneAuthorization(checkModels: true)
         }
         .onChange(of: self.currentStep) { _, _ in
+            self.skipVoiceModelIfNeeded()
             if self.step != .voiceModel {
                 self.cancelOnboardingModelPreparation()
             }
@@ -443,7 +450,7 @@ struct OnboardingFlowView: View {
                 .foregroundStyle(self.theme.palette.secondaryText)
 
             HStack {
-                Text("Step \(self.step.rawValue + 1) of \(Step.allCases.count)")
+                Text("Step \(self.visibleStepIndex + 1) of \(self.visibleSteps.count)")
                     .font(self.theme.typography.captionStrong)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -521,6 +528,10 @@ struct OnboardingFlowView: View {
     func goBack() {
         self.activeShortcutRecordingTarget = nil
         self.shortcutRecordingMessage = nil
+        if self.step == .permissions || self.step == .voiceModel {
+            self.currentStep = Step.language.rawValue
+            return
+        }
         self.currentStep = max(0, self.currentStep - 1)
     }
 
@@ -530,13 +541,30 @@ struct OnboardingFlowView: View {
         self.currentStep = min(Step.allCases.count - 1, self.currentStep + 1)
     }
 
+    func applyOnboardingAppleVoice() {
+        if let route = self.selectedOnboardingRoute ?? self.preferredOnboardingRoute {
+            self.selectOnboardingRoute(route)
+            return
+        }
+        self.settings.selectedSpeechModel = SettingsStore.SpeechModel.defaultModel
+        SpokenLanguageResolver.pinSpokenEngineToSource()
+    }
+
+    func skipVoiceModelIfNeeded() {
+        guard self.step == .voiceModel else { return }
+        self.applyOnboardingAppleVoice()
+        self.currentStep = Step.permissions.rawValue
+    }
+
     func handlePrimaryAction() {
         guard !self.isModelPreparationInProgress else {
             return
         }
 
-        if self.step == .language, let route = self.selectedOnboardingRoute {
-            self.selectOnboardingRoute(route)
+        if self.step == .language {
+            self.applyOnboardingAppleVoice()
+            self.currentStep = Step.permissions.rawValue
+            return
         }
 
         if self.step == .playground {
@@ -571,25 +599,21 @@ struct OnboardingFlowView: View {
     }
 
     func refreshOnboardingLanguagePack() async {
-        let differs = SpokenLanguageResolver.sourceLanguage().id != SpokenLanguageResolver.targetLanguage().id
         await self.refreshLanguagePackAvailability()
-        if differs, !self.languagePackIsInstalled {
-            await self.refreshLanguagePackAvailability(requestDownload: true)
-        }
     }
 
     func refreshLanguagePackAvailability(requestDownload: Bool = false) async {
         let source = SpokenLanguageResolver.sourceLanguage()
         let target = SpokenLanguageResolver.targetLanguage()
         await AppleTranslationEngine.shared.warm(source: source, target: target)
-        if requestDownload {
-            AppleTranslationEngine.shared.requestLanguagePackDownload(source: source, target: target)
-        }
         let status = await AppleTranslationEngine.shared.packAvailability(
             source: source,
             target: target
         )
         self.languagePackIsInstalled = status.isReady
+        if requestDownload, !status.isReady {
+            AppleTranslationEngine.shared.requestLanguagePackDownload(source: source, target: target)
+        }
         self.languagePackAvailability = await AppleTranslationEngine.shared.checkAvailability(
             source: source,
             target: target

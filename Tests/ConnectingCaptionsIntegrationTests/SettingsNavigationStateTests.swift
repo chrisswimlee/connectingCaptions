@@ -63,6 +63,7 @@ final class SettingsNavigationStateTests: XCTestCase {
         XCTAssertNil(SidebarItem.translationEngine.aiEnhancementConfigurationSection)
         XCTAssertNil(SidebarItem.customDictionary.aiEnhancementConfigurationSection)
         XCTAssertEqual(SidebarItem.translationEngine.accessibilityIdentifier, "sidebar.translationEngine")
+        XCTAssertEqual(SidebarItem.languagePacks.accessibilityIdentifier, "sidebar.languagePacks")
     }
 
     func testInactiveSettingsSearchResignsFirstResponder() {
@@ -100,14 +101,32 @@ final class SettingsNavigationStateTests: XCTestCase {
         XCTAssertTrue(SettingsSearchIndex.results(for: "Voice").contains { $0.target == .liveTranslation })
         XCTAssertTrue(SettingsSearchIndex.results(for: "Translate").contains { $0.target == .liveTranslation })
         XCTAssertTrue(SettingsSearchIndex.results(for: "Translation Engine").contains { $0.target == .liveTranslation })
+        XCTAssertTrue(SettingsSearchIndex.results(for: "language packs").contains { $0.target == .liveTranslation })
         XCTAssertTrue(SettingsSearchIndex.results(for: "speech to text").contains { $0.target == .liveTranslation })
         XCTAssertFalse(SettingsSearchIndex.results(for: "FluidVoice").contains { $0.target == .theaterAppearance })
         XCTAssertTrue(SettingsSearchIndex.results(for: "high contrast").contains { $0.target == .theaterAppearance })
         XCTAssertTrue(SettingsSearchIndex.results(for: "talk notes").contains { $0.target == .theaterAppearance })
         XCTAssertTrue(SettingsSearchIndex.results(for: "pace cue").contains { $0.target == .theaterAppearance })
-        XCTAssertTrue(SettingsSearchIndex.results(for: "setup wizard").contains { $0.target == .setupWizard })
-        XCTAssertTrue(SettingsSearchIndex.results(for: "original language").contains { $0.target == .setupWizard })
+        XCTAssertTrue(SettingsSearchIndex.results(for: "Keep History").contains { $0.section == .dataAndDiagnostics })
+        XCTAssertTrue(SettingsSearchIndex.results(for: "setup wizard").isEmpty)
+        XCTAssertTrue(SettingsSearchIndex.results(for: "either way").isEmpty)
+        XCTAssertTrue(SettingsSearchIndex.results(for: "experimental").isEmpty)
+        XCTAssertTrue(SettingsSearchIndex.results(for: "Copy to Clipboard").isEmpty)
+        XCTAssertTrue(SettingsSearchIndex.results(for: "Spoken Send").isEmpty)
+        XCTAssertTrue(SettingsSearchIndex.results(for: "original language").contains { $0.target == .theaterAppearance })
         XCTAssertTrue(SettingsSearchIndex.results(for: "Caption Cleanup").isEmpty)
+    }
+
+    func testHiddenSidebarDestinationsResolveToAdvertisedOnes() {
+        XCTAssertEqual(SidebarItem.translationEngine.advertisedDestination, .languagePacks)
+        XCTAssertEqual(SidebarItem.customDictionary.advertisedDestination, .welcome)
+        XCTAssertEqual(SidebarItem.aiEnhancements.advertisedDestination, .welcome)
+        XCTAssertEqual(SidebarItem.cleanupStyles.advertisedDestination, .welcome)
+        XCTAssertEqual(SidebarItem.stats.advertisedDestination, .history)
+        XCTAssertEqual(SettingsSection.dictation.advertisedDestination, .translation)
+        XCTAssertEqual(SettingsSection.experimental.advertisedDestination, .translation)
+        XCTAssertEqual(SettingsSection.aiProviders.advertisedDestination, .translation)
+        XCTAssertEqual(SettingsSection.dataAndDiagnostics.advertisedDestination, .dataAndDiagnostics)
     }
 
     func testSettingsSectionsHaveStableTitlesAndIcons() {
@@ -121,7 +140,7 @@ final class SettingsNavigationStateTests: XCTestCase {
         XCTAssertFalse(SettingsSection.productSections.contains(.dictation))
         XCTAssertEqual(
             SettingsSection.productSections.map(\.title),
-            ["Theater", "Speak and type", "General", "Notifications", "Audio", "Data & Diagnostics", "Experimental"]
+            ["Theater", "Speak and type", "General", "Notifications", "Audio", "Data & Diagnostics"]
         )
     }
 
@@ -136,12 +155,11 @@ final class SettingsNavigationStateTests: XCTestCase {
     }
 
     func testSettingsSearchRanksExactTitleAheadOfRelatedTerms() {
-        let results = SettingsSearchIndex.results(for: "Copy to Clipboard")
+        let results = SettingsSearchIndex.results(for: "Keep History")
 
-        XCTAssertEqual(results.first?.target, .copyToClipboard)
-        XCTAssertEqual(results.first?.section, .general)
-        XCTAssertTrue(results.contains { $0.target == .textInsertionMode })
-        XCTAssertEqual(SettingsSearchIndex.results(for: "Spoken Send").first?.section, .general)
+        XCTAssertEqual(results.first?.target, .historyRetention)
+        XCTAssertEqual(results.first?.section, .dataAndDiagnostics)
+        XCTAssertTrue(results.contains { $0.target == .historyRetention })
     }
 
     func testSettingsSearchNormalizesCaseAndDiacritics() {
@@ -158,8 +176,11 @@ final class SettingsNavigationStateTests: XCTestCase {
 
     func testSettingsSearchToleratesRepresentativeTypos() {
         XCTAssertTrue(SettingsSearchIndex.results(for: "microfone").contains { $0.target == .microphonePermission })
-        XCTAssertEqual(SettingsSearchIndex.results(for: "clipbord").first?.target, .copyToClipboard)
-        XCTAssertEqual(SettingsSearchIndex.results(for: "hot ky").first?.target, .globalHotkey)
+        XCTAssertTrue(
+            SettingsSearchIndex.results(for: "histroy")
+                .contains { $0.target == .historyRetention || $0.target == .transcriptionHistory }
+        )
+        XCTAssertTrue(SettingsSearchIndex.results(for: "theatr").contains { $0.target == .liveTranslation })
     }
 
     func testSettingsSearchRejectsUnrelatedShortQuery() {
@@ -169,7 +190,7 @@ final class SettingsNavigationStateTests: XCTestCase {
     func testSettingsSearchKeepsSectionsInNavigationOrder() {
         XCTAssertEqual(
             SettingsSearchIndex.matchingSections(for: "mic"),
-            [.general, .notifications, .audio]
+            [.notifications, .audio, .dataAndDiagnostics]
         )
     }
 
@@ -182,7 +203,7 @@ final class SettingsNavigationStateTests: XCTestCase {
         )
         XCTAssertEqual(
             SettingsSearchIndex.preferredSection(current: .general, results: results),
-            .general
+            results.first?.section
         )
         XCTAssertEqual(SettingsSearchIndex.preferredSection(current: .audio, results: []), .audio)
     }

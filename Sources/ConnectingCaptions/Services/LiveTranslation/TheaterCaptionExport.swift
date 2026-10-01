@@ -23,6 +23,45 @@ nonisolated enum TheaterCaptionExport {
         Self.vtt(pairs: Self.pairs(from: entries), secondsPerCue: secondsPerCue)
     }
 
+    /// Show-as, then the spoken line when they differ. Times match the VTT cues.
+    static func markdown(pairs: [CaptionHistoryPair], secondsPerCue: Int = 4) -> String {
+        var lines = [
+            "# \(ConnectingCaptionsProduct.displayName)",
+            "",
+            "Times are when each caption was accepted, not when the word was spoken.",
+            "",
+        ]
+        for cue in Self.cues(from: pairs, secondsPerCue: secondsPerCue) {
+            lines.append("## \(Self.vttTimestamp(cue.start))")
+            lines.append("")
+            lines.append(cue.text)
+            lines.append("")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    static func sessionExportDirectory(fileManager: FileManager = .default) -> URL {
+        AppSupportDirectory.url(fileManager: fileManager)
+            .appendingPathComponent("Session Exports", isDirectory: true)
+    }
+
+    /// Writes Markdown and VTT with one timestamp. Empty sessions write nothing.
+    static func writeSessionFiles(
+        pairs: [CaptionHistoryPair],
+        directory: URL? = nil,
+        fileManager: FileManager = .default,
+        now: Date = Date()
+    ) throws -> [URL] {
+        guard !Self.cues(from: pairs, secondsPerCue: 4).isEmpty else { return [] }
+        let folder = directory ?? Self.sessionExportDirectory(fileManager: fileManager)
+        try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
+        let markdownURL = folder.appendingPathComponent(Self.savePanelName(extension: "md", date: now))
+        let vttURL = folder.appendingPathComponent(Self.savePanelName(extension: "vtt", date: now))
+        try Self.markdown(pairs: pairs).write(to: markdownURL, atomically: true, encoding: .utf8)
+        try Self.vtt(pairs: pairs).write(to: vttURL, atomically: true, encoding: .utf8)
+        return [markdownURL, vttURL]
+    }
+
     static func pairs(from entries: [LectureCaptionEntry]) -> [CaptionHistoryPair] {
         entries.map { entry in
             CaptionHistoryPair(
@@ -34,8 +73,8 @@ nonisolated enum TheaterCaptionExport {
         }
     }
 
-    static func savePanelName(extension fileExtension: String) -> String {
-        let stamp = Self.fileStamp.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+    static func savePanelName(extension fileExtension: String, date: Date = Date()) -> String {
+        let stamp = Self.fileStamp.string(from: date).replacingOccurrences(of: ":", with: "-")
         return "connectingCaptions-\(stamp).\(fileExtension)"
     }
 

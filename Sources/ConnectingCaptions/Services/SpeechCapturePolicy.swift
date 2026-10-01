@@ -17,6 +17,7 @@ protocol SpeechCapturePolicy: AnyObject {
     func markFirstBuffer()
     func markSpeechStart(hostTime: UInt64)
     func markSilenceHold()
+    func markPauseSkip()
     func handleEndOfUtterance()
 }
 

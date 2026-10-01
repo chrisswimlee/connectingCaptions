@@ -904,6 +904,52 @@ extension ASRService {
             return
         }
 
+        // Theater only. Dictation and dictionary training keep the raw window.
+        // A pause stays in the ring. A trailing-window decode leaves that quiet
+        // out so Whisper does not invent words. Streaming engines append the
+        // array and index it by the full sample count, so they keep that array
+        // even in the first second, before the ring has dropped samples. A
+        // delta is skipped only when the whole tick is a pause.
+        let theaterListen = self.speechCapturePolicy?.isSessionActive == true
+        let keepsSampleCursor = self.transcriptionProvider.streamingPreviewMode == .incrementalDelta
+        let preparedPause = theaterListen
+            ? PauseIntervalAudio.preparingForDecode(
+                chunk,
+                floorRMS: self.audioCapturePipeline.speechFloorRMS(),
+                minimumSamples: keepsSampleCursor ? 0 : minSamples
+            )
+            : nil
+        let pauseOnly = preparedPause?.isPauseOnly == true
+        let warmUpTick = self.hasCompletedFirstTranscription == false
+        if theaterListen, pauseOnly, warmUpTick == false {
+            self.didRunStreamingTickThisListen = true
+            self.benchmarkLog(
+                "chunk_skip index=\(chunkIndex) reason=pause ageMs=\(chunkAgeMs) samples=\(chunk.count)"
+            )
+            self.speechCapturePolicy?.markPauseSkip()
+            if LiveTranslationSilenceGate.isPastHold(
+                lastVoicedUptime: self.lastVoicedUptime,
+                now: ProcessInfo.processInfo.systemUptime
+            ) {
+                self.speechCapturePolicy?.markSilenceHold()
+            }
+            return
+        }
+        // The first tick still decodes, so the model can warm up. If that
+        // audio is only a pause, the text is thrown away.
+        let suppressPauseOnlyText = theaterListen && pauseOnly && warmUpTick
+        let decodeSamples: [Float]
+        if let prepared = preparedPause {
+            decodeSamples = PauseIntervalAudio.samplesForDecode(
+                chunk: chunk,
+                prepared: prepared,
+                keepsSampleCursor: keepsSampleCursor,
+                warmUpTick: warmUpTick
+            )
+        } else {
+            decodeSamples = chunk
+        }
+
         self.isProcessingChunk = true
         self.didRunStreamingTickThisListen = true
 
@@ -914,12 +960,24 @@ extension ASRService {
         let audioMilliseconds = Int((Double(currentSampleCount) / 16_000.0 * 1000).rounded())
         self.benchmarkLog(
             "chunk_start index=\(chunkIndex) ageMs=\(chunkAgeMs) samples=\(currentSampleCount) " +
-                "inputSamples=\(chunk.count) newSamples=\(newSamples) audioMs=\(audioMilliseconds) " +
+                "inputSamples=\(decodeSamples.count) newSamples=\(newSamples) audioMs=\(audioMilliseconds) " +
                 "provider=\(self.transcriptionProvider.name)"
         )
+        // Parakeet Flash and Nemotron append whatever array they are given, and
+        // the ring keeps the last second after each tick. `overlapSamples` is
+        // that second when it is larger than the audio that actually arrived.
+        // A listen log decides whether that re-feed is real; this tick does not
+        // change it.
+        if self.transcriptionProvider.streamingPreviewMode == .incrementalDelta {
+            let overlapSamples = max(0, decodeSamples.count - newSamples)
+            self.benchmarkLog(
+                "delta_feed index=\(chunkIndex) inputSamples=\(decodeSamples.count) " +
+                    "newSamples=\(newSamples) overlapSamples=\(overlapSamples)"
+            )
+        }
 
         do {
-            DebugLogger.shared.debug("Streaming chunk starting transcription (samples: \(currentSampleCount), input: \(chunk.count)) using \(self.transcriptionProvider.name)", source: "ASRService")
+            DebugLogger.shared.debug("Streaming chunk starting transcription (samples: \(currentSampleCount), input: \(decodeSamples.count)) using \(self.transcriptionProvider.name)", source: "ASRService")
             let result: ASRTranscriptionResult
             let useDelta = usesIncrementalDelta
                 || self.transcriptionProvider.streamingPreviewMode == .incrementalDelta
@@ -927,7 +985,7 @@ extension ASRService {
                 do {
                     result = try await self.transcriptionExecutor.run { [provider = self.transcriptionProvider] in
                         let result = try await provider.transcribeStreamingDelta(
-                            chunk,
+                            decodeSamples,
                             totalSampleCount: currentSampleCount
                         )
                         logStreamingProviderOperationReturn(
@@ -952,6 +1010,9 @@ extension ASRService {
                         "Incremental delta preview failed; retrying with the retained window",
                         source: "ASRService"
                     )
+                    // Incremental engines index this window by samples already
+                    // accepted. A trimmed copy would point that index at the
+                    // wrong audio.
                     let retainedWindow = self.theaterBoundedWindow(self.audioBuffer.getRetained())
                     result = try await self.transcriptionExecutor.run { [provider = self.transcriptionProvider] in
                         let result = try await provider.transcribeStreaming(retainedWindow)
@@ -965,7 +1026,7 @@ extension ASRService {
                 }
             } else {
                 result = try await self.transcriptionExecutor.run { [provider = self.transcriptionProvider] in
-                    let result = try await provider.transcribeStreaming(chunk)
+                    let result = try await provider.transcribeStreaming(decodeSamples)
                     logStreamingProviderOperationReturn(
                         sessionID: sessionID,
                         operationID: operationID,
@@ -997,9 +1058,11 @@ extension ASRService {
                 "Streaming chunk transcription finished in \(String(format: "%.2f", duration))s",
                 source: "ASRService"
             )
-            SpokenLanguageResolver.noteDetectedLanguage(result.detectedLanguageID)
+            if suppressPauseOnlyText == false {
+                SpokenLanguageResolver.noteDetectedLanguage(result.detectedLanguageID)
+            }
             let rawText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let newText = self.cleanedLiveTranscript(rawText)
+            let newText = suppressPauseOnlyText ? "" : self.cleanedLiveTranscript(rawText)
             self.recordWordBoostHitIfAny(transcribedText: newText)
             self.benchmarkCompletedStreamingChunks += 1
             self.lastProcessedSampleCount = currentSampleCount
@@ -1034,7 +1097,7 @@ extension ASRService {
                     "✅ Streaming: \(previewCount) chars (\(String(format: "%.2f", duration))s)"
                 }
             }
-            if result.endOfUtterance {
+            if result.endOfUtterance, suppressPauseOnlyText == false {
                 self.speechCapturePolicy?.handleEndOfUtterance()
             }
             self.dropRetainedAudioAfterPreview(
@@ -1045,7 +1108,7 @@ extension ASRService {
             let chunkDoneAgeMs = self.elapsedMilliseconds(since: self.benchmarkRecordingStartedAt)
             self.benchmarkLog(
                 "chunk_done index=\(chunkIndex) elapsedMs=\(self.elapsedMilliseconds(since: startedAt)) ageMs=\(chunkDoneAgeMs) " +
-                    "samples=\(currentSampleCount) inputSamples=\(chunk.count) rawChars=\(rawText.count) cleanedChars=\(newText.count) rtf=\(String(format: "%.3f", rtf))"
+                    "samples=\(currentSampleCount) inputSamples=\(decodeSamples.count) rawChars=\(rawText.count) cleanedChars=\(newText.count) rtf=\(String(format: "%.3f", rtf))"
             )
 
             // If transcription takes longer than the interval, skip next to prevent queue buildup
@@ -1065,7 +1128,7 @@ extension ASRService {
             schedulingSessionID: self.streamingSchedulingSessionID
         ) {
             DebugLogger.shared.error("❌ Streaming failed: \(error)", source: "ASRService")
-            self.benchmarkLog("chunk_fail index=\(chunkIndex) elapsedMs=\(self.elapsedMilliseconds(since: startedAt)) samples=\(currentSampleCount) inputSamples=\(chunk.count) error=\(error.localizedDescription)")
+            self.benchmarkLog("chunk_fail index=\(chunkIndex) elapsedMs=\(self.elapsedMilliseconds(since: startedAt)) samples=\(currentSampleCount) inputSamples=\(decodeSamples.count) error=\(error.localizedDescription)")
             self.skipNextChunk = true
         } catch {
             self.benchmarkLog(

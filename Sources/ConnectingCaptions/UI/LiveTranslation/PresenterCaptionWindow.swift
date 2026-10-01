@@ -79,6 +79,7 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         self.model.paceCueCompactLabel = ""
         self.model.paceCueKind = ""
         self.model.inboxLines = []
+        self.model.inboxOpenTail = false
     }
 
     func update(
@@ -92,7 +93,8 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         latencyReadout: String = "",
         compactLatencyReadout: String = "",
         paceCue: TheaterPaceCue.Snapshot? = nil,
-        inboxLines: [String] = []
+        inboxLines: [String] = [],
+        inboxOpenTail: Bool = false
     ) {
         if self.model.board != board { self.model.board = board }
         if self.model.pairLabel != pairLabel { self.model.pairLabel = pairLabel }
@@ -123,6 +125,9 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         }
         if self.model.inboxLines != inboxLines {
             self.model.inboxLines = inboxLines
+        }
+        if self.model.inboxOpenTail != inboxOpenTail {
+            self.model.inboxOpenTail = inboxOpenTail
         }
     }
 

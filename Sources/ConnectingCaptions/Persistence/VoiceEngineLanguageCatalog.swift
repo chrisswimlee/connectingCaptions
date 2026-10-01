@@ -206,7 +206,14 @@ enum VoiceEngineLanguageCatalog {
     /// True when this Voice Engine can hear the product language, not merely
     /// when its leftover locale string happens to match.
     static func supports(_ model: SettingsStore.SpeechModel, languageID: String) -> Bool {
-        Self.routes(forLanguageID: languageID).contains { $0.model == model }
+        if Self.routes(forLanguageID: languageID).contains(where: { $0.model == model }) {
+            return true
+        }
+        // Older Apple Speech can take a product language even when Analyzer has no route.
+        if model == .appleSpeech, SettingsStore.SpeechModel.appleSpeechOnly {
+            return Self.isProductLanguageID(languageID)
+        }
+        return false
     }
 
     /// Returns the selected engine's route when it can hear this language.

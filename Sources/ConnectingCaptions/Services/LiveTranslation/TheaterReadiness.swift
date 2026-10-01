@@ -18,6 +18,9 @@ enum TheaterReadiness {
     static let boardIdle =
         "Press Listen. Each sentence appears when it is ready."
 
+    static let boardAfterFirstCaption =
+        "Each sentence appears when it is ready."
+
     static let boardListening =
         "Listening. The next sentence appears here."
 
@@ -97,7 +100,7 @@ enum TheaterReadiness {
         "A caption appeared. Open Theater anytime from the sidebar."
 
     static let gettingStartedOpenDetail =
-        "Voice Engine sharpens speech into text. Translation Engine is Apple Translation on this Mac, with an optional experimental local LLM. Both use the microphone. Open Theater, pick Voice or Translate, then press Listen."
+        "Voice Engine sharpens speech into text. Translation Engine is Apple Translation on this Mac. Both use the microphone. Open Theater, pick Voice or Translate, then press Listen."
 
     static let gettingStartedMicrophone =
         "Theater needs the microphone to hear you."
@@ -115,7 +118,10 @@ enum TheaterReadiness {
         "This removes every caption. The microphone stays on. Talk notes stay."
 
     static let talkPack =
-        "Lock names from notes, a PDF, or a JSON list. They stay on this Mac."
+        "Lock names from notes, a PDF, a PowerPoint deck, or a JSON list. They stay on this Mac."
+
+    static let autoExportSession =
+        "When Listen stops, save Markdown and VTT in Application Support/connectingCaptions/Session Exports. Times are when each caption was accepted."
 
     static let paceCue =
         "Behind means keep talking slower. Caught up means the last sentence is on screen."
@@ -277,6 +283,11 @@ enum TheaterReadyGate {
         var captureAllowed: Bool
         var firstCaptionPrinted: Bool
         var mode: TheaterSessionMode
+        /// Why this Voice Engine is not ready, from the live settings.
+        var voiceEngineAdvice: String? = nil
+        /// This engine hears I speak but is set to another language. One press
+        /// of Match I speak fixes it; no other engine is needed.
+        var voiceEngineNeedsRealign = false
 
         var canListen: Bool {
             self.osSupported && self.voiceEngineReady && self.languagePackReady && self.captureAllowed
@@ -296,7 +307,8 @@ enum TheaterReadyGate {
                 return TheaterAvailability.unsupportedCopy
             }
             if !self.voiceEngineReady {
-                return "Download a Voice Engine for the language you speak. Apple Speech is enough to try."
+                return self.voiceEngineAdvice
+                    ?? "This Voice Engine does not hear I speak. Open Voice Engine."
             }
             if !self.captureAllowed {
                 return MicrophoneAccess.deniedCopy
@@ -324,7 +336,9 @@ enum TheaterReadyGate {
         microphone: AVAuthorizationStatus,
         firstCaptionPrinted: Bool,
         mode: TheaterSessionMode = .translation,
-        osSupported: Bool = true
+        osSupported: Bool = true,
+        voiceEngineAdvice: String? = nil,
+        voiceEngineNeedsRealign: Bool = false
     ) -> Snapshot {
         let canPromptMic = microphone != .denied && microphone != .restricted
         let packOK = mode == .transcription || sameLanguagePair
@@ -336,7 +350,9 @@ enum TheaterReadyGate {
             microphoneAllowed: microphone == .authorized,
             captureAllowed: canPromptMic,
             firstCaptionPrinted: firstCaptionPrinted,
-            mode: mode
+            mode: mode,
+            voiceEngineAdvice: voiceEngineAdvice,
+            voiceEngineNeedsRealign: voiceEngineNeedsRealign
         )
     }
 
@@ -346,16 +362,46 @@ enum TheaterReadyGate {
         microphone: AVAuthorizationStatus,
         firstCaptionPrinted: Bool
     ) -> Snapshot {
-        self.snapshot(
-            engineSupportsSource: SpokenLanguageResolver.voiceEngineSupportsSource(),
-            modelInstalled: SettingsStore.shared.selectedSpeechModel.isInstalled,
+        let settings = SettingsStore.shared
+        let source = SpokenLanguageResolver.sourceLanguage(settings: settings)
+        let engineSupportsSource = SpokenLanguageResolver.voiceEngineSupportsSource()
+        return self.snapshot(
+            engineSupportsSource: engineSupportsSource,
+            modelInstalled: settings.selectedSpeechModel.isInstalled,
             sameLanguagePair: SpokenLanguageResolver.isSameLanguagePair(),
             pack: pack,
             microphone: microphone,
             firstCaptionPrinted: firstCaptionPrinted,
-            mode: SettingsStore.shared.theaterSessionMode,
-            osSupported: TheaterAvailability.isSupported
+            mode: settings.theaterSessionMode,
+            osSupported: TheaterAvailability.isSupported,
+            voiceEngineAdvice: self.voiceEngineAdvice(
+                model: settings.selectedSpeechModel,
+                source: source,
+                heard: SpokenLanguageResolver.heardLanguage(settings: settings)
+            ),
+            voiceEngineNeedsRealign: !engineSupportsSource
+                && VoiceEngineLanguageCatalog.supports(settings.selectedSpeechModel, languageID: source.id)
         )
+    }
+
+    /// The older Apple Speech is only the answer when Analyzer is in use and
+    /// cannot hear I speak. An engine that can hear it but is set to another
+    /// language only needs its language matched, not a different engine.
+    static func voiceEngineAdvice(
+        model: SettingsStore.SpeechModel,
+        source: TranslationLanguage,
+        heard: TranslationLanguage?
+    ) -> String {
+        if VoiceEngineLanguageCatalog.supports(model, languageID: source.id) {
+            let heardName = heard?.displayName ?? "another language"
+            return "Voice Engine is set to hear \(heardName), not \(source.displayName). Press Match I speak."
+        }
+        if model == .appleSpeechAnalyzer,
+           VoiceEngineLanguageCatalog.supports(.appleSpeech, languageID: source.id)
+        {
+            return "Apple Speech Analyzer does not hear \(source.displayName). Open Voice Engine and pick the older Apple Speech."
+        }
+        return "Apple Speech on this Mac does not hear \(source.displayName). Pick another I speak."
     }
 
     static func microphoneAllowed(_ status: AVAuthorizationStatus) -> Bool {

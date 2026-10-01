@@ -80,13 +80,13 @@ final class LiveTranslationMockASRTests: XCTestCase {
         XCTAssertFalse(liveRows.contains { $0.isDraft })
 
         await subscriber.waitForIdleForTesting()
-        // The last sentence is still the whole draft. It waits for the next
-        // line or silence, so a close correction can still replace it.
+        // The last sentence prints once its wording stays still.
         XCTAssertEqual(
             subscriber.committedSourceLines,
             [
                 "Today we trained the model.",
                 "Then we applied it.",
+                "And we shipped it to production.",
             ]
         )
 
@@ -321,6 +321,101 @@ final class LiveTranslationMockASRTests: XCTestCase {
 
     /// A 15-letter burst used to type in 0.57 s and then idle until the next
     /// tick. Flow now spreads it across the expected arrival window.
+
+    func testAndAlexaGrowsTheLineAlreadyOnTheBoard() async {
+        let settings = SettingsStore.shared
+        let originalSource = settings.translationSourceLanguageID
+        let originalTarget = settings.translationTargetLanguageID
+        let originalMode = settings.theaterSessionMode
+        defer {
+            settings.translationSourceLanguageID = originalSource
+            settings.translationTargetLanguageID = originalTarget
+            settings.theaterSessionMode = originalMode
+        }
+        settings.theaterSessionMode = .transcription
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "en"
+
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        let siri = "Many people don't realize AI already impacts us, powering many tools we use daily from search engines that predict what we're looking for to voice assistance like Siri."
+        subscriber.handlePartial(siri)
+        subscriber.handlePartial(siri)
+        XCTAssertEqual(subscriber.committedSourceLines, [siri])
+
+        let alexa = "and Alexa, and even recommendations on Netflix."
+        subscriber.handlePartial(alexa)
+        subscriber.handlePartial(alexa)
+        await subscriber.waitForIdleForTesting()
+
+        XCTAssertEqual(subscriber.committedSourceLines.count, 1)
+        let line = subscriber.committedSourceLines[0]
+        XCTAssertTrue(
+            TranslationClauseSegmenter.normalizedKey(line).contains("like siri and alexa"),
+            line
+        )
+        XCTAssertFalse(line.hasPrefix("and "))
+    }
+
+    func testEpsteinCutsStayOnTheEnglishLine() async {
+        let settings = SettingsStore.shared
+        let originalSource = settings.translationSourceLanguageID
+        let originalTarget = settings.translationTargetLanguageID
+        let originalMode = settings.theaterSessionMode
+        defer {
+            settings.translationSourceLanguageID = originalSource
+            settings.translationTargetLanguageID = originalTarget
+            settings.theaterSessionMode = originalMode
+        }
+        settings.theaterSessionMode = .transcription
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "en"
+
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+
+        func commit(_ text: String) {
+            subscriber.handlePartial(text)
+            subscriber.handlePartial(text)
+        }
+
+        commit("Epstein files.")
+        XCTAssertEqual(subscriber.committedSourceLines, ["Epstein files."])
+        commit("The Epstein Files.")
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, ["The Epstein Files."])
+
+        commit("Deeply shrouded in controversy and secrecy.")
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines.count, 1)
+        XCTAssertTrue(
+            TranslationClauseSegmenter.normalizedKey(subscriber.committedSourceLines[0])
+                .contains("epstein files deeply shrouded"),
+            subscriber.committedSourceLines[0]
+        )
+
+        let us = "whose alleged crimes have implicated a web of high profile individuals across U.S."
+        commit(us)
+        commit("politics in Hollywood.")
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines.count, 2)
+        XCTAssertTrue(
+            TranslationClauseSegmenter.normalizedKey(subscriber.committedSourceLines[1])
+                .contains("us politics in hollywood"),
+            subscriber.committedSourceLines[1]
+        )
+
+        let despite = "Despite over 250 victims, and clear evidence of a large scale sex trafficking ring."
+        commit(despite)
+        commit("The full extent of the criminal network remains obscured.")
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines.count, 3)
+        XCTAssertTrue(
+            TranslationClauseSegmenter.normalizedKey(subscriber.committedSourceLines[2])
+                .contains("full extent"),
+            subscriber.committedSourceLines[2]
+        )
+    }
 
     func testVoiceDoesNotPrintALoneProvisionalPeriod() {
         let settings = SettingsStore.shared

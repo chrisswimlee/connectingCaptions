@@ -807,51 +807,6 @@ struct SettingsView: View {
                                     Divider().opacity(0.2)
 
                                     self.optionToggleRow(
-                                        title: "Save Transcription History",
-                                        description: "Save transcriptions for stats tracking. Disable for privacy.",
-                                        isOn: Binding(
-                                            get: { SettingsStore.shared.saveTranscriptionHistory },
-                                            set: {
-                                                SettingsStore.shared.saveTranscriptionHistory = $0
-                                                self.refreshAudioHistoryUsage()
-                                            }
-                                        )
-                                    )
-                                    .settingsSearchTarget(.transcriptionHistory)
-
-                                    if SettingsStore.shared.saveTranscriptionHistory {
-                                        self.historyRetentionControls()
-                                            .padding(.top, 2)
-                                            .settingsSearchTarget(.historyRetention)
-                                    }
-                                    Divider().opacity(0.2)
-
-                                    self.optionToggleRow(
-                                        title: "Save Audio With History",
-                                        description: "Store actual microphone audio locally with dictation history. Disabled by default.",
-                                        isOn: Binding(
-                                            get: { SettingsStore.shared.saveAudioWithTranscriptionHistory },
-                                            set: {
-                                                SettingsStore.shared.saveAudioWithTranscriptionHistory = $0
-                                                self.refreshAudioHistoryUsage()
-                                            }
-                                        )
-                                    )
-                                    .disabled(!SettingsStore.shared.saveTranscriptionHistory)
-                                    .settingsSearchTarget(.audioHistory)
-
-                                    if SettingsStore.shared.saveTranscriptionHistory,
-                                       SettingsStore.shared.saveAudioWithTranscriptionHistory
-                                    {
-                                        self.audioHistoryControls()
-                                            .padding(.top, 2)
-                                            .settingsSearchTarget(.audioStorage)
-                                        Divider().opacity(0.2)
-                                    } else {
-                                        Divider().opacity(0.2)
-                                    }
-
-                                    self.optionToggleRow(
                                         title: "Weekends Don't Break Streak",
                                         description: "Skip Saturday and Sunday when calculating usage streaks. Perfect for weekday-only users.",
                                         isOn: Binding(
@@ -880,7 +835,7 @@ struct SettingsView: View {
                     }
                     .padding(16)
                 }
-                .shownInSettingsSection(.general, selectedSection: self.selectedSection)
+                .shownInSettingsSection(.dictation, selectedSection: self.selectedSection)
 
                 ThemedCard(style: .standard) {
                     VStack(alignment: .leading, spacing: 14) {
@@ -946,18 +901,6 @@ struct SettingsView: View {
                 ThemedCard(style: .standard) {
                     VStack(alignment: .leading, spacing: 14) {
                         VStack(alignment: .leading, spacing: 12) {
-                            self.optionToggleRow(
-                                title: "AI Enhancement Failures",
-                                description: "Notify when AI Enhancement fails and raw transcription is typed.",
-                                isOn: Binding(
-                                    get: { SettingsStore.shared.notifyAIProcessingFailures },
-                                    set: { SettingsStore.shared.notifyAIProcessingFailures = $0 }
-                                )
-                            )
-                            .settingsSearchTarget(.aiEnhancementFailures)
-
-                            Divider().opacity(0.2)
-
                             self.optionToggleRow(
                                 title: "Microphone Changes",
                                 description: "Show an alert when \(ConnectingCaptionsProduct.displayName) changes or loses its microphone.",
@@ -1304,6 +1247,9 @@ struct SettingsView: View {
                 }
                 .settingsSearchTarget(.overlay)
                 .shownInSettingsSection(.dictation, selectedSection: self.selectedSection)
+
+                self.historySettingsCard
+                    .shownInSettingsSection(.dataAndDiagnostics, selectedSection: self.selectedSection)
 
                 // Backup & Restore Card
                 ThemedCard(style: .standard) {

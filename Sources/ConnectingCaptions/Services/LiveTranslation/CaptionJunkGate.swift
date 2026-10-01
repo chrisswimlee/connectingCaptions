@@ -2,17 +2,33 @@ import Foundation
 
 /// Drops Whisper YouTube boilerplate and clause-level loops before a line prints.
 /// Single-grapheme emphasis (ㅋㅋㅋㅋ, ㅎㅎ) and short acknowledgements stay.
+/// A short credit is junk only when it is the whole line, so a talk about
+/// subscribing is kept.
 enum CaptionJunkGate {
+    /// Long credits. A line that contains one of these is not a caption.
     private static let boilerplate: [String] = [
         "thanks for watching",
         "thank you for watching",
-        "thanks for watching.",
         "subtitles by",
         "amara.org",
-        "please subscribe",
-        "like and subscribe",
         "don't forget to subscribe",
         "do not forget to subscribe",
+        "字幕由",
+        "subtítulos realizados por",
+        "untertitel im auftrag",
+        "sous-titres réalisés par",
+        "ご視聴ありがとうございました",
+        "시청해 주셔서 감사합니다",
+    ]
+
+    /// Short credits. These are real words inside a sentence.
+    private static let wholeLineBoilerplate: [String] = [
+        "please subscribe",
+        "like and subscribe",
+        "チャンネル登録",
+        "구독과 좋아요",
+        "请不吝点赞",
+        "订阅",
     ]
 
     private static let acknowledgements: Set<String> = [
@@ -26,6 +42,7 @@ enum CaptionJunkGate {
         if trimmed.isEmpty { return false }
         if self.isAcknowledgement(trimmed) { return false }
         if self.matchesBoilerplate(trimmed) { return true }
+        if self.matchesWholeLine(trimmed) { return true }
         return self.hasPhraseRepeat(trimmed)
     }
 
@@ -35,10 +52,20 @@ enum CaptionJunkGate {
     }
 
     private static func matchesBoilerplate(_ text: String) -> Bool {
-        let folded = text
+        let folded = self.foldedLine(text)
+        return Self.boilerplate.contains { folded.contains(self.foldedLine($0)) }
+    }
+
+    private static func matchesWholeLine(_ text: String) -> Bool {
+        let folded = self.foldedLine(text)
+        guard folded.isEmpty == false else { return false }
+        return Self.wholeLineBoilerplate.contains { folded == self.foldedLine($0) }
+    }
+
+    private static func foldedLine(_ text: String) -> String {
+        text
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return Self.boilerplate.contains { folded.contains($0) }
+            .filter { $0.isLetter || $0.isNumber }
     }
 
     static func hasPhraseRepeat(_ text: String) -> Bool {

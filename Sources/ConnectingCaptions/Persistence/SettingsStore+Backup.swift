@@ -147,6 +147,7 @@ extension SettingsStore {
             self.privateAIContextTokenLimit = privateAIContextTokenLimit
         }
         self.selectedSpeechModel = payload.selectedSpeechModel
+        self.pinSpeechModelToAppleIfNeeded()
         if let selectedWhisperLanguageCode = payload.selectedWhisperLanguageCode {
             self.selectedWhisperLanguageCode = Self.whisperLanguageCode(fromBackupValue: selectedWhisperLanguageCode)
         }

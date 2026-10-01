@@ -46,7 +46,8 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         XCTAssertEqual(settings.selectedWhisperLanguageCode, "en")
     }
 
-    func testTheaterListenPinsAutomaticWhisperToSpokenSource() {
+    func testTheaterListenPinsAutomaticWhisperToSpokenSource() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalSource = settings.translationSourceLanguageID
@@ -71,7 +72,8 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         XCTAssertTrue(SpokenLanguageResolver.voiceEngineSupportsSource(settings: settings))
     }
 
-    func testTheaterListenOverwritesMismatchedWhisperLanguage() {
+    func testTheaterListenOverwritesMismatchedWhisperLanguage() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalSource = settings.translationSourceLanguageID
@@ -141,7 +143,8 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         XCTAssertEqual(SpokenLanguageHints.whisperLanguageCode(stored: "ko", alsoHearOthers: false), "ko")
     }
 
-    func testEitherWayLeavesWhisperOnAutoDetect() {
+    func testEitherWayLeavesWhisperOnAutoDetect() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalSource = settings.translationSourceLanguageID
@@ -177,7 +180,8 @@ final class WhisperLanguageSelectionTests: XCTestCase {
     }
 
     @MainActor
-    func testAlignSpokenEnginePinsAutomaticWhisperToSpokenSource() {
+    func testAlignSpokenEnginePinsAutomaticWhisperToSpokenSource() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalSource = settings.translationSourceLanguageID
@@ -226,7 +230,8 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         XCTAssertEqual(SettingsStore.whisperLanguageCode(fromBackupValue: backupValue), "ko")
     }
 
-    func testPinLocksCohereAndNemotronToISpeak() {
+    func testPinLocksCohereAndNemotronToISpeak() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalSource = settings.translationSourceLanguageID
@@ -297,7 +302,8 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         XCTAssertNil(SpokenLanguageResolver.voiceEngineMismatchMessage(settings: settings))
     }
 
-    func testWhisperLargeHearsISpeakEnglish() {
+    func testWhisperLargeHearsISpeakEnglish() throws {
+        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalSource = settings.translationSourceLanguageID

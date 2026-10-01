@@ -2,6 +2,45 @@ import XCTest
 @testable import ConnectingCaptions_Debug
 
 final class TheaterListenPolicyTests: XCTestCase {
+    func testVoiceEngineAdviceMatchesWhyTheEngineIsNotReady() {
+        let mismatch = TheaterReadyGate.voiceEngineAdvice(
+            model: .appleSpeechAnalyzer,
+            source: TranslationLanguageCatalog.english,
+            heard: TranslationLanguageCatalog.korean
+        )
+        XCTAssertTrue(mismatch.contains("set to hear Korean"), mismatch)
+        XCTAssertFalse(mismatch.contains("older Apple Speech"), mismatch)
+
+        let candidates = [
+            TranslationLanguageCatalog.arabic, TranslationLanguageCatalog.chinese,
+            TranslationLanguageCatalog.danish, TranslationLanguageCatalog.dutch,
+            TranslationLanguageCatalog.finnish, TranslationLanguageCatalog.french,
+        ]
+        for language in candidates {
+            let analyzer = VoiceEngineLanguageCatalog.supports(.appleSpeechAnalyzer, languageID: language.id)
+            let older = VoiceEngineLanguageCatalog.supports(.appleSpeech, languageID: language.id)
+            guard !analyzer else { continue }
+            let onAnalyzer = TheaterReadyGate.voiceEngineAdvice(model: .appleSpeechAnalyzer, source: language, heard: nil)
+            XCTAssertEqual(onAnalyzer.contains("older Apple Speech"), older, onAnalyzer)
+            if !older {
+                // Already on the older engine: never tell them to pick it.
+                let onOlder = TheaterReadyGate.voiceEngineAdvice(model: .appleSpeech, source: language, heard: nil)
+                XCTAssertFalse(onOlder.contains("older Apple Speech"), onOlder)
+            }
+        }
+
+        let blocked = TheaterReadyGate.snapshot(
+            engineSupportsSource: false,
+            modelInstalled: true,
+            sameLanguagePair: true,
+            pack: .installed,
+            microphone: .authorized,
+            firstCaptionPrinted: false,
+            voiceEngineAdvice: mismatch
+        )
+        XCTAssertEqual(blocked.nextAction, mismatch)
+    }
+
     func testReadyGateVoiceAndTranslateUseTheMicrophone() {
         let voiceDenied = TheaterReadyGate.snapshot(
             engineSupportsSource: true,
@@ -117,6 +156,18 @@ final class TheaterListenPolicyTests: XCTestCase {
 
     func testJunkGateDropsBoilerplateAndPhraseLoops() {
         XCTAssertTrue(CaptionJunkGate.shouldDrop("Thanks for watching."))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("ご視聴ありがとうございました"))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("시청해 주셔서 감사합니다."))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("字幕由 Amara.org"))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("Subtítulos realizados por Amara"))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("Please subscribe."))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("チャンネル登録"))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("구독과 좋아요"))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("订阅"))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("How do I 订阅 this channel?"))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("チャンネル登録の方法を説明します。"))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("Thank you."))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("감사합니다."))
         XCTAssertTrue(CaptionJunkGate.shouldDrop("감사합니다 감사합니다 감사합니다"))
         XCTAssertTrue(CaptionJunkGate.hasPhraseRepeat("hello hello hello"))
         XCTAssertFalse(CaptionJunkGate.shouldDrop("ㅋㅋㅋㅋ"))

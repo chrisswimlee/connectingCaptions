@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Honor-system work notice, or Licensed to {org} after a signed key.
+/// Optional work notice, or Licensed to {org} after a signed key.
 struct CommercialLicenseStatusCard: View {
     var showsKeyField = false
     var compact = false
@@ -101,10 +101,10 @@ struct CommercialLicenseStatusCard: View {
         }
         if self.settings.commercialLicenseRecord != nil {
             let refusal = self.settings.commercialSeatRefusal
-                ?? "Personal use stays free. Listen stays unlocked."
+                ?? "Free under GPLv3. Listen stays unlocked."
             return "\(refusal) Send Seat ID \(self.settings.commercialSeatID) to IT."
         }
-        return "Personal use is free."
+        return "Free under GPLv3, work use included."
     }
 
     private var title: String {

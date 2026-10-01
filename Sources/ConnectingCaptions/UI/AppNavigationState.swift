@@ -13,6 +13,7 @@ enum SidebarItem: Hashable {
     case welcome
     case voiceEngine
     case translationEngine
+    case languagePacks
     case aiEnhancements
     case cleanupStyles
     case customDictionary
@@ -28,6 +29,7 @@ enum SidebarItem: Hashable {
         case .welcome: return "sidebar.welcome"
         case .voiceEngine: return "sidebar.voiceEngine"
         case .translationEngine: return "sidebar.translationEngine"
+        case .languagePacks: return "sidebar.languagePacks"
         case .aiEnhancements: return "sidebar.aiProviders"
         case .cleanupStyles: return "sidebar.cleanupStyles"
         case .customDictionary: return "sidebar.customDictionary"
@@ -35,6 +37,20 @@ enum SidebarItem: Hashable {
         case .history: return "sidebar.history"
         case .changelog: return "sidebar.changelog"
         case .feedback: return "sidebar.feedback"
+        }
+    }
+
+    /// Hidden FluidVoice leftovers resolve to an advertised destination.
+    var advertisedDestination: SidebarItem {
+        switch self {
+        case .translationEngine:
+            return .languagePacks
+        case .customDictionary, .aiEnhancements, .cleanupStyles:
+            return .welcome
+        case .stats:
+            return .history
+        default:
+            return self
         }
     }
 }
@@ -69,9 +85,14 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     }
 
     /// Settings this product advertises. Dictation leftovers stay in the
-    /// enum for search and backups but are not a sidebar destination.
+    /// enum for backups but are not a sidebar destination or search hit.
     static var productSections: [SettingsSection] {
-        Self.allCases.filter { $0 != .dictation && $0 != .aiProviders }
+        Self.allCases.filter { $0 != .dictation && $0 != .aiProviders && $0 != .experimental }
+    }
+
+    /// Hidden settings resolve to Theater.
+    var advertisedDestination: SettingsSection {
+        Self.productSections.contains(self) ? self : .translation
     }
 
     var systemImage: String {
