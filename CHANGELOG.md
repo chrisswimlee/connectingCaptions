@@ -4,6 +4,7 @@ All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
 
+- Either way is on Theater Home and the board language chrome. Turn it on when Whisper can hear both languages of the pair; a Show-as clause flips. English ↔ Korean is the clearest script pair. Take turns — two voices at once will mix.
 - An open clause in the task bar is dimmer and shows a trailing ellipsis. A full board eases to the next line. Talk notes can read a PowerPoint deck. Save transcript, off until you turn it on, writes Markdown and VTT when Listen stops.
 - A pause no longer prints words that were never said.
 - A continuation that starts with and, but, or so stays on the current line. A shorter copy of a sentence already on the board does not print again.

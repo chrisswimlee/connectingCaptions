@@ -1419,7 +1419,7 @@ final class LiveTranslationSubscriber: ObservableObject {
             self.schedulePaintedGrowth(id: last.id, source: merged)
             return true
         }
-        if (recent || connective),
+        if recent || connective,
            let appended = TranslationClauseSegmenter.rowContinuation(row: source, unit: unit, languageID: languageID)
         {
             self.schedulePaintedGrowth(id: last.id, source: appended)

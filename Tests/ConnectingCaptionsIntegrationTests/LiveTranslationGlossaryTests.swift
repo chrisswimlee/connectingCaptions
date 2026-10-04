@@ -776,6 +776,17 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         let french = SpokenLanguageResolver.pairForSpokenText("Bonjour tout le monde", settings: settings)
         XCTAssertEqual(french.source.id, "fr")
         XCTAssertEqual(french.target.id, "en")
+
+        settings.translationTargetLanguageID = "ko"
+        SpokenLanguageResolver.noteDetectedLanguage(nil)
+        // Mixed script refuses a pick; stay I speak → Show as.
+        let mixed = SpokenLanguageResolver.pairForSpokenText("Hi 안녕", settings: settings)
+        XCTAssertEqual(mixed.source.id, "en")
+        XCTAssertEqual(mixed.target.id, "ko")
+        XCTAssertEqual(
+            SpokenLanguageResolver.dynamicPairingControlCopy(settings: settings),
+            TheaterReadiness.dynamicPairingHint(isWhisper: true)
+        )
     }
 
     func testSpeakCaptionsStaysOffForInsertAndSameLanguage() {

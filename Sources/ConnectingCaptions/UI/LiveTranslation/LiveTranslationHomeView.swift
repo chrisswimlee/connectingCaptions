@@ -83,7 +83,11 @@ struct LiveTranslationHomeView: View {
                 self.sectionRule
                 TheaterAudienceCard(showsCard: false)
                 if self.settings.theaterSessionMode.showsTranslation {
-                    Text(TheaterReadiness.oneSpeakerCloseMic)
+                    Text(
+                        SpokenLanguageResolver.isDynamicPairingEnabled()
+                            ? TheaterReadiness.eitherWayCloseMic
+                            : TheaterReadiness.oneSpeakerCloseMic
+                    )
                         .font(self.theme.typography.bodySmall)
                         .foregroundStyle(self.theme.palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -860,6 +864,12 @@ struct TranslationLanguagePairCard: View {
         .onChange(of: self.settings.selectedCohereLanguage) { _, _ in
             Task { await self.prepareAndRefreshAvailability() }
         }
+        .onChange(of: self.settings.theaterDynamicPairing) { _, _ in
+            Task { await self.prepareAndRefreshAvailability() }
+        }
+        .onChange(of: self.settings.theaterSessionMode) { _, _ in
+            Task { await self.prepareAndRefreshAvailability() }
+        }
     }
 
     private var cardBody: some View {
@@ -867,6 +877,11 @@ struct TranslationLanguagePairCard: View {
             FluidSectionHeader(title: AppLanguage.text("Languages"), systemImage: "globe")
                 .accessibilityIdentifier("theater.languages")
             self.languagePairRow
+            if self.settings.theaterSessionMode == .translation,
+               !SpokenLanguageResolver.isSameLanguagePair()
+            {
+                TheaterEitherWaySection(accessibilityIdentifier: "theater.home.eitherWay")
+            }
             self.engineHint
             self.packAction
         }

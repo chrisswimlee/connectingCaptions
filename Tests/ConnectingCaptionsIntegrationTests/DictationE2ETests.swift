@@ -507,9 +507,11 @@ final class DictationE2ETests: XCTestCase {
                 ASRService.applySpokenPunctuationFormatting("plus equal percent"),
                 "plus equal percent"
             )
+            // Bare "plus"/"equal" need symbol context; leading "plus" stays a word.
+            // "equal" still converts because the preceding "plus" alias counts as symbol context.
             XCTAssertEqual(
                 ASRService.applySpokenPunctuationFormatting("literal plus literal equal 50 literal percent"),
-                "+ = 50%"
+                "literal plus = 50%"
             )
             XCTAssertEqual(
                 ASRService.applySpokenPunctuationFormatting("plus I need the normal word"),

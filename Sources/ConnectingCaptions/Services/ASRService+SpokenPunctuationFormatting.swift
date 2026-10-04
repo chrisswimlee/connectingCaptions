@@ -186,13 +186,34 @@ private enum SpokenPunctuationFormatter {
 
     private static func makeRules(from dictionaryRules: [SettingsStore.PunctuationDictionaryRule]) -> [PhraseRule] {
         dictionaryRules.flatMap { rule in
-            self.rules(
-                symbol: rule.symbol,
-                spacing: self.spacing(for: rule),
-                phrases: rule.aliases
-            )
+            let spacing = self.spacing(for: rule)
+            return rule.aliases.flatMap { alias in
+                self.rules(
+                    symbol: rule.symbol,
+                    spacing: spacing,
+                    phrases: [alias],
+                    requiresSymbolContext: self.requiresSymbolContext(forAlias: alias),
+                    requiresDotContext: alias == "dot",
+                    requiresSlashPathContext: self.slashPathAliases.contains(alias),
+                    requiresAtSignPunctuationApp: self.atSignAppAliases.contains(alias)
+                )
+            }
         }
     }
+
+    /// Bare "plus"/"equal(s)" stay words in prose; "plus sign"/"equals sign" always convert.
+    private static func requiresSymbolContext(forAlias alias: String) -> Bool {
+        alias == "plus" || alias == "equal" || alias == "equals"
+    }
+
+    private static let slashPathAliases: Set<String> = [
+        "slash", "forward slash", "forwardslash",
+    ]
+
+    /// "at the rate" is always safe; "at sign" needs a coding/chat app context.
+    private static let atSignAppAliases: Set<String> = [
+        "at sign", "commercial at",
+    ]
 
     private static func makeActionRules(
         from actionRules: [SettingsStore.SpokenFormattingActionRule]
@@ -248,229 +269,6 @@ private enum SpokenPunctuationFormatter {
             .split(whereSeparator: \.isWhitespace)
             .map { String($0).lowercased() }
             .filter { !$0.isEmpty }
-    }
-
-    private static func makeRules() -> [PhraseRule] {
-        self.rules(
-            symbol: ",",
-            spacing: .rightAttached,
-            phrases: ["comma"]
-        ) +
-            self.rules(
-                symbol: ".",
-                spacing: .rightAttached,
-                phrases: ["period", "full stop"]
-            ) +
-            self.rules(
-                symbol: ".",
-                spacing: .noSpaceAround,
-                phrases: ["dot"],
-                requiresDotContext: true
-            ) +
-            self.rules(
-                symbol: "?",
-                spacing: .rightAttached,
-                phrases: ["question mark", "questionmark"]
-            ) +
-            self.rules(
-                symbol: "!",
-                spacing: .rightAttached,
-                phrases: ["exclamation mark", "exclamation point", "bang"]
-            ) +
-            self.rules(
-                symbol: ":",
-                spacing: .rightAttached,
-                phrases: ["colon"]
-            ) +
-            self.rules(
-                symbol: ";",
-                spacing: .rightAttached,
-                phrases: ["semicolon", "semi colon"]
-            ) +
-            self.rules(
-                symbol: "...",
-                spacing: .rightAttached,
-                phrases: ["ellipsis", "dot dot dot", "three dots"]
-            ) +
-            self.rules(
-                symbol: "/",
-                spacing: .noSpaceAround,
-                phrases: ["slash", "forward slash", "forwardslash"],
-                requiresSlashPathContext: true
-            ) +
-            self.rules(
-                symbol: "\\",
-                spacing: .noSpaceAround,
-                phrases: ["backslash", "back slash"]
-            ) +
-            self.rules(
-                symbol: "-",
-                spacing: .noSpaceAround,
-                phrases: ["hyphen"]
-            ) +
-            self.rules(
-                symbol: "-",
-                spacing: .spaceAround,
-                phrases: ["dash", "minus sign"]
-            ) +
-            self.rules(
-                symbol: "—",
-                spacing: .spaceAround,
-                phrases: ["em dash", "long dash"]
-            ) +
-            self.rules(
-                symbol: "–",
-                spacing: .spaceAround,
-                phrases: ["en dash"]
-            ) +
-            self.rules(
-                symbol: "(",
-                spacing: .leftAttached,
-                phrases: ["open parenthesis", "open parentheses", "left parenthesis", "left parentheses", "open paren", "left paren"]
-            ) +
-            self.rules(
-                symbol: ")",
-                spacing: .rightAttached,
-                phrases: ["close parenthesis", "close parentheses", "right parenthesis", "right parentheses", "close paren", "right paren"]
-            ) +
-            self.rules(
-                symbol: "[",
-                spacing: .leftAttached,
-                phrases: ["open bracket", "left bracket", "open square bracket", "left square bracket"]
-            ) +
-            self.rules(
-                symbol: "]",
-                spacing: .rightAttached,
-                phrases: ["close bracket", "right bracket", "close square bracket", "right square bracket"]
-            ) +
-            self.rules(
-                symbol: "{",
-                spacing: .leftAttached,
-                phrases: ["open brace", "left brace", "open curly brace", "left curly brace", "open curly bracket", "left curly bracket"]
-            ) +
-            self.rules(
-                symbol: "}",
-                spacing: .rightAttached,
-                phrases: ["close brace", "right brace", "close curly brace", "right curly brace", "close curly bracket", "right curly bracket"]
-            ) +
-            self.rules(
-                symbol: "<",
-                spacing: .leftAttached,
-                phrases: ["open angle bracket", "left angle bracket", "less than sign"]
-            ) +
-            self.rules(
-                symbol: ">",
-                spacing: .rightAttached,
-                phrases: ["close angle bracket", "right angle bracket", "greater than sign"]
-            ) +
-            self.rules(
-                symbol: "\"",
-                spacing: .toggleDoubleQuote,
-                phrases: ["quote", "quotes", "quotation mark", "double quote"]
-            ) +
-            self.rules(
-                symbol: "\"",
-                spacing: .leftAttached,
-                phrases: ["open quote", "opening quote", "open double quote", "opening double quote"]
-            ) +
-            self.rules(
-                symbol: "\"",
-                spacing: .rightAttached,
-                phrases: ["close quote", "closing quote", "close double quote", "closing double quote"]
-            ) +
-            self.rules(
-                symbol: "'",
-                spacing: .toggleSingleQuote,
-                phrases: ["single quote"]
-            ) +
-            self.rules(
-                symbol: "'",
-                spacing: .noSpaceAround,
-                phrases: ["apostrophe"]
-            ) +
-            self.rules(
-                symbol: "@",
-                spacing: .noSpaceAround,
-                phrases: ["at the rate"]
-            ) +
-            self.rules(
-                symbol: "@",
-                spacing: .noSpaceAround,
-                phrases: ["at sign", "commercial at"],
-                requiresAtSignPunctuationApp: true
-            ) +
-            self.rules(
-                symbol: "&",
-                spacing: .spaceAround,
-                phrases: ["ampersand", "and sign"]
-            ) +
-            self.rules(
-                symbol: "+",
-                spacing: .spaceAround,
-                phrases: ["plus sign"]
-            ) +
-            self.rules(
-                symbol: "+",
-                spacing: .spaceAround,
-                phrases: ["plus"],
-                requiresSymbolContext: true
-            ) +
-            self.rules(
-                symbol: "=",
-                spacing: .spaceAround,
-                phrases: ["equals sign", "equal sign"]
-            ) +
-            self.rules(
-                symbol: "=",
-                spacing: .spaceAround,
-                phrases: ["equal", "equals"],
-                requiresSymbolContext: true
-            ) +
-            self.rules(
-                symbol: "%",
-                spacing: .rightAttached,
-                phrases: ["percent sign", "percentage sign", "percent"]
-            ) +
-            self.rules(
-                symbol: "$",
-                spacing: .leftAttached,
-                phrases: ["dollar sign", "dollar"]
-            ) +
-            self.rules(
-                symbol: "#",
-                spacing: .noSpaceAround,
-                phrases: ["hash", "hash sign", "hashtag", "pound sign", "number sign"]
-            ) +
-            self.rules(
-                symbol: "*",
-                spacing: .noSpaceAround,
-                phrases: ["asterisk", "star symbol"]
-            ) +
-            self.rules(
-                symbol: "_",
-                spacing: .noSpaceAround,
-                phrases: ["underscore"]
-            ) +
-            self.rules(
-                symbol: "|",
-                spacing: .noSpaceAround,
-                phrases: ["pipe", "vertical bar"]
-            ) +
-            self.rules(
-                symbol: "~",
-                spacing: .noSpaceAround,
-                phrases: ["tilde"]
-            ) +
-            self.rules(
-                symbol: "^",
-                spacing: .noSpaceAround,
-                phrases: ["caret"]
-            ) +
-            self.rules(
-                symbol: "`",
-                spacing: .noSpaceAround,
-                phrases: ["backtick", "back tick"]
-            )
     }
 
     private static func rules(

@@ -43,6 +43,7 @@ enum AppLanguageCopy {
         case "Same language": return "sameLanguage"
         case "Theater mode": return "theaterMode"
         case "Swap languages": return "swapLanguages"
+        case "Either way": return "eitherWay"
         case TheaterReadiness.screenShare: return "screenShare"
         default: return nil
         }
@@ -564,6 +565,7 @@ enum AppLanguageCopy {
         "sameLanguage": "같은 언어",
         "theaterMode": "Theater 모드",
         "swapLanguages": "언어 바꾸기",
+        "eitherWay": "양쪽 모두",
         "screenShare": "자리에는 자막이 보이고 회의에는 보이지 않게 하려면 슬라이드 창을 공유하세요. "
             + "회의가 보드를 봐야 하면 Theater 창을 공유하세요. "
             + "스크린샷과 전체 화면 공유에는 이 자막이 포함됩니다.",

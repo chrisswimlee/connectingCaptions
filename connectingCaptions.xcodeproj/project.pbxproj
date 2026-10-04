@@ -25,6 +25,7 @@
 		86CAA2D4EF18433096185602 /* LLMClientRequestBodyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343B29013F4441D6A797D12D /* LLMClientRequestBodyTests.swift */; };
 		A62300000000000000000002 /* AudioBufferConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A62300000000000000000001 /* AudioBufferConverterTests.swift */; };
 		B51800000000000000000002 /* SpokenSendTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B51800000000000000000001 /* SpokenSendTests.swift */; };
+		SPFC00000000000000000002 /* SpokenPunctuationFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SPFC00000000000000000001 /* SpokenPunctuationFormattingTests.swift */; };
 		B51900000000000000000002 /* PrivateAIProviderPromptFormatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B51900000000000000000001 /* PrivateAIProviderPromptFormatTests.swift */; };
 		B52000000000000000000002 /* PrivateAIDictationTokenBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B52000000000000000000001 /* PrivateAIDictationTokenBudgetTests.swift */; };
 		C0DE63600000000000000002 /* AudioEngineRetirementDrainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE63600000000000000001 /* AudioEngineRetirementDrainTests.swift */; };
@@ -115,6 +116,7 @@
 		980330F3CE464336ADCE3E23 /* TemperatureSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemperatureSupportTests.swift; sourceTree = "<group>"; };
 		A62300000000000000000001 /* AudioBufferConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioBufferConverterTests.swift; sourceTree = "<group>"; };
 		B51800000000000000000001 /* SpokenSendTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpokenSendTests.swift; sourceTree = "<group>"; };
+		SPFC00000000000000000001 /* SpokenPunctuationFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpokenPunctuationFormattingTests.swift; sourceTree = "<group>"; };
 		B51900000000000000000001 /* PrivateAIProviderPromptFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateAIProviderPromptFormatTests.swift; sourceTree = "<group>"; };
 		B52000000000000000000001 /* PrivateAIDictationTokenBudgetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateAIDictationTokenBudgetTests.swift; sourceTree = "<group>"; };
 		C0DE63600000000000000001 /* AudioEngineRetirementDrainTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioEngineRetirementDrainTests.swift; sourceTree = "<group>"; };
@@ -262,6 +264,7 @@
 				7CFA1D0B2F500000C0DEF002 /* TypingServiceTransientPasteboardTests.swift */,
 				803000000000000000000001 /* MediaPlaybackServiceTests.swift */,
 				B51800000000000000000001 /* SpokenSendTests.swift */,
+				SPFC00000000000000000001 /* SpokenPunctuationFormattingTests.swift */,
 				B51900000000000000000001 /* PrivateAIProviderPromptFormatTests.swift */,
 				B52000000000000000000001 /* PrivateAIDictationTokenBudgetTests.swift */,
 				C0DE63700000000000000001 /* WhisperLanguageSelectionTests.swift */,
@@ -540,6 +543,7 @@
 				7CFA1D0B2F500000C0DEF001 /* TypingServiceTransientPasteboardTests.swift in Sources */,
 				803000000000000000000002 /* MediaPlaybackServiceTests.swift in Sources */,
 				B51800000000000000000002 /* SpokenSendTests.swift in Sources */,
+				SPFC00000000000000000002 /* SpokenPunctuationFormattingTests.swift in Sources */,
 				B51900000000000000000002 /* PrivateAIProviderPromptFormatTests.swift in Sources */,
 				C0DE63700000000000000002 /* WhisperLanguageSelectionTests.swift in Sources */,
 				CACEC0010000000000000002 /* KeychainServiceCacheTests.swift in Sources */,

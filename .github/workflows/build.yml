@@ -40,6 +40,7 @@ jobs:
             - 'Info.plist'
             - 'connectingCaptions.entitlements'
             - '.swiftlint.yml'
+            - 'scripts/test-omitted-tests.sh'
             - '.github/workflows/build.yml'
 
   lint:
@@ -52,6 +53,9 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+    - name: Check test harness wiring
+      run: sh scripts/test-omitted-tests.sh
 
     - name: Run SwiftLint (strict)
       run: |
@@ -88,7 +92,14 @@ jobs:
     
     - name: Show Xcode version
       run: xcodebuild -version
-      
+
+    # Standalone swiftc harnesses (no XCTest). Non-live only — --live needs a
+    # full Accessibility session and is intentionally local.
+    - name: Run paste-key and history persistence harnesses
+      run: |
+        sh Tests/run_paste_key_cache_tests.sh
+        sh Tests/run_history_persistence_tests.sh
+
     # Hosted CI is Xcode 26 on macos-15. It cannot prove a live Theater listen.
     # Prove a talk on a Mac with docs/STAGE_SCORE.md. Do not invent HUD numbers.
     # Tiny Whisper GGUF output is nondeterministic on hosted macOS runners.

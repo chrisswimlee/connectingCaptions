@@ -151,17 +151,28 @@ When a change belongs in the upstream dictation engine rather than translation o
 
 ---
 
-## Run Integration Tests
+## Run tests
+
+Full local run, matching the `Build and Test` CI gate (CI skips the Theater smoke and
+the flaky Tiny Whisper E2E because hosted runners can't prove either):
 
 ```bash
-xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions -destination 'platform=macOS'
+xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions \
+  -destination 'platform=macOS,arch=arm64' \
+  -skip-testing:ConnectingCaptionsUITests \
+  -skip-testing:ConnectingCaptionsIntegrationTests/DictationE2ETests/testDictationEndToEnd_whisperTiny_transcribesFixture
 ```
 
-CI uses unsigned builds:
+CI runs the two standalone harnesses before that test command, and `scripts/test-omitted-tests.sh`
+as the first lint-job step (it fails the build if a file under `Tests/` compiles in no target or harness):
 
 ```bash
-xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions -destination 'platform=macOS' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+sh scripts/test-omitted-tests.sh
+sh Tests/run_paste_key_cache_tests.sh
+sh Tests/run_history_persistence_tests.sh
 ```
+
+The paste-key and history harnesses are **not** XCTest targets — they compile via `swiftc` in those scripts (CLT or full Xcode). Pass `--live` to the paste harness only on a local Mac with Accessibility; CI never passes that flag.
 
 ---
 

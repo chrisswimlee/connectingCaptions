@@ -42,6 +42,10 @@ enum TheaterChromeHelp {
         "Swap languages",
         does: "Swap I speak and Show as. Stops Listen."
     )
+    static let eitherWay = tag(
+        "Either way",
+        does: "Speak either language of this pair. Whisper hears both; a Show-as clause flips. Stops Listen when changed."
+    )
     static let mode = tag(
         "Theater mode",
         does: "Voice writes what you say. Translate captions into a supported language. Switching stops Listen."

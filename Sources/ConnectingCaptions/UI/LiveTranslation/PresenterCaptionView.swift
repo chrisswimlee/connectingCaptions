@@ -806,6 +806,18 @@ struct PresenterCaptionView: View {
                     selection: self.targetLanguageID,
                     languages: self.targetLanguages
                 )
+
+                if !SpokenLanguageResolver.isSameLanguagePair() {
+                    TheaterEitherWaySection(
+                        accessibilityIdentifier: "theater.window.eitherWay",
+                        compact: true,
+                        apply: { enabled in
+                            PresenterCaptionController.shared.performChromeAction {
+                                self.controller.applyDynamicPairing(enabled)
+                            }
+                        }
+                    )
+                }
             }
         }
         .accessibilityElement(children: .contain)

@@ -129,6 +129,10 @@ enum TheaterReadiness {
     static let oneSpeakerCloseMic =
         "Best with one speaker and a close mic. Halls, PA bleed, and Q&A will miss words."
 
+    /// Stage card when Either way is active for the current Whisper pair.
+    static let eitherWayCloseMic =
+        "Either way: take turns in either language of the pair. Two voices at once will mix. English ↔ Korean is the clearest script pair."
+
     static let transcriptionCopy =
         "Voice Engine sharpens speech into text. Voice writes that text in the language you speak. Switch to Translate for a supported language."
 

@@ -46,13 +46,25 @@ Launch `DerivedData/Build/Products/Debug/Connecting Captions Debug.app`. Keep us
 
 4. Allow the microphone. Pick **Voice** for the language you speak or **Translate** for captions. Press **Listen** and speak one sentence. A language pack downloads only when I speak and Show as differ. Theater Listen does not ask for Screen Recording.
 
-5. Format, lint, and test. `./scripts/format-and-lint.sh` is required before you open a PR (SwiftFormat, SwiftLint strict, and the PR-policy unit tests when those tools are installed):
+5. Format, lint, and test. `./scripts/format-and-lint.sh` is required before you open a PR (SwiftFormat, SwiftLint strict, and the PR-policy unit tests when those tools are installed). CI runs the same chain in this order: `scripts/test-omitted-tests.sh` (wiring guard), SwiftLint strict, then the harnesses and the test command:
 
 ```bash
 ./scripts/format-and-lint.sh
+sh scripts/test-omitted-tests.sh
+sh Tests/run_paste_key_cache_tests.sh
+sh Tests/run_history_persistence_tests.sh
 xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions \
   -destination 'platform=macOS,arch=arm64' \
-  -skip-testing:ConnectingCaptionsUITests
+  -skip-testing:ConnectingCaptionsUITests \
+  -skip-testing:ConnectingCaptionsIntegrationTests/DictationE2ETests/testDictationEndToEnd_whisperTiny_transcribesFixture
+```
+
+The Tiny Whisper E2E is skipped in CI only because GGUF output is nondeterministic on hosted runners; keep it green locally.
+
+Paste-key and history persistence tests stay in `Tests/run_*.sh` only (not the Integration Sources phase). Non-live paste + history run in CI. Local-only live layout probe:
+
+```bash
+sh Tests/run_paste_key_cache_tests.sh --live
 ```
 
 `ConnectingCaptionsUITests` is the Theater smoke. It needs macOS UI automation. Local machines can skip it. Hosted CI uses Xcode 26 on a `macos-15` runner; it **cannot** prove a live Theater listen. Prove a talk on your Mac with [docs/STAGE_SCORE.md](docs/STAGE_SCORE.md). Do not invent WER or HUD numbers.
