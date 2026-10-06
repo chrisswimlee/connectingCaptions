@@ -29,7 +29,7 @@ struct CommercialLicenseStatusCard: View {
                 .foregroundStyle(self.theme.palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             if self.showsLicenseRequest {
-                Link("Request a commercial license", destination: ConnectingCaptionsProduct.commercialLicenseMailURL)
+                Link("Email to buy", destination: ConnectingCaptionsProduct.commercialLicenseMailURL)
                     .textLinkPointer()
                     .font(self.theme.typography.bodySmall)
                     .accessibilityIdentifier("commercial.license.request")
@@ -55,8 +55,17 @@ struct CommercialLicenseStatusCard: View {
                 }
 
                 if self.showsLicenseRequest {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Named license \(ConnectingCaptionsProduct.commercialSeatPriceLine), \(ConnectingCaptionsProduct.commercialSeatMinimum) Macs minimum.")
+                        Text("Written SLA \(ConnectingCaptionsProduct.commercialSLAPriceLine).")
+                        Text("MDM / Jamf pkg \(ConnectingCaptionsProduct.commercialMDMPriceLine).")
+                    }
+                    .font(self.theme.typography.bodySmall)
+                    .foregroundStyle(self.theme.palette.secondaryText)
+                    .accessibilityIdentifier("commercial.license.prices")
+
                     HStack(spacing: 8) {
-                        Link("Request a commercial license", destination: ConnectingCaptionsProduct.commercialLicenseMailURL)
+                        Link("Email to buy", destination: ConnectingCaptionsProduct.commercialLicenseMailURL)
                             .textLinkPointer()
                             .accessibilityIdentifier("commercial.license.request")
                         Link("License page", destination: ConnectingCaptionsProduct.commercialLicenseURL)

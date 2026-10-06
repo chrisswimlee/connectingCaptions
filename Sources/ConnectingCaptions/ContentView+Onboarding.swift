@@ -156,7 +156,11 @@ extension ContentView {
     }
 
     var onboardingVoiceModelReady: Bool {
-        self.asr.isAsrReady
+        let model = self.settings.selectedSpeechModel
+        if model == .appleSpeech || model == .appleSpeechAnalyzer {
+            return model.isInstalled
+        }
+        return self.asr.isAsrReady
     }
 
     var onboardingMicrophoneReady: Bool {

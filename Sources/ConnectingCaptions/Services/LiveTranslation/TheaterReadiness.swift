@@ -250,8 +250,8 @@ enum TheaterReadiness {
 
     static func dynamicPairingHint(isWhisper: Bool) -> String {
         isWhisper
-            ? "Either way: speak either language of this pair. Captions stay both."
-            : "Either way needs Whisper. This Voice Engine stays on I speak, so a question in Show as is not flipped."
+            ? "Either way: speak either language of this pair. Captions stay both. Whisper Small is the add-on; Apple Speech stays for one speaker."
+            : "Turn Either way on to download Whisper Small. Apple Speech stays on I speak until then."
     }
 
     static var macOSNote: String {

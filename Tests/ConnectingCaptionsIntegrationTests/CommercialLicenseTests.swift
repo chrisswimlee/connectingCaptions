@@ -112,6 +112,9 @@ final class CommercialLicenseTests: XCTestCase {
         )
         XCTAssertEqual(ConnectingCaptionsProduct.commercialLicenseMailURL.scheme, "mailto")
         XCTAssertTrue(ConnectingCaptionsProduct.commercialLicenseMailURL.absoluteString.contains("commercial%20license"))
+        XCTAssertTrue(ConnectingCaptionsProduct.workNotice.contains("$60"))
+        XCTAssertEqual(ConnectingCaptionsProduct.commercialSeatMinimum, 5)
+        XCTAssertTrue(ConnectingCaptionsProduct.commercialLicenseMailURL.absoluteString.contains("Mac%20count"))
     }
 
     private func makeRecord(

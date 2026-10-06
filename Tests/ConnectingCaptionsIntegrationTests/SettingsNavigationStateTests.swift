@@ -91,6 +91,7 @@ final class SettingsNavigationStateTests: XCTestCase {
         )
         XCTAssertEqual(SettingsSearchIndex.results(for: "commercial license").first?.section, .general)
         XCTAssertTrue(SettingsSearchIndex.results(for: "SLA").contains { $0.target == .commercialLicense })
+        XCTAssertTrue(SettingsSearchIndex.results(for: "$60").contains { $0.target == .commercialLicense })
         XCTAssertTrue(SettingsSearchIndex.results(for: "enterprise").contains { $0.target == .commercialLicense })
     }
 

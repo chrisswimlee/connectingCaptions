@@ -345,9 +345,36 @@ final class LiveTranslationController: ObservableObject {
         self.finishLanguageChange()
     }
 
-    /// Either way. The stored flag stays; the engine gate decides whether Listen flips.
+    /// Either way. Turning it on selects Whisper Small (download once). Turning
+    /// it off returns Voice Engine to Apple Speech.
     func applyDynamicPairing(_ enabled: Bool) {
-        SettingsStore.shared.theaterDynamicPairing = enabled
+        let settings = SettingsStore.shared
+        settings.theaterDynamicPairing = enabled
+        let addOn = SettingsStore.SpeechModel.eitherWayAddOn
+        if enabled {
+            if settings.selectedSpeechModel != addOn {
+                settings.selectedSpeechModel = addOn
+                SpokenLanguageResolver.pinSpokenEngineToSource(settings: settings)
+                let asr = AppServices.shared.asr
+                asr.resetTranscriptionProvider()
+                Task {
+                    do {
+                        try await asr.ensureAsrReady()
+                    } catch is CancellationError {
+                        DebugLogger.shared.info("Either way Whisper add-on cancelled", source: "LiveTranslationController")
+                    } catch {
+                        DebugLogger.shared.error("Either way Whisper add-on failed: \(error)", source: "LiveTranslationController")
+                        asr.errorTitle = "Whisper download failed"
+                        asr.errorMessage = error.localizedDescription
+                        asr.showError = true
+                    }
+                }
+            }
+        } else if settings.selectedSpeechModel == addOn {
+            settings.selectedSpeechModel = SettingsStore.SpeechModel.defaultModel
+            SpokenLanguageResolver.pinAppleSpeechToSpokenSource(settings: settings)
+            AppServices.shared.asr.resetTranscriptionProvider()
+        }
         self.finishLanguageChange()
     }
 

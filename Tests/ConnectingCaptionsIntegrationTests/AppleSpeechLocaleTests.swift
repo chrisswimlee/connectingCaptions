@@ -135,10 +135,25 @@ final class AppleSpeechLocaleTests: XCTestCase {
 
         settings.translationSourceLanguageID = "ko"
         settings.selectedAppleSpeechLocaleIdentifier = "en-US"
-        settings.selectedSpeechModel = .whisperSmall
+        settings.selectedSpeechModel = .whisperTiny
         settings.pinSpeechModelToAppleIfNeeded()
+        XCTAssertEqual(settings.selectedSpeechModel, SettingsStore.SpeechModel.defaultModel)
         XCTAssertEqual(settings.selectedAppleSpeechLocaleIdentifier, "ko-KR")
         XCTAssertTrue(SpokenLanguageResolver.voiceEngineSupportsSource(settings: settings))
+    }
+
+    func testEitherWayWhisperAddOnIsNotPinnedToApple() throws {
+        try XCTSkipUnless(SettingsStore.SpeechModel.appleSpeechOnly)
+        let settings = SettingsStore.shared
+        let originalModel = settings.selectedSpeechModel
+        defer { settings.selectedSpeechModel = originalModel }
+
+        settings.selectedSpeechModel = .whisperSmall
+        settings.pinSpeechModelToAppleIfNeeded()
+        XCTAssertEqual(settings.selectedSpeechModel, .whisperSmall)
+        XCTAssertTrue(SettingsStore.SpeechModel.availableModels.contains(.whisperSmall))
+        XCTAssertFalse(SettingsStore.SpeechModel.availableModels.contains(.whisperTiny))
+        XCTAssertFalse(SettingsStore.SpeechModel.availableModels.contains(.parakeetTDTv2))
     }
 
     func testVoiceEngineDefaultsToAnalyzerOtherwiseAppleSpeech() throws {
@@ -167,7 +182,11 @@ final class AppleSpeechLocaleTests: XCTestCase {
         settings.selectedSpeechModel = .parakeetTDTv2
         settings.pinSpeechModelToAppleIfNeeded()
         XCTAssertEqual(settings.selectedSpeechModel, expected)
-        XCTAssertFalse(SettingsStore.SpeechModel.availableModels.contains { $0.provider != .apple })
+        XCTAssertFalse(
+            SettingsStore.SpeechModel.availableModels.contains {
+                $0.provider != .apple && $0 != SettingsStore.SpeechModel.eitherWayAddOn
+            }
+        )
 
         settings.selectedSpeechModel = .appleSpeech
         settings.pinSpeechModelToAppleIfNeeded()

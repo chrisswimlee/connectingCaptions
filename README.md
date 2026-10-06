@@ -18,7 +18,7 @@ By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
 [Download](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://chrisswimlee.com/connectingCaptions/license/)
 
-**For work:** if IT or legal need a named commercial license or an SLA, [request one](https://chrisswimlee.com/connectingCaptions/license/). The app stays free for everyone, work use included.
+**For work:** a named license is $60 per Mac per year, five Macs minimum. Prices are on the [license page](https://chrisswimlee.com/connectingCaptions/license/). The app stays free for everyone, work use included.
 
 ---
 
@@ -194,10 +194,10 @@ This release does not send analytics, feedback, or update checks to a third-part
 
 connectingCaptions is free for everyone under GPLv3, work use included. Theater Listen stays unlocked. A commercial license is optional.
 
-Firms that need a vendor they can sanction — a named license, a security contact, or a written SLA — request a commercial license:
+Firms that need a vendor they can sanction — a named license, a security contact, or a written SLA — buy at the published price:
 
-- [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/)
-- Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=Connecting%20Captions%20commercial%20license) with the organization, seat count, and whether you need an SLA
+- [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/) — $60 / Mac / year, five Macs minimum; SLA +$90 / Mac / year; MDM pkg $1,500 once
+- Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=Connecting%20Captions%20commercial%20license) with the organization and Mac count
 
 A paid key is air-gapped. It replaces the in-app work notice with **Licensed to** your organization. It does not phone home. A written SLA and a signed seat list are optional. A Jamf or Fleet package can install the key, the seat list, and caption settings. The on-device audit log stores no captions. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
 

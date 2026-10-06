@@ -247,7 +247,8 @@ enum SettingsSearchIndex {
             title: "Commercial License",
             terms: [
                 "license commercial enterprise SLA IT legal procurement named organization",
-                "for work request a commercial license licensed to activation key air-gapped",
+                "for work email to buy licensed to activation key air-gapped",
+                "price $60 seat Mac year SLA MDM Jamf Fleet pkg",
                 "seat list Jamf Fleet MDM pkg audit log caption policy activity log backup restore",
             ]
         ),

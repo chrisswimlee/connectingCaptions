@@ -877,9 +877,7 @@ struct TranslationLanguagePairCard: View {
             FluidSectionHeader(title: AppLanguage.text("Languages"), systemImage: "globe")
                 .accessibilityIdentifier("theater.languages")
             self.languagePairRow
-            if self.settings.theaterSessionMode == .translation,
-               !SpokenLanguageResolver.isSameLanguagePair()
-            {
+            if SpokenLanguageResolver.showsEitherWayControl() {
                 TheaterEitherWaySection(accessibilityIdentifier: "theater.home.eitherWay")
             }
             self.engineHint

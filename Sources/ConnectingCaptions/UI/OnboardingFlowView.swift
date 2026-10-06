@@ -257,8 +257,8 @@ struct OnboardingFlowView: View {
         if let route = self.selectedOnboardingRoute {
             return self.isOnboardingRouteReady(route)
         }
-        return self.settings.selectedSpeechModel == .appleSpeech
-            || self.settings.selectedSpeechModel == .appleSpeechAnalyzer
+        let model = self.settings.selectedSpeechModel
+        return (model == .appleSpeech || model == .appleSpeechAnalyzer) && model.isInstalled
     }
 
     var isModelPreparationInProgress: Bool {

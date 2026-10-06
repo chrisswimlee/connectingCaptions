@@ -807,7 +807,7 @@ struct PresenterCaptionView: View {
                     languages: self.targetLanguages
                 )
 
-                if !SpokenLanguageResolver.isSameLanguagePair() {
+                if SpokenLanguageResolver.showsEitherWayControl() {
                     TheaterEitherWaySection(
                         accessibilityIdentifier: "theater.window.eitherWay",
                         compact: true,

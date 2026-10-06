@@ -35,8 +35,8 @@ struct TheaterModeSection: View {
 }
 
 /// Either way: speak either language of the pair; Theater flips the clause.
-/// Shared by the language card and Theater chrome. Stays visible when Whisper
-/// cannot hear both sides so the disabled reason is never a missing control.
+/// Shared by the language card and Theater chrome. Turning it on downloads
+/// Whisper Small once; Apple Speech stays the default for one speaker.
 struct TheaterEitherWaySection: View {
     @ObservedObject private var settings = SettingsStore.shared
     @ObservedObject private var controller = LiveTranslationController.shared
@@ -45,10 +45,6 @@ struct TheaterEitherWaySection: View {
     var compact = false
     /// Board chrome wraps Listen-stopping changes; Home can leave this nil.
     var apply: ((Bool) -> Void)?
-
-    private var available: Bool {
-        SpokenLanguageResolver.dynamicPairingAvailable(settings: self.settings)
-    }
 
     private var detail: String {
         SpokenLanguageResolver.dynamicPairingControlCopy(settings: self.settings)
@@ -72,7 +68,6 @@ struct TheaterEitherWaySection: View {
             Toggle(AppLanguage.text("Either way"), isOn: self.pairingBinding)
                 .toggleStyle(.switch)
                 .controlSize(.small)
-                .disabled(!self.available)
                 .help(TheaterChromeHelp.eitherWay)
                 .theaterTag(TheaterChromeHelp.eitherWay)
                 .accessibilityLabel(AppLanguage.text("Either way"))
@@ -86,7 +81,6 @@ struct TheaterEitherWaySection: View {
                 Toggle(AppLanguage.text("Either way"), isOn: self.pairingBinding)
                     .toggleStyle(.switch)
                     .labelsHidden()
-                    .disabled(!self.available)
                     .help(TheaterChromeHelp.eitherWay)
                     .accessibilityLabel(AppLanguage.text("Either way"))
                     .accessibilityHint(self.detail)

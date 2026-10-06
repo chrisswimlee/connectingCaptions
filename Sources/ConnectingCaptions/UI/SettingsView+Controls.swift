@@ -34,6 +34,7 @@ struct FillerWordsEditor: View {
                                 .font(.caption2)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Remove \(word)")
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)

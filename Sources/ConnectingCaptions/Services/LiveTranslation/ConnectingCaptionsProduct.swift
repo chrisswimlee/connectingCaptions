@@ -50,7 +50,11 @@ nonisolated enum ConnectingCaptionsProduct {
     static let licenseKeychainAccount = "connectingCaptionsCommercialLicense"
     static let workNoticeTitle = "For work"
     static let workNotice =
-        "Free for everyone under GPLv3, work use included. If IT or legal need a named license or an SLA, request a commercial license."
+        "Free for everyone under GPLv3, work use included. Named license is $60 per Mac per year, five Macs minimum. Written SLA is +$90 per Mac per year. A Jamf or Fleet pkg is $1,500 once."
+    static let commercialSeatPriceLine = "$60 / Mac / year"
+    static let commercialSLAPriceLine = "+$90 / Mac / year"
+    static let commercialMDMPriceLine = "$1,500 once"
+    static let commercialSeatMinimum = 5
 
     static var commercialLicenseMailURL: URL {
         var components = URLComponents()
@@ -61,9 +65,11 @@ nonisolated enum ConnectingCaptionsProduct {
             URLQueryItem(name: "body", value: """
                 Organization:
 
-                Seat count:
+                Mac count (5 minimum):
 
-                Do you need a written SLA?
+                Named license $60/Mac/year. Add written SLA +$90/Mac/year? (yes/no)
+
+                MDM / Jamf pkg $1,500 once? (yes/no)
 
                 Anything else IT or legal needs:
                 """),

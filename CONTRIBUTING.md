@@ -42,7 +42,7 @@ cp xcconfig/Local.xcconfig.example xcconfig/Local.xcconfig
 
 Launch `DerivedData/Build/Products/Debug/Connecting Captions Debug.app`. Keep using that product so macOS can keep Accessibility and Microphone. An unsigned or ad-hoc rebuild can drop those grants; allow **Connecting Captions Debug** again in System Settings → Privacy & Security.
 
-3. First run selects **Apple Speech Analyzer** on macOS 26, otherwise **Apple Speech**, and ends when a sentence appears. Setup is **Voice Engine** and **Language packs**.
+3. First run selects **Apple Speech Analyzer** on macOS 26, otherwise **Apple Speech**, and ends when a sentence appears. Setup is **Voice Engine** and **Language packs**. Either way downloads **Whisper Small** once.
 
 4. Allow the microphone. Pick **Voice** for the language you speak or **Translate** for captions. Press **Listen** and speak one sentence. A language pack downloads only when I speak and Show as differ. Theater Listen does not ask for Screen Recording.
 
@@ -111,7 +111,7 @@ Start a [GitHub Discussion](https://github.com/chrisswimlee/connectingCaptions/d
 - Report behavior that you are not sure is a connectingCaptions bug.
 - Ask whether a change would be accepted before writing code.
 
-Do not open an issue to buy or quote a commercial license. Send IT and legal to [the license page](https://chrisswimlee.com/connectingCaptions/license/).
+Do not open an issue to buy or quote a commercial license. Send IT and legal to [the license page](https://chrisswimlee.com/connectingCaptions/license/). Prices are on that page.
 
 Feature ideas should begin in the Ideas category. Maintainers may turn an accepted discussion into a tracked issue.
 

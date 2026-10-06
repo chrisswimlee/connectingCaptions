@@ -44,7 +44,7 @@ enum TheaterChromeHelp {
     )
     static let eitherWay = tag(
         "Either way",
-        does: "Speak either language of this pair. Whisper hears both; a Show-as clause flips. Stops Listen when changed."
+        does: "Speak either language of this pair. Downloads Whisper Small once. Apple Speech stays for one speaker. Stops Listen when changed."
     )
     static let mode = tag(
         "Theater mode",

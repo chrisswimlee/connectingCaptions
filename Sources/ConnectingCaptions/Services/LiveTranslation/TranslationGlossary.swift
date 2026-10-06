@@ -409,6 +409,14 @@ enum SpokenLanguageResolver {
         settings.theaterDynamicPairing && self.dynamicPairingAvailable(settings: settings)
     }
 
+    /// Home and Theater chrome. Distinct Translate pair. Whisper Small is the
+    /// add-on that actually hears both languages.
+    static func showsEitherWayControl(settings: SettingsStore = .shared) -> Bool {
+        guard settings.theaterSessionMode == .translation else { return false }
+        guard !self.isSameLanguagePair(settings: settings) else { return false }
+        return SettingsStore.SpeechModel.availableModels.contains(SettingsStore.SpeechModel.eitherWayAddOn)
+    }
+
     /// I speak → Show as, unless Either way heard the Show-as language.
     static func pairForSpokenText(
         _ text: String,
@@ -447,8 +455,9 @@ enum SpokenLanguageResolver {
         if source.id == target.id {
             return "Pick a Show as language that differs from I speak."
         }
-        if !settings.selectedSpeechModel.isWhisperModel {
-            return TheaterReadiness.dynamicPairingHint(isWhisper: false)
+        let addOn = SettingsStore.SpeechModel.eitherWayAddOn
+        if settings.selectedSpeechModel != addOn {
+            return "Uses Whisper Small (\(addOn.downloadSize)) so both languages of this pair are heard. Apple Speech stays the default for one speaker."
         }
         if !self.dynamicPairingAvailable(settings: settings) {
             return "Either way needs Whisper to hear both \(source.displayName) and \(target.displayName)."

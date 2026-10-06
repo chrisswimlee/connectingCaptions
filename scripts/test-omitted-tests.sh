@@ -68,9 +68,16 @@ while IFS= read -r swift; do
     case "$swift" in
         */Helpers/*|*/Resources/*|*/Fixtures/*) continue ;;
     esac
-    case "${CC_OMIT_TESTS_ALLOWLIST:-}" in
-        *"$leaf"*) continue ;;
-    esac
+    skip_orphan=0
+    IFS=':'
+    for allowed in ${CC_OMIT_TESTS_ALLOWLIST:-}; do
+        if [ "$allowed" = "$leaf" ]; then
+            skip_orphan=1
+            break
+        fi
+    done
+    unset IFS
+    [ "$skip_orphan" = 1 ] && continue
     if ! grep -qxF "$leaf" "$refs"; then
         echo "ORPHANED TEST (compiled nowhere): $swift"
         fail=1

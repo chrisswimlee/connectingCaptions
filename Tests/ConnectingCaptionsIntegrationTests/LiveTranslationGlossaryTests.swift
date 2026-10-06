@@ -462,7 +462,10 @@ final class LiveTranslationGlossaryTests: XCTestCase {
     }
 
     func testThaiWhisperMatchShowsHintNotMismatch() throws {
-        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
+        try XCTSkipUnless(
+            SettingsStore.SpeechModel.availableModels.contains(.whisperSmall),
+            "Whisper Small Either way add-on missing"
+        )
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalWhisper = settings.selectedWhisperLanguageCode
@@ -585,7 +588,10 @@ final class LiveTranslationGlossaryTests: XCTestCase {
     }
 
     func testKoreanWhisperMatchHasNoMismatch() throws {
-        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
+        try XCTSkipUnless(
+            SettingsStore.SpeechModel.availableModels.contains(.whisperSmall),
+            "Whisper Small Either way add-on missing"
+        )
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel
         let originalWhisper = settings.selectedWhisperLanguageCode
@@ -727,8 +733,29 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertTrue(TranslationEngineError.timeout.isTimeout)
     }
 
+    func testEitherWayControlShowsForADistinctTranslatePair() {
+        let settings = SettingsStore.shared
+        let originalSource = settings.translationSourceLanguageID
+        let originalTarget = settings.translationTargetLanguageID
+        let originalMode = settings.theaterSessionMode
+        defer {
+            settings.translationSourceLanguageID = originalSource
+            settings.translationTargetLanguageID = originalTarget
+            settings.theaterSessionMode = originalMode
+        }
+        settings.theaterSessionMode = .translation
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "ko"
+        XCTAssertTrue(SpokenLanguageResolver.showsEitherWayControl(settings: settings))
+        settings.translationTargetLanguageID = "en"
+        XCTAssertFalse(SpokenLanguageResolver.showsEitherWayControl(settings: settings))
+    }
+
     func testEitherWayStaysOffUnlessWhisperHearsBothSides() throws {
-        try XCTSkipIf(SettingsStore.SpeechModel.appleSpeechOnly, "Voice Engine is Apple Speech only")
+        try XCTSkipUnless(
+            SettingsStore.SpeechModel.availableModels.contains(.whisperSmall),
+            "Whisper Small Either way add-on missing"
+        )
         let settings = SettingsStore.shared
         let originalSource = settings.translationSourceLanguageID
         let originalTarget = settings.translationTargetLanguageID

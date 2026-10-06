@@ -21,9 +21,14 @@ extension SettingsStore {
         /// Flip to `true` in a future round to re-enable Qwen without deleting implementation.
         static let qwenPreviewEnabled = false
 
-        /// Voice Engine is Apple Speech only for now. Other engines keep their
-        /// implementation; flip to `false` to offer them again.
+        /// Voice Engine is Apple Speech plus Whisper Small for Either way.
+        /// Other engines keep their implementation; flip to `false` to offer them again.
         static let appleSpeechOnly = true
+
+        /// Whisper Small is the Either way add-on: one extra download so a
+        /// conversation can hear both languages of the pair. Apple Speech stays
+        /// the default for one speaker.
+        static let eitherWayAddOn: SpeechModel = .whisperSmall
 
         // MARK: - FluidAudio Models (Apple Silicon Only)
 
@@ -218,7 +223,7 @@ extension SettingsStore {
         /// Returns models available for the current Mac's architecture and OS
         static var availableModels: [SpeechModel] {
             allCases.filter { model in
-                if Self.appleSpeechOnly, model.provider != .apple {
+                if Self.appleSpeechOnly, model.provider != .apple, model != Self.eitherWayAddOn {
                     return false
                 }
                 if model == .whisperLargeTurbo, !CPUArchitecture.isAppleSilicon {
@@ -986,11 +991,15 @@ extension SettingsStore {
     }
 
     /// Moves a saved non-Apple Voice Engine onto Apple Speech while `appleSpeechOnly` is on.
-    /// Leaves Analyzer vs older Apple Speech as the user's pick.
+    /// Leaves Analyzer vs older Apple Speech as the user's pick. Whisper Small stays if
+    /// they turned on the Either way add-on.
     func pinSpeechModelToAppleIfNeeded() {
         guard SpeechModel.appleSpeechOnly else { return }
         let current = self.selectedSpeechModel
         if current.provider == .apple, SpeechModel.availableModels.contains(current) {
+            return
+        }
+        if current == SpeechModel.eitherWayAddOn {
             return
         }
         let target = SpeechModel.defaultModel

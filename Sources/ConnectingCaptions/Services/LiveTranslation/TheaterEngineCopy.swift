@@ -62,6 +62,8 @@ enum TheaterEngineCopy {
             return "Prints while you talk. The recognizer macOS has included for years. Hears the languages already on this Mac. No download."
         case .appleSpeechAnalyzer:
             return "Prints while you talk. The recognizer added in macOS 26. Hears the Speech Analyzer languages installed on this Mac."
+        case .whisperSmall:
+            return "Add-on for Either way. Hears both languages of the pair. \(model.downloadSize). Apple Speech stays the default for one speaker."
         default:
             let when = model.supportsStreaming ? "Prints while you talk" : "Prints when you stop"
             return "\(when). \(model.languageSupport) · \(model.downloadSize)"

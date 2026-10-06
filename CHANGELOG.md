@@ -4,13 +4,14 @@ All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
 
-- Either way is on Theater Home and the board language chrome. Turn it on when Whisper can hear both languages of the pair; a Show-as clause flips. English ↔ Korean is the clearest script pair. Take turns — two voices at once will mix.
+- Named commercial license prices are public: $60 per Mac per year (five Macs minimum), written SLA +$90 per Mac per year, MDM pkg $1,500 once. The zip stays free.
+- Either way is on Home and Theater chrome. Turning it on downloads Whisper Small once so both languages of the pair are heard. Turning it off returns Voice Engine to Apple Speech. English ↔ Korean is the clearest script pair. Parakeet and the other Whisper sizes stay off the list.
 - An open clause in the task bar is dimmer and shows a trailing ellipsis. A full board eases to the next line. Talk notes can read a PowerPoint deck. Save transcript, off until you turn it on, writes Markdown and VTT when Listen stops.
 - A pause no longer prints words that were never said.
 - A continuation that starts with and, but, or so stays on the current line. A shorter copy of a sentence already on the board does not print again.
 - A "Because…" sentence that already has its main clause no longer swallows the next sentence. A name after a joined period keeps its capital. One noisy microphone packet no longer counts as speech.
 - Voice Engine is Apple Speech Analyzer when this Mac has it, otherwise Apple Speech. Translation Engine is Apple Translation.
-- Voice Engine only offers the two Apple Speech versions. Language packs is the Setup list for Apple Translation downloads.
+- Voice Engine offers the two Apple Speech versions, plus Whisper Small as the Either way add-on. Language packs is the Setup list for Apple Translation downloads.
 - First run is Welcome, languages, microphone, then Listen. Setup is Voice Engine and Language packs. Setup Wizard, Custom Dictionary, and Experimental stay off the advertised lists. Getting Started treats Apple Speech as ready. The Home license card appears only when a key is on.
 - The language pack downloads on Try Theater. Getting Started explains Listen and only asks for a microphone, a missing pack, or optional typing. Settings leaves dictation shortcuts, clipboard, streaks, and AI enhancement notices off the advertised lists. Search does not open those leftovers. After the first caption, Home no longer says to press Listen.
 - Japanese no longer cuts at 何か / そうだ, a short から, or です when ので still follows. Those leftovers stay on the same line.

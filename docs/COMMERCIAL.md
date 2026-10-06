@@ -2,15 +2,25 @@
 
 connectingCaptions is free for everyone under GPLv3, work use included. Theater Listen stays unlocked. A commercial license is optional.
 
-If IT or legal need a vendor they can sanction — a named license, a security contact, or an SLA — request a commercial license.
+If IT or legal need a vendor they can sanction — a named license, a security contact, or an SLA — buy a commercial license at the published price.
 
-**Request:** [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/) or email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=connectingCaptions%20commercial%20license).
+**Buy:** [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/) or email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=connectingCaptions%20commercial%20license) with the organization and Mac count.
+
+## Price
+
+| | Price | Notes |
+| --- | --- | --- |
+| Named license | **$60 / Mac / year** | Five Macs minimum. Air-gapped key. Licensed to the organization. |
+| Written SLA | **+$90 / Mac / year** | Security reply in 7 days, plus a weekday window if Listen breaks. |
+| MDM / Jamf pkg | **$1,500 once** | App, key, seat list, and caption policy. IT signs the pkg. |
+
+Apple Speech is the default for one speaker. Either way downloads Whisper Small once if the room talks both languages of the pair. The zip stays free. Custom overlay or glossary work is [Engage](https://chrisswimlee.com/engage/), not this license.
 
 This is not consulting. Consulting is [Engage](https://chrisswimlee.com/engage/).
 
 ## What IT usually asks
 
-**How does this monetize?** Named commercial licenses and optional support. Not transcripts, voiceprints, or model training.
+**How does this monetize?** Named license $60 per Mac per year, five Macs minimum. Written SLA +$90 per Mac per year. MDM pkg $1,500 once. Not transcripts, voiceprints, or model training.
 
 **Does voice leave this Mac?** No, unless someone opts in to a cloud speech model. There is no analytics host. Live Theater does not send telemetry. See the README Privacy section.
 

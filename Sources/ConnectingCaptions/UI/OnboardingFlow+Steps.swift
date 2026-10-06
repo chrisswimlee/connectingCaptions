@@ -848,11 +848,17 @@ extension OnboardingFlowView {
     }
 
     func isOnboardingModelReady(_ model: SettingsStore.SpeechModel) -> Bool {
-        self.isOnboardingModelSelected(model) && self.asr.isAsrReady
+        guard self.isOnboardingModelSelected(model) else { return false }
+        // Apple Speech needs no download. Waiting on isAsrReady stranded first run
+        // on Voice Engine while the checklist already treated it as ready.
+        if model == .appleSpeech || model == .appleSpeechAnalyzer {
+            return model.isInstalled
+        }
+        return self.asr.isAsrReady
     }
 
     func isOnboardingRouteReady(_ route: VoiceEngineLanguageRoute) -> Bool {
-        self.isRouteSelectedInSettings(route) && self.asr.isAsrReady
+        self.isRouteSelectedInSettings(route) && self.isOnboardingModelReady(route.model)
     }
 
     func isOnboardingModelDownloaded(_ model: SettingsStore.SpeechModel) -> Bool {

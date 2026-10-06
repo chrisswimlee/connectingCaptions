@@ -251,7 +251,7 @@ brew trust chrisswimlee/connectingcaptions
 brew install --cask connectingcaptions
 \`\`\`
 
-Free for everyone under GPLv3, work use included. If IT or legal need a named license or an SLA, [request a commercial license](https://chrisswimlee.com/connectingCaptions/license/).
+Free for everyone under GPLv3, work use included. Named license is $60 per Mac per year, five Macs minimum. [Prices](https://chrisswimlee.com/connectingCaptions/license/).
 
 - [Product page](https://chrisswimlee.com/connectingCaptions)
 - [Homebrew tap](https://github.com/chrisswimlee/homebrew-connectingcaptions)
