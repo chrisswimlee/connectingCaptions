@@ -345,30 +345,19 @@ final class LiveTranslationController: ObservableObject {
         self.finishLanguageChange()
     }
 
-    /// Either way. Turning it on selects Whisper Small (download once). Turning
-    /// it off returns Voice Engine to Apple Speech.
+    /// Either way. Requires Whisper Small already downloaded in Voice Engine
+    /// settings — the toggle stays disabled until then. Turning it off returns
+    /// Voice Engine to Apple Speech.
     func applyDynamicPairing(_ enabled: Bool) {
         let settings = SettingsStore.shared
-        settings.theaterDynamicPairing = enabled
         let addOn = SettingsStore.SpeechModel.eitherWayAddOn
+        guard !enabled || addOn.isInstalled else { return }
+        settings.theaterDynamicPairing = enabled
         if enabled {
             if settings.selectedSpeechModel != addOn {
                 settings.selectedSpeechModel = addOn
                 SpokenLanguageResolver.pinSpokenEngineToSource(settings: settings)
-                let asr = AppServices.shared.asr
-                asr.resetTranscriptionProvider()
-                Task {
-                    do {
-                        try await asr.ensureAsrReady()
-                    } catch is CancellationError {
-                        DebugLogger.shared.info("Either way Whisper add-on cancelled", source: "LiveTranslationController")
-                    } catch {
-                        DebugLogger.shared.error("Either way Whisper add-on failed: \(error)", source: "LiveTranslationController")
-                        asr.errorTitle = "Whisper download failed"
-                        asr.errorMessage = error.localizedDescription
-                        asr.showError = true
-                    }
-                }
+                AppServices.shared.asr.resetTranscriptionProvider()
             }
         } else if settings.selectedSpeechModel == addOn {
             settings.selectedSpeechModel = SettingsStore.SpeechModel.defaultModel
@@ -694,6 +683,37 @@ final class LiveTranslationController: ObservableObject {
         self.refreshPresenter()
     }
 
+    /// Called by the ASR streaming loop when a chunk of real, non-silent audio
+    /// produces no text. After enough of those in a row, the active engine itself
+    /// is the problem, not the room — hop to the next engine for this spoken
+    /// language per `VoiceEngineLanguageCatalog.nextFallbackModel`.
+    func noteConsecutiveVoicedSilentChunks(_ count: Int) {
+        guard self.isSessionActive else { return }
+        let asr = AppServices.shared.asr
+        guard LiveTranslationSilenceFallbackEngine.shouldApply(
+            consecutiveVoicedSilentChunks: count,
+            alreadyOverridden: asr.hasSilenceFallbackOverride
+        ) else { return }
+        let failing = asr.effectiveSpeechModel
+        let languageID = SpokenLanguageResolver.sourceLanguage().id
+        guard let next = VoiceEngineLanguageCatalog.nextFallbackModel(
+            after: failing,
+            forLanguageID: languageID
+        ) else {
+            self.trace("silence fallback exhausted model=\(failing.rawValue) language=\(languageID)", level: .warning)
+            return
+        }
+        self.trace("silence fallback swap to=\(next.rawValue) from=\(failing.rawValue)")
+        asr.applySilenceFallbackOverride(next)
+        self.subscriber.reportStatus(
+            LiveTranslationSilenceFallbackEngine.statusCopy(switchedFrom: failing, to: next),
+            kind: .info
+        )
+        self.refreshPresenter()
+    }
+
+    /// Clears both session-only engine overrides (thermal and silence fallback) so a
+    /// new Listen starts back on the user's actual selected Voice Engine.
     func clearThermalEngineOverride() {
         let hadOverride = AppServices.shared.asr.hasThermalSpeechOverride
         self.pendingThermalDowngrade = false
@@ -701,6 +721,7 @@ final class LiveTranslationController: ObservableObject {
         if hadOverride {
             self.trace("thermal restore")
         }
+        AppServices.shared.asr.clearSilenceFallbackOverride()
     }
 
     func persistBoard() {

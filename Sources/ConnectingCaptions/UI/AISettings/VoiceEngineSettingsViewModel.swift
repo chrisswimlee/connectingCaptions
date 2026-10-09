@@ -63,6 +63,10 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
         Task {
             await self.asr.checkIfModelsExistAsync()
         }
+        Task {
+            await AppleSpeechLiveCapability.refreshAnalyzer()
+            self.objectWillChange.send()
+        }
     }
 
     func handleSelectedSpeechModelChange(_ newValue: SettingsStore.SpeechModel) {
@@ -114,6 +118,74 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
                 self.asr.showError = true
             }
         }
+    }
+
+    /// Model currently running a raw mic → ASR test (see `testSpeechModel`), or nil.
+    @Published private(set) var testingModel: SettingsStore.SpeechModel?
+    /// Which row `testResultText`/`testErrorText` belongs to, so the result renders
+    /// under the model that was actually tested, not whichever is active now.
+    @Published private(set) var lastTestedModel: SettingsStore.SpeechModel?
+    @Published private(set) var testResultText: String?
+    @Published private(set) var testErrorText: String?
+    private var testTask: Task<Void, Never>?
+
+    /// Records a few seconds and shows the raw transcribed text (or the real thrown
+    /// error) for `model`, bypassing Theater's session/board/translation machinery
+    /// entirely — a direct mic → ASR round trip, same `start()`/`stop()` Theater
+    /// Listen uses, so errors surface here instead of only in the debug log.
+    func testSpeechModel(_ model: SettingsStore.SpeechModel) {
+        guard self.testingModel == nil, !self.areSpeechModelActionsBlocked else { return }
+        let previousActive = self.settings.selectedSpeechModel
+        let shouldRestore = previousActive != model
+        self.testingModel = model
+        self.lastTestedModel = model
+        self.testResultText = nil
+        self.testErrorText = nil
+        self.testTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                Task { @MainActor in
+                    if shouldRestore {
+                        self.skipNextSpeechModelSync = true
+                        self.settings.selectedSpeechModel = previousActive
+                        self.asr.resetTranscriptionProvider()
+                        self.suppressSpeechProviderSync = false
+                    }
+                    self.testingModel = nil
+                }
+            }
+            if shouldRestore {
+                self.suppressSpeechProviderSync = true
+                self.settings.selectedSpeechModel = model
+                self.asr.resetTranscriptionProvider()
+            }
+            let granted = await MicrophoneAccess.authorize(updating: self.asr)
+            guard granted else {
+                self.testErrorText = MicrophoneAccess.failureCopy(detail: self.asr.microphoneAccessDetail)
+                return
+            }
+            do {
+                try await self.asr.ensureAsrReady()
+            } catch {
+                if !(error is CancellationError) {
+                    self.testErrorText = error.localizedDescription
+                }
+                return
+            }
+            guard await self.asr.start() != .failed else {
+                self.testErrorText = "Could not start listening. Check the microphone."
+                return
+            }
+            try? await Task.sleep(nanoseconds: 6_000_000_000)
+            let text = await self.asr.stop(onFinalTranscriptionStarted: nil)
+            guard !Task.isCancelled else { return }
+            self.testResultText = text.isEmpty ? "No speech detected." : text
+        }
+    }
+
+    /// Ends the test early; whatever was captured so far still gets transcribed.
+    func cancelSpeechModelTest() {
+        self.testTask?.cancel()
     }
 
     func cancelSpeechModelDownload() {

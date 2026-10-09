@@ -60,6 +60,7 @@ struct TheaterVoiceEngineList: View {
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+                self.testResult(for: model)
             }
         } trailing: {
             self.actions(for: model)
@@ -68,8 +69,62 @@ struct TheaterVoiceEngineList: View {
         .accessibilityIdentifier("voiceEngine.\(model.rawValue)")
     }
 
+    /// Raw mic → ASR result (or the real thrown error) from the last "Test" tap on
+    /// this row — stays visible until a new test runs, on this row or another.
+    @ViewBuilder
+    private func testResult(for model: SettingsStore.SpeechModel) -> some View {
+        if self.viewModel.testingModel == model {
+            Text("Listening…")
+                .font(self.theme.typography.caption)
+                .foregroundStyle(self.theme.palette.secondaryText)
+        } else if self.viewModel.lastTestedModel == model, let error = self.viewModel.testErrorText {
+            Text(error)
+                .font(self.theme.typography.caption)
+                .foregroundStyle(self.theme.palette.warning)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("voiceEngine.test.error.\(model.rawValue)")
+        } else if self.viewModel.lastTestedModel == model, let text = self.viewModel.testResultText {
+            Text("Test heard: \u{201C}\(text)\u{201D}")
+                .font(self.theme.typography.caption)
+                .foregroundStyle(self.theme.palette.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("voiceEngine.test.result.\(model.rawValue)")
+        }
+    }
+
     @ViewBuilder
     private func actions(for model: SettingsStore.SpeechModel) -> some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            self.primaryAction(for: model)
+            if model.isInstalled {
+                self.testAction(for: model)
+            }
+        }
+    }
+
+    /// Runs a short, isolated mic → ASR round trip for `model` (see
+    /// `VoiceEngineSettingsViewModel.testSpeechModel`) — no Theater session, no
+    /// translation, just "does this engine hear this language right now."
+    @ViewBuilder
+    private func testAction(for model: SettingsStore.SpeechModel) -> some View {
+        if self.viewModel.testingModel == model {
+            Button("Stop test") {
+                self.viewModel.cancelSpeechModelTest()
+            }
+            .buttonStyle(.theaterText)
+            .accessibilityIdentifier("voiceEngine.test.stop.\(model.rawValue)")
+        } else {
+            Button("Test") {
+                self.viewModel.testSpeechModel(model)
+            }
+            .buttonStyle(.theaterText)
+            .disabled(self.viewModel.testingModel != nil || self.viewModel.areSpeechModelActionsBlocked)
+            .accessibilityIdentifier("voiceEngine.test.\(model.rawValue)")
+        }
+    }
+
+    @ViewBuilder
+    private func primaryAction(for model: SettingsStore.SpeechModel) -> some View {
         let blocked = self.viewModel.areSpeechModelActionsBlocked
         if self.viewModel.downloadingModel == model {
             Text(self.viewModel.asr.modelPreparationStatusText)

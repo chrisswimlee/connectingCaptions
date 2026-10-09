@@ -18,8 +18,17 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
 
     private var mailbox = TranslationRequestMailbox()
     private var lastPair: String = ""
+    /// Default strategy: prefers Apple Intelligence when the Mac has it,
+    /// falls back to the small packs automatically otherwise. Drives actual
+    /// translating and "can this pair translate right now" (Listen gating).
     private let languageAvailability = LanguageAvailability()
+    /// Always asks about the small, explicitly-downloadable pack, even on a
+    /// Mac where Apple Intelligence already covers the pair. Used only by
+    /// the Language packs screen, which needs to tell "already covered by
+    /// Apple Intelligence" apart from "the discrete pack is on disk."
+    private let fastLanguageAvailability = AppleTranslationStrategy.makeLowLatencyAvailability()
     private var packStatusByPair: [String: TranslationPackAvailability] = [:]
+    private var fastPackStatusByPair: [String: TranslationPackAvailability] = [:]
 
     var isMailboxReady: Bool { self.mailbox.isReady }
     var hasQueuedOrInFlightCommit: Bool { self.mailbox.hasQueuedOrInFlightCommit }
@@ -52,12 +61,11 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         await self.waitUntilMailboxReady(timeoutSeconds: timeoutSeconds)
     }
 
-    /// Re-triggers the SwiftUI host so macOS can show the language-pack sheet.
+    /// Opens the download window, which asks macOS for this exact pair. The
+    /// hidden serving host is left alone so its sheet cannot land on a 1×1
+    /// panel; closing the window remints it.
     func requestLanguagePackDownload(source: TranslationLanguage, target: TranslationLanguage) {
         TranslationPackDownloadController.present(source: source, target: target)
-        guard var configuration = self.configuration else { return }
-        configuration.invalidate()
-        self.configuration = configuration
     }
 
     func translate(_ text: String, source: TranslationLanguage, target: TranslationLanguage) async throws -> String {
@@ -186,6 +194,74 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         return resolved
     }
 
+    /// Same question, but always about the small downloadable pack — never
+    /// Apple Intelligence coverage. Used to drive an actual download and to
+    /// tell the Language packs screen whether the discrete pack is on disk.
+    func fastPackAvailability(
+        source: TranslationLanguage,
+        target: TranslationLanguage
+    ) async -> TranslationPackAvailability {
+        if source.id == target.id { return .installed }
+        let key = Self.packCacheKey(source: source, target: target)
+        if let cached = self.fastPackStatusByPair[key], cached == .installed || cached == .unsupported {
+            return cached
+        }
+        let status = await self.fastLanguageAvailability.status(
+            from: source.localeLanguage,
+            to: target.localeLanguage
+        )
+        let resolved: TranslationPackAvailability
+        switch status {
+        case .installed:
+            resolved = .installed
+        case .supported:
+            resolved = .supported
+        case .unsupported:
+            resolved = .unsupported
+        @unknown default:
+            resolved = .unknown
+        }
+        self.fastPackStatusByPair[key] = resolved
+        return resolved
+    }
+
+    /// What the Language packs screen shows: whether this pair needs a
+    /// download at all, or already works because Apple Intelligence covers
+    /// it. `packAvailability` alone can't tell these apart — on an Apple
+    /// Intelligence Mac it reports installed either way.
+    func languagePackCoverage(
+        source: TranslationLanguage,
+        target: TranslationLanguage
+    ) async -> LanguagePackCoverage {
+        if source.id == target.id { return .packDownloaded }
+        let fast = await self.fastPackAvailability(source: source, target: target)
+        if let decided = Self.coverage(forFastStatus: fast) { return decided }
+        // Fast status alone was inconclusive (.supported or .unknown): the
+        // discrete pack isn't confirmed installed or unsupported, so only
+        // now ask the AI-preferring check to see if Apple Intelligence
+        // already covers the pair without it.
+        let rich = await self.packAvailability(source: source, target: target)
+        return Self.coverage(forRichStatus: rich)
+    }
+
+    /// `nil` means the fast (pack-only) status didn't settle the question —
+    /// the caller should go on to ask the AI-preferring status.
+    nonisolated static func coverage(forFastStatus status: TranslationPackAvailability) -> LanguagePackCoverage? {
+        switch status {
+        case .installed: return .packDownloaded
+        case .unsupported: return .unsupported
+        case .supported, .unknown: return nil
+        }
+    }
+
+    nonisolated static func coverage(forRichStatus status: TranslationPackAvailability) -> LanguagePackCoverage {
+        switch status {
+        case .installed: return .appleIntelligence
+        case .unsupported: return .unsupported
+        case .supported, .unknown: return .needsDownload
+        }
+    }
+
     /// Synchronous, cache-only read. Never queries `LanguageAvailability` and
     /// never triggers a download — safe to call while building a menu.
     func cachedPackAvailability(
@@ -267,8 +343,7 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         source: Locale.Language,
         target: Locale.Language
     ) -> TranslationSession {
-        // preferredStrategy is a later SDK. Hosted CI is Xcode 26.3.
-        return TranslationSession(installedSource: source, target: target)
+        TranslationSession(installedSource: source, target: target)
     }
 
     private func serve(
@@ -359,6 +434,56 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
             "Apple Translation finished in \(ms)ms",
             source: "AppleTranslationEngine"
         )
+    }
+}
+
+/// What the Language packs screen can tell someone about a language pair.
+/// Apple Intelligence coverage and an explicitly downloaded pack both mean
+/// translation works right now; they differ in how they got there, which is
+/// worth saying since "download" would be a lie for the first one.
+enum LanguagePackCoverage: Equatable {
+    case packDownloaded
+    case appleIntelligence
+    case needsDownload
+    case unsupported
+}
+
+/// Forces the small, explicitly-downloadable pack, bypassing Apple
+/// Intelligence coverage. The engine's main `languageAvailability` prefers
+/// Apple Intelligence when available (better quality, already on disk, no
+/// extra download) and falls back to this same pack automatically — that's
+/// right for actual translating and for "can this pair translate right
+/// now." These helpers exist only so the Language packs screen can ask the
+/// narrower question "is the discrete pack itself on disk," and so its
+/// Download button fetches that pack specifically — Apple Intelligence
+/// coverage has nothing to download, so asking the default strategy there
+/// would make the button silently do nothing on an Apple Intelligence Mac.
+/// `preferredStrategy` needs the Swift 6.3 / Xcode 26.4 SDK. Hosted CI is
+/// Xcode 26.3, whose default already means this same pack.
+enum AppleTranslationStrategy {
+    static func makeLowLatencyAvailability() -> LanguageAvailability {
+        #if compiler(>=6.3)
+        if #available(macOS 26.4, *) {
+            return LanguageAvailability(preferredStrategy: .lowLatency)
+        }
+        #endif
+        return LanguageAvailability()
+    }
+
+    static func makeLowLatencyConfiguration(
+        source: Locale.Language,
+        target: Locale.Language
+    ) -> TranslationSession.Configuration {
+        #if compiler(>=6.3)
+        if #available(macOS 26.4, *) {
+            return TranslationSession.Configuration(
+                source: source,
+                target: target,
+                preferredStrategy: .lowLatency
+            )
+        }
+        #endif
+        return TranslationSession.Configuration(source: source, target: target)
     }
 }
 
@@ -525,6 +650,9 @@ private final class TranslationPackDownloadStatus: ObservableObject {
     }
 
     @Published private(set) var phase: Phase = .waiting
+    /// The pair this window downloads. It used to borrow the engine's
+    /// I speak → Show as session, so any other pair never downloaded.
+    @Published private(set) var configuration: TranslationSession.Configuration?
     private(set) var languageLabel = ""
     private var source: TranslationLanguage?
     private var target: TranslationLanguage?
@@ -556,6 +684,15 @@ private final class TranslationPackDownloadStatus: ObservableObject {
 
     func begin(source: TranslationLanguage, target: TranslationLanguage) {
         self.pollTask?.cancel()
+        if var current = self.configuration, self.source?.id == source.id, self.target?.id == target.id {
+            current.invalidate()
+            self.configuration = current
+        } else {
+            self.configuration = AppleTranslationStrategy.makeLowLatencyConfiguration(
+                source: source.localeLanguage,
+                target: target.localeLanguage
+            )
+        }
         self.source = source
         self.target = target
         self.phase = .waiting
@@ -574,7 +711,10 @@ private final class TranslationPackDownloadStatus: ObservableObject {
         guard let source, let target else { return }
         var isFirstCheck = true
         while !Task.isCancelled {
-            let status = await AppleTranslationEngine.shared.packAvailability(source: source, target: target)
+            // The fast/pack-specific check, not the AI-preferring one — on an
+            // Apple Intelligence Mac the latter can already read "installed"
+            // before this window has downloaded anything.
+            let status = await AppleTranslationEngine.shared.fastPackAvailability(source: source, target: target)
             guard !Task.isCancelled else { return }
             switch status {
             case .installed:
@@ -613,8 +753,19 @@ private struct TranslationPackDownloadView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            TranslationSessionHost()
+            Color.clear
                 .frame(width: 8, height: 8)
+                .accessibilityHidden(true)
+                .translationTask(self.status.configuration) { session in
+                    do {
+                        try await session.prepareTranslation()
+                    } catch {
+                        DebugLogger.shared.debug(
+                            "Language pack prepare ended: \(error.localizedDescription)",
+                            source: "AppleTranslationEngine"
+                        )
+                    }
+                }
             HStack {
                 Spacer()
                 Button("Close") {

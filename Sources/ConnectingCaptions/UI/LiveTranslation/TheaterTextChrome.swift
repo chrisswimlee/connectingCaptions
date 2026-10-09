@@ -416,6 +416,11 @@ struct TheaterLanguageMenu: View {
     var compactChrome = false
     var menuHelp: String? = nil
     var accessibilityIdentifier: String? = nil
+    /// Short reason this language won't actually work right now (Voice Engine can't
+    /// hear it, or Apple Translation doesn't support the pair) — shown inline in the
+    /// menu so the gap surfaces while picking, not only after, in the mismatch banner
+    /// below. `nil` means no known issue.
+    var issueHint: ((TranslationLanguage) -> String?)? = nil
 
     @ObservedObject private var settings = SettingsStore.shared
 
@@ -455,13 +460,23 @@ struct TheaterLanguageMenu: View {
         Menu {
             Picker(self.visibleTitle, selection: self.$selection) {
                 ForEach(self.languages) { language in
-                    Text(AppLanguage.localizedName(for: language, languageID: self.settings.appLanguageID)).tag(language.id)
+                    self.menuRow(for: language).tag(language.id)
                 }
             }
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
             self.label
+        }
+    }
+
+    @ViewBuilder
+    private func menuRow(for language: TranslationLanguage) -> some View {
+        let name = AppLanguage.localizedName(for: language, languageID: self.settings.appLanguageID)
+        if let issue = self.issueHint?(language) {
+            Label("\(name) — \(issue)", systemImage: "exclamationmark.triangle")
+        } else {
+            Text(name)
         }
     }
 
@@ -473,7 +488,7 @@ struct TheaterLanguageMenu: View {
         } else if self.compactChrome {
             menu
         } else {
-            menu.help("Languages Apple Translation and the Voice Engine both support.")
+            menu.help("Languages this Voice Engine can't hear or Apple Translation can't pair are flagged in the list.")
         }
     }
 

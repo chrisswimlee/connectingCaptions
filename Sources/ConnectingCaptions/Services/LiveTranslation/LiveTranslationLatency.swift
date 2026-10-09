@@ -142,6 +142,25 @@ enum LiveTranslationThermalEngine {
     }
 }
 
+/// Mirrors `LiveTranslationThermalEngine`'s shape: a bad condition detected mid-session
+/// (there, heat; here, the active engine going silent despite real audio) triggers a
+/// session-only Voice Engine swap via `ASRService`'s override mechanism, with a status
+/// line instead of a silent failure.
+enum LiveTranslationSilenceFallbackEngine {
+    /// Chunks of real (non-silent) audio in a row that produced no transcribed text
+    /// before concluding the engine itself — not the room — is the problem.
+    static let consecutiveVoicedSilentChunksThreshold = 5
+
+    static func shouldApply(consecutiveVoicedSilentChunks: Int, alreadyOverridden: Bool) -> Bool {
+        guard !alreadyOverridden else { return false }
+        return consecutiveVoicedSilentChunks >= self.consecutiveVoicedSilentChunksThreshold
+    }
+
+    static func statusCopy(switchedFrom: SettingsStore.SpeechModel, to: SettingsStore.SpeechModel) -> String {
+        "Switched to \(to.displayName) — \(switchedFrom.displayName) wasn't hearing you."
+    }
+}
+
 enum LiveTranslationThermalReadout {
     static func label(_ state: ProcessInfo.ThermalState) -> String {
         switch state {

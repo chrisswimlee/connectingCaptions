@@ -1,0 +1,1 @@
+A live interpreter shouldn't need the cloud. Connecting Captions hears your talk with Apple Speech, translates it with Apple Translation, and prints each sentence on your Mac when it's ready. 1.97 s from speech to caption on a real Listen. Free for Mac: local-host.ai/connectingCaptions

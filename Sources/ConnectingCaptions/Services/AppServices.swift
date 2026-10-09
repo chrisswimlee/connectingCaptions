@@ -124,6 +124,13 @@ final class AppServices: ObservableObject {
         _ = self.audioObserver
         _ = self.asr
 
+        // Refresh what Apple Speech Analyzer actually supports on this Mac so the
+        // "I speak" mismatch banner reflects live reality, not just the static catalog.
+        Task { [weak self] in
+            await AppleSpeechLiveCapability.refreshAnalyzer()
+            self?.objectWillChange.send()
+        }
+
         DebugLogger.shared.info("✅ All services initialized", source: "AppServices")
     }
 

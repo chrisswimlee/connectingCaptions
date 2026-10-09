@@ -55,6 +55,44 @@ struct VoiceEngineLanguageRoute: Identifiable, Equatable {
     }
 }
 
+/// What Apple Speech Analyzer actually supports on this Mac, refreshed asynchronously
+/// from `SpeechTranscriber.supportedLocales`. The static maps in
+/// `VoiceEngineLanguageCatalog` are a hopeful per-OS-version guess (e.g. Thai); this
+/// cache is the live, per-machine truth `supports(_:languageID:)` intersects against.
+/// `nil` means "not refreshed yet" — callers should trust the static catalog until a
+/// refresh completes, not treat it as "nothing is supported."
+enum AppleSpeechLiveCapability {
+    private static let lock = NSLock()
+    private static var _analyzerLanguagePrefixes: Set<String>?
+
+    static var analyzerLanguagePrefixes: Set<String>? {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        return self._analyzerLanguagePrefixes
+    }
+
+    /// Safe to call repeatedly (app launch, Voice Engine settings appearing) — each
+    /// call replaces the cache with a fresh read rather than accumulating state.
+    static func refreshAnalyzer() async {
+        #if canImport(Speech)
+        guard #available(macOS 26.0, *) else { return }
+        let supported = await SpeechTranscriber.supportedLocales
+        let prefixes = Set(supported.map {
+            VoiceEngineLanguageCatalog.languagePrefix($0.identifier(.bcp47))
+        })
+        self.lock.lock()
+        self._analyzerLanguagePrefixes = prefixes
+        self.lock.unlock()
+        #endif
+    }
+
+    static func setAnalyzerLanguagePrefixesForTesting(_ prefixes: Set<String>?) {
+        self.lock.lock()
+        self._analyzerLanguagePrefixes = prefixes
+        self.lock.unlock()
+    }
+}
+
 enum VoiceEngineLanguageCatalog {
     static let productLanguageIDs: Set<String> = TranslationLanguageCatalog.supportedIDs
 
@@ -206,6 +244,12 @@ enum VoiceEngineLanguageCatalog {
     /// True when this Voice Engine can hear the product language, not merely
     /// when its leftover locale string happens to match.
     static func supports(_ model: SettingsStore.SpeechModel, languageID: String) -> Bool {
+        if model == .appleSpeechAnalyzer,
+           let liveSupported = AppleSpeechLiveCapability.analyzerLanguagePrefixes,
+           !liveSupported.contains(Self.languagePrefix(languageID))
+        {
+            return false
+        }
         if Self.routes(forLanguageID: languageID).contains(where: { $0.model == model }) {
             return true
         }
@@ -214,6 +258,25 @@ enum VoiceEngineLanguageCatalog {
             return Self.isProductLanguageID(languageID)
         }
         return false
+    }
+
+    /// Next engine to try, for this spoken language, after `failing` stops producing
+    /// text despite real audio. Walks the same per-language order
+    /// `preferredModelOrder` already defines — that table is the fallback matrix, this
+    /// just continues along it past whatever just failed. `nil` means the chain for
+    /// this language is exhausted.
+    static func nextFallbackModel(
+        after failing: SettingsStore.SpeechModel,
+        forLanguageID languageID: String,
+        availableModels: [SettingsStore.SpeechModel] = SettingsStore.SpeechModel.availableModels
+    ) -> SettingsStore.SpeechModel? {
+        let order = Self.preferredModelOrder(forLanguageID: languageID)
+        guard let failingIndex = order.firstIndex(of: failing) else { return nil }
+        return order[(failingIndex + 1)...].first { candidate in
+            availableModels.contains(candidate)
+                && candidate.isInstalled
+                && Self.supports(candidate, languageID: languageID)
+        }
     }
 
     /// Returns the selected engine's route when it can hear this language.

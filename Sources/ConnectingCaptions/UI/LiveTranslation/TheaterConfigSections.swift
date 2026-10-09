@@ -40,11 +40,18 @@ struct TheaterModeSection: View {
 struct TheaterEitherWaySection: View {
     @ObservedObject private var settings = SettingsStore.shared
     @ObservedObject private var controller = LiveTranslationController.shared
+    @ObservedObject private var asr = AppServices.shared.asr
 
     var accessibilityIdentifier: String
     var compact = false
     /// Board chrome wraps Listen-stopping changes; Home can leave this nil.
     var apply: ((Bool) -> Void)?
+
+    /// Either way only turns on once Whisper Small is already on disk —
+    /// no surprise download kicked off from a toggle flip.
+    private var addOnInstalled: Bool {
+        SettingsStore.SpeechModel.eitherWayAddOn.isInstalled
+    }
 
     private var detail: String {
         SpokenLanguageResolver.dynamicPairingControlCopy(settings: self.settings)
@@ -68,6 +75,7 @@ struct TheaterEitherWaySection: View {
             Toggle(AppLanguage.text("Either way"), isOn: self.pairingBinding)
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                .disabled(!self.addOnInstalled)
                 .help(TheaterChromeHelp.eitherWay)
                 .theaterTag(TheaterChromeHelp.eitherWay)
                 .accessibilityLabel(AppLanguage.text("Either way"))
@@ -81,6 +89,7 @@ struct TheaterEitherWaySection: View {
                 Toggle(AppLanguage.text("Either way"), isOn: self.pairingBinding)
                     .toggleStyle(.switch)
                     .labelsHidden()
+                    .disabled(!self.addOnInstalled)
                     .help(TheaterChromeHelp.eitherWay)
                     .accessibilityLabel(AppLanguage.text("Either way"))
                     .accessibilityHint(self.detail)

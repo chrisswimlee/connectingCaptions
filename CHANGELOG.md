@@ -5,7 +5,7 @@ All notable changes to connectingCaptions are documented in this file.
 ## [Unreleased]
 
 - Named commercial license prices are public: $60 per Mac per year (five Macs minimum), written SLA +$90 per Mac per year, MDM pkg $1,500 once. The zip stays free.
-- Either way is on Home and Theater chrome. Turning it on downloads Whisper Small once so both languages of the pair are heard. Turning it off returns Voice Engine to Apple Speech. English ↔ Korean is the clearest script pair. Parakeet and the other Whisper sizes stay off the list.
+- Either way is on Home and Theater chrome. The toggle stays off until Whisper Small is downloaded in Voice Engine settings; turning it on then switches to Whisper so both languages of the pair are heard. Turning it off returns Voice Engine to Apple Speech. English ↔ Korean is the clearest script pair. Parakeet and the other Whisper sizes stay off the list.
 - An open clause in the task bar is dimmer and shows a trailing ellipsis. A full board eases to the next line. Talk notes can read a PowerPoint deck. Save transcript, off until you turn it on, writes Markdown and VTT when Listen stops.
 - A pause no longer prints words that were never said.
 - A continuation that starts with and, but, or so stays on the current line. A shorter copy of a sentence already on the board does not print again.

@@ -1076,6 +1076,7 @@ extension ASRService {
             }
 
             if !newText.isEmpty {
+                self.consecutiveVoicedSilentChunks = 0
                 if self.transcriptionProvider.streamingPreviewMode == .trailingWindow {
                     self.committedStreamingText = StreamingTranscriptStitcher.stitch(
                         committed: self.committedStreamingText,
@@ -1096,6 +1097,11 @@ extension ASRService {
                 DebugLogger.shared.logLazy(level: .debug, source: "ASRService") {
                     "✅ Streaming: \(previewCount) chars (\(String(format: "%.2f", duration))s)"
                 }
+            } else if !self.lastCaptureWasSilent {
+                // Real audio, no text: the engine itself may not be hearing this
+                // language, not the room going quiet. See `LiveTranslationSilenceFallbackEngine`.
+                self.consecutiveVoicedSilentChunks += 1
+                LiveTranslationController.shared.noteConsecutiveVoicedSilentChunks(self.consecutiveVoicedSilentChunks)
             }
             if result.endOfUtterance, suppressPauseOnlyText == false {
                 self.speechCapturePolicy?.handleEndOfUtterance()

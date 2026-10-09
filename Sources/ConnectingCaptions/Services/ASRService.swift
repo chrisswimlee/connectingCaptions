@@ -177,12 +177,18 @@ final class ASRService: ObservableObject {
     let typingService = TypingService()
     /// Session-only Voice Engine swap for critical thermal. Never persisted.
     var thermalSpeechModelOverride: SettingsStore.SpeechModel?
+    /// Session-only Voice Engine swap after the active engine goes silent despite
+    /// real audio (see `consecutiveVoicedSilentChunks`). Never persisted.
+    var silenceFallbackModelOverride: SettingsStore.SpeechModel?
 
     var effectiveSpeechModel: SettingsStore.SpeechModel {
-        self.thermalSpeechModelOverride ?? SettingsStore.shared.selectedSpeechModel
+        self.thermalSpeechModelOverride
+            ?? self.silenceFallbackModelOverride
+            ?? SettingsStore.shared.selectedSpeechModel
     }
 
     var hasThermalSpeechOverride: Bool { self.thermalSpeechModelOverride != nil }
+    var hasSilenceFallbackOverride: Bool { self.silenceFallbackModelOverride != nil }
 
     func applyThermalSpeechOverride(_ model: SettingsStore.SpeechModel) {
         guard self.thermalSpeechModelOverride != model else { return }
@@ -198,6 +204,30 @@ final class ASRService: ObservableObject {
             self.resetTranscriptionProvider()
         }
     }
+
+    func applySilenceFallbackOverride(_ model: SettingsStore.SpeechModel) {
+        guard self.silenceFallbackModelOverride != model else { return }
+        self.silenceFallbackModelOverride = model
+        self.resetTranscriptionProvider()
+        Task { try? await self.ensureAsrReady() }
+    }
+
+    func clearSilenceFallbackOverride() {
+        guard self.silenceFallbackModelOverride != nil else { return }
+        self.silenceFallbackModelOverride = nil
+        if self.isRunning == false {
+            self.resetTranscriptionProvider()
+        }
+    }
+
+    /// Latest `onCaptureHealth` silence reading. The streaming loop reads this to
+    /// tell "the room is quiet" apart from "the engine isn't hearing real audio" —
+    /// only the latter should count toward `consecutiveVoicedSilentChunks`. Defaults
+    /// to silent so a chunk before the first health reading never counts.
+    var lastCaptureWasSilent: Bool = true
+    /// Streaming chunks in a row that produced no text while the mic was picking up
+    /// real (non-silent) audio. Reset on any non-empty result or provider switch.
+    var consecutiveVoicedSilentChunks: Int = 0
     var defaultInputListenerInstalled = false
     var defaultInputListenerToken: AudioObjectPropertyListenerBlock?
     var defaultOutputListenerToken: AudioObjectPropertyListenerBlock?
@@ -602,6 +632,7 @@ final class ASRService: ObservableObject {
             self.modelPreparationPhase = nil
         }
         self.hasCompletedFirstTranscription = false // Reset warm-up state when switching models
+        self.consecutiveVoicedSilentChunks = 0 // A fresh engine starts its own silence count
         let retiringTask = self.ensureReadyTask
         if let task = retiringTask {
             self.isCancellingModelPreparation = true
@@ -1328,6 +1359,7 @@ final class ASRService: ObservableObject {
                           self.isStoppingFinalTranscription == false
                     else { return }
                     let silent = rms < 0.002 && peak < 0.01
+                    self.lastCaptureWasSilent = silent
                     self.benchmarkLog(
                         "capture_health attempt=\(attemptID) audioMs=\(audioMs) " +
                             "samples=\(sampleCount) rms=\(String(format: "%.6f", rms)) " +

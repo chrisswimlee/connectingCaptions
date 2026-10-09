@@ -456,8 +456,11 @@ enum SpokenLanguageResolver {
             return "Pick a Show as language that differs from I speak."
         }
         let addOn = SettingsStore.SpeechModel.eitherWayAddOn
+        if !addOn.isInstalled {
+            return "Download Whisper Small (\(addOn.downloadSize)) in Voice Engine settings to turn this on. Apple Speech stays the default for one speaker."
+        }
         if settings.selectedSpeechModel != addOn {
-            return "Uses Whisper Small (\(addOn.downloadSize)) so both languages of this pair are heard. Apple Speech stays the default for one speaker."
+            return "Uses Whisper Small so both languages of this pair are heard. Apple Speech stays the default for one speaker."
         }
         if !self.dynamicPairingAvailable(settings: settings) {
             return "Either way needs Whisper to hear both \(source.displayName) and \(target.displayName)."

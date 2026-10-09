@@ -129,6 +129,54 @@ final class LiveTranslationQualityTests: XCTestCase {
         )
     }
 
+    func testLanguagePackProgressLabelShowsElapsedAgainstTheLimit() {
+        let started = Date(timeIntervalSince1970: 1_700_000_000)
+        XCTAssertEqual(
+            LanguagePackDownloadTiming.progressLabel(started: started, now: started.addingTimeInterval(65)),
+            "Downloading · 1:05 of 10:00"
+        )
+        XCTAssertEqual(
+            LanguagePackDownloadTiming.progressLabel(started: started, now: started.addingTimeInterval(9_999)),
+            "Downloading · 10:00 of 10:00"
+        )
+    }
+
+    /// The fast (pack-only) status settles installed/unsupported on its own;
+    /// `.supported`/`.unknown` are inconclusive and must fall through to the
+    /// AI-preferring check rather than being reported directly.
+    func testFastStatusCoverageSettlesInstalledAndUnsupportedOnly() {
+        XCTAssertEqual(AppleTranslationEngine.coverage(forFastStatus: .installed), .packDownloaded)
+        XCTAssertEqual(AppleTranslationEngine.coverage(forFastStatus: .unsupported), .unsupported)
+        XCTAssertNil(AppleTranslationEngine.coverage(forFastStatus: .supported))
+        XCTAssertNil(AppleTranslationEngine.coverage(forFastStatus: .unknown))
+    }
+
+    /// Reached only when the pack itself isn't confirmed installed or
+    /// unsupported: an AI-preferring "installed" means Apple Intelligence
+    /// covers the pair without a discrete pack, not that one was downloaded.
+    func testRichStatusCoverageMeansAppleIntelligenceNotAPack() {
+        XCTAssertEqual(AppleTranslationEngine.coverage(forRichStatus: .installed), .appleIntelligence)
+        XCTAssertEqual(AppleTranslationEngine.coverage(forRichStatus: .unsupported), .unsupported)
+        XCTAssertEqual(AppleTranslationEngine.coverage(forRichStatus: .supported), .needsDownload)
+        XCTAssertEqual(AppleTranslationEngine.coverage(forRichStatus: .unknown), .needsDownload)
+    }
+
+    @MainActor
+    func testLanguagePackDownloadPartnerPrefersAReadyLanguageOverFallbacks() throws {
+        let languages = TranslationLanguageCatalog.menuOrder
+        let french = try XCTUnwrap(languages.first { $0.id == "fr" })
+        let thai = try XCTUnwrap(languages.first { $0.id == "th" })
+        let english = try XCTUnwrap(languages.first { $0.id == "en" })
+        XCTAssertEqual(
+            LanguagePacksViewModel.downloadPartner(for: french, ready: [thai], fallbacks: [english])?.id,
+            "th"
+        )
+        XCTAssertEqual(
+            LanguagePacksViewModel.downloadPartner(for: thai, ready: [thai], fallbacks: [english])?.id,
+            "en"
+        )
+    }
+
     func testProductLanguagesAreTheAppleAndVoiceOverlap() {
         XCTAssertEqual(
             VoiceEngineLanguageCatalog.productLanguageIDs,
@@ -192,6 +240,87 @@ final class LiveTranslationQualityTests: XCTestCase {
         XCTAssertTrue(
             japanese.contains { $0.model == .cohereTranscribeSixBit },
             "Japanese should expose Cohere."
+        )
+    }
+
+    /// The static catalog claims Analyzer supports Thai (it may, on some Macs/OS
+    /// builds), but `supports` must defer to the live `SpeechTranscriber` reality
+    /// once it's known, rather than trusting the static map unconditionally.
+    func testAnalyzerSupportDefersToLiveCapabilityOnceKnown() {
+        defer { AppleSpeechLiveCapability.setAnalyzerLanguagePrefixesForTesting(nil) }
+
+        AppleSpeechLiveCapability.setAnalyzerLanguagePrefixesForTesting(nil)
+        XCTAssertTrue(
+            VoiceEngineLanguageCatalog.supports(.appleSpeechAnalyzer, languageID: "th"),
+            "Before a live refresh, the static catalog's claim should still be trusted."
+        )
+
+        AppleSpeechLiveCapability.setAnalyzerLanguagePrefixesForTesting(["en", "ko", "ja"])
+        XCTAssertFalse(
+            VoiceEngineLanguageCatalog.supports(.appleSpeechAnalyzer, languageID: "th"),
+            "Once the live set is known and excludes Thai, supports must say no even though the static catalog claims yes."
+        )
+        XCTAssertTrue(
+            VoiceEngineLanguageCatalog.supports(.appleSpeechAnalyzer, languageID: "en"),
+            "A language present in both the static catalog and the live set should still be supported."
+        )
+    }
+
+    /// The exact chain this app needs to walk for a two-person Thai/English
+    /// conversation when Apple Speech Analyzer goes silent on Thai: fall back to
+    /// Legacy Apple Speech next, and stop (not loop) once the given candidate set
+    /// is exhausted.
+    func testNextFallbackModelWalksPastTheFailingEngineForThai() {
+        let availableModels: [SettingsStore.SpeechModel] = [.appleSpeechAnalyzer, .appleSpeech]
+        XCTAssertEqual(
+            VoiceEngineLanguageCatalog.nextFallbackModel(
+                after: .appleSpeechAnalyzer,
+                forLanguageID: "th",
+                availableModels: availableModels
+            ),
+            .appleSpeech,
+            "Legacy Apple Speech is next in the Thai fallback order after Analyzer."
+        )
+        XCTAssertNil(
+            VoiceEngineLanguageCatalog.nextFallbackModel(
+                after: .appleSpeech,
+                forLanguageID: "th",
+                availableModels: availableModels
+            ),
+            "No more candidates in this restricted set after Legacy Apple Speech."
+        )
+        XCTAssertNil(
+            VoiceEngineLanguageCatalog.nextFallbackModel(
+                after: .whisperLargeTurbo,
+                forLanguageID: "th",
+                availableModels: availableModels
+            ),
+            "A model not offered in availableModels should yield no fallback."
+        )
+    }
+
+    func testSilenceFallbackAppliesAtThresholdUnlessAlreadyOverridden() {
+        let threshold = LiveTranslationSilenceFallbackEngine.consecutiveVoicedSilentChunksThreshold
+        XCTAssertFalse(
+            LiveTranslationSilenceFallbackEngine.shouldApply(
+                consecutiveVoicedSilentChunks: threshold - 1,
+                alreadyOverridden: false
+            ),
+            "Below threshold must not trigger a fallback yet."
+        )
+        XCTAssertTrue(
+            LiveTranslationSilenceFallbackEngine.shouldApply(
+                consecutiveVoicedSilentChunks: threshold,
+                alreadyOverridden: false
+            ),
+            "Hitting the threshold must trigger a fallback."
+        )
+        XCTAssertFalse(
+            LiveTranslationSilenceFallbackEngine.shouldApply(
+                consecutiveVoicedSilentChunks: threshold,
+                alreadyOverridden: true
+            ),
+            "Must not fire again once this session already fell back once."
         )
     }
 

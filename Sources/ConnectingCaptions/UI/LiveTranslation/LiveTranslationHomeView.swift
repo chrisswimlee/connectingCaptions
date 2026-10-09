@@ -910,7 +910,12 @@ struct TranslationLanguagePairCard: View {
         self.languagePicker(
             title: "I speak",
             selection: self.sourceLanguageID,
-            languages: TranslationLanguageCatalog.menuOrder
+            languages: TranslationLanguageCatalog.menuOrder,
+            issueHint: { language in
+                let model = self.settings.selectedSpeechModel
+                guard !VoiceEngineLanguageCatalog.supports(model, languageID: language.id) else { return nil }
+                return "not heard by \(model.displayName)"
+            }
         )
     }
 
@@ -918,19 +923,28 @@ struct TranslationLanguagePairCard: View {
         self.languagePicker(
             title: "Show as",
             selection: self.targetLanguageID,
-            languages: self.targetLanguages
+            languages: self.targetLanguages,
+            issueHint: { language in
+                let source = SpokenLanguageResolver.sourceLanguage()
+                guard source.id != language.id else { return nil }
+                guard self.controller.appleEngine.cachedPackAvailability(source: source, target: language) == .unsupported
+                else { return nil }
+                return "not supported by Apple Translation"
+            }
         )
     }
 
     private func languagePicker(
         title: String,
         selection: Binding<String>,
-        languages: [TranslationLanguage]
+        languages: [TranslationLanguage],
+        issueHint: ((TranslationLanguage) -> String?)? = nil
     ) -> some View {
         TheaterLanguageMenu(
             title: title,
             selection: selection,
-            languages: languages
+            languages: languages,
+            issueHint: issueHint
         )
     }
 
