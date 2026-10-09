@@ -224,3 +224,6 @@ builds/
 dist/
 **/__pycache__/
 *.pyc
+
+# /brag launch-video output
+brag-output*/
