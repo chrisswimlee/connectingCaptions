@@ -76,6 +76,7 @@ struct CommercialLicenseStatusCard: View {
                 }
 
                 if self.showsKeyField {
+                    Divider().opacity(0.3)
                     self.seatLine
                     self.keyField
                     if self.settings.commercialLicenseRecord != nil {
@@ -165,6 +166,9 @@ struct CommercialLicenseStatusCard: View {
                 .textFieldStyle(.roundedBorder)
                 .font(self.theme.typography.bodySmall)
                 .accessibilityIdentifier("commercial.license.field")
+                .onChange(of: self.draft) { _, _ in
+                    self.message = nil
+                }
             HStack(spacing: 8) {
                 Button("Activate") {
                     self.activate()
@@ -172,6 +176,13 @@ struct CommercialLicenseStatusCard: View {
                 .buttonStyle(.theaterTextProminent)
                 .disabled(self.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityIdentifier("commercial.license.activate")
+            }
+            if let message {
+                Text(message)
+                    .font(self.theme.typography.caption)
+                    .foregroundStyle(self.theme.palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("commercial.license.error")
             }
         }
     }

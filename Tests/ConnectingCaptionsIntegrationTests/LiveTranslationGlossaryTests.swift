@@ -56,7 +56,8 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertEqual(TranslationLanguageCatalog.language(matchingSpokenID: "hu-HU").id, "en")
         XCTAssertEqual(TranslationLanguageCatalog.language(id: "zh-TW")?.id, "zh")
         XCTAssertEqual(TranslationLanguageCatalog.language(id: "vi")?.id, "vi")
-        XCTAssertEqual(TranslationLanguageCatalog.language(matchingSpokenID: "nb-NO").id, "no")
+        // Norwegian is not in the catalog: Apple Translation has no supported pairing for it.
+        XCTAssertEqual(TranslationLanguageCatalog.language(matchingSpokenID: "nb-NO").id, "en")
     }
 
     func testLanguagesFromAppleListFollowTheCatalog() {
@@ -67,11 +68,8 @@ final class LiveTranslationGlossaryTests: XCTestCase {
             Locale.Language(identifier: "ko"),
             Locale.Language(identifier: "ja"),
             Locale.Language(identifier: "vi"),
-            Locale.Language(identifier: "nb"),
         ])
         XCTAssertEqual(languages.map(\.id), TranslationLanguageCatalog.all.map(\.id))
-        let norwegian = languages.first { $0.id == "no" }
-        XCTAssertEqual(norwegian?.localeLanguage.languageCode?.identifier, "nb")
     }
 
     func testVoiceEngineLanguagesMatchTheCatalog() {

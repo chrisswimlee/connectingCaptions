@@ -991,10 +991,25 @@ struct TranslationLanguagePairCard: View {
                 .fixedSize(horizontal: false, vertical: true)
             Button(self.isRequestingPack ? TheaterReadiness.downloadPackBusy : TheaterReadiness.downloadPack) {
                 self.isRequestingPack = true
+                let source = SpokenLanguageResolver.sourceLanguage()
+                let target = SpokenLanguageResolver.targetLanguage()
                 Task {
                     await self.controller.requestNeededLanguagePackDownload()
-                    try? await Task.sleep(nanoseconds: 1_500_000_000)
-                    await self.prepareAndRefreshAvailability()
+                    // The download sheet polls and dismisses itself, but never tells
+                    // this card — without this loop, Listen stays disabled forever
+                    // after a successful download that takes longer than one check.
+                    let deadline = ProcessInfo.processInfo.systemUptime + 180
+                    while !self.controller.packAvailability.isReady,
+                          self.controller.packAvailability != .unsupported,
+                          ProcessInfo.processInfo.systemUptime < deadline
+                    {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000)
+                        if Task.isCancelled { break }
+                        guard source.id == SpokenLanguageResolver.sourceLanguage().id,
+                              target.id == SpokenLanguageResolver.targetLanguage().id
+                        else { break }
+                        await self.prepareAndRefreshAvailability()
+                    }
                     self.isRequestingPack = false
                 }
             }

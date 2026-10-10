@@ -186,7 +186,8 @@ final class LiveTranslationQualityTests: XCTestCase {
             Set(VoiceEngineLanguageCatalog.allLanguages().map(\.id)),
             TranslationLanguageCatalog.supportedIDs
         )
-        XCTAssertEqual(TranslationLanguageCatalog.language(id: "nb")?.id, "no")
+        // Norwegian is not in the catalog: Apple Translation has no supported pairing for it.
+        XCTAssertNil(TranslationLanguageCatalog.language(id: "nb"))
         XCTAssertEqual(TranslationLanguageCatalog.language(id: "zh-TW")?.id, "zh")
         XCTAssertEqual(TranslationLanguageCatalog.language(id: "pt-PT")?.id, "pt")
         XCTAssertNil(TranslationLanguageCatalog.language(id: "el"))

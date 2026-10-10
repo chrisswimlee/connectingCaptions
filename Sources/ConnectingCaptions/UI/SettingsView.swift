@@ -241,28 +241,46 @@ struct SettingsView: View {
                                 )
                             )
                             .settingsSearchTarget(.dockVisibility)
-                            Divider().opacity(0.2)
+                        }
+                    }
+                    .padding(16)
+                }
+                .shownInSettingsSection(.general, selectedSection: self.selectedSection)
 
-                            // Accent Color
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(alignment: .center) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Accent Color")
-                                            .font(self.theme.typography.bodyStrong)
-                                            .foregroundStyle(self.settingsTitleText)
-                                        Text(TheaterSetupWizard.accentDetail)
-                                            .font(self.theme.typography.bodySmall)
-                                            .foregroundStyle(self.settingsSecondaryText)
-                                    }
+                // Appearance Card
+                ThemedCard(style: .standard) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        FluidSectionHeader(title: "Appearance", systemImage: "paintpalette.fill")
 
-                                    Spacer()
-
-                                    AccentColorSwatches(accessibilityIdentifier: "settings.accentColor")
+                        // Accent Color
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .center) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Accent Color")
+                                        .font(self.theme.typography.bodyStrong)
+                                        .foregroundStyle(self.settingsTitleText)
+                                    Text(TheaterSetupWizard.accentDetail)
+                                        .font(self.theme.typography.bodySmall)
+                                        .foregroundStyle(self.settingsSecondaryText)
                                 }
-                            }
-                            .settingsSearchTarget(.accentColor)
-                            Divider().opacity(0.2)
 
+                                Spacer()
+
+                                AccentColorSwatches(accessibilityIdentifier: "settings.accentColor")
+                            }
+                        }
+                        .settingsSearchTarget(.accentColor)
+                    }
+                    .padding(16)
+                }
+                .shownInSettingsSection(.general, selectedSection: self.selectedSection)
+
+                // Updates Card
+                ThemedCard(style: .standard) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        FluidSectionHeader(title: "Updates", systemImage: "arrow.triangle.2.circlepath")
+
+                        VStack(alignment: .leading, spacing: 16) {
                             // Automatic Updates
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(alignment: .center) {

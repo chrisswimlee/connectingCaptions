@@ -57,17 +57,31 @@ enum TheaterEngineCopy {
     }
 
     static func voiceEngineDetail(_ model: SettingsStore.SpeechModel) -> String {
+        let languages = Self.languagesLine(for: model)
         switch model {
         case .appleSpeech:
-            return "Prints while you talk. The recognizer macOS has included for years. Hears the languages already on this Mac. No download."
+            return "Prints while you talk. The recognizer macOS has included for years. \(languages). No download."
         case .appleSpeechAnalyzer:
-            return "Prints while you talk. The recognizer added in macOS 26. Hears the Speech Analyzer languages installed on this Mac."
+            return "Prints while you talk. The recognizer added in macOS 26. \(languages)."
         case .whisperSmall:
             return "Add-on for Either way. Hears both languages of the pair. \(model.downloadSize). Apple Speech stays the default for one speaker."
         default:
             let when = model.supportsStreaming ? "Prints while you talk" : "Prints when you stop"
-            return "\(when). \(model.languageSupport) · \(model.downloadSize)"
+            return "\(when). \(languages). \(model.downloadSize)."
         }
+    }
+
+    /// What `model` actually hears, spelled out by name instead of a vague
+    /// "supported languages" badge — the thing someone picking an engine needs to know.
+    static func languagesLine(for model: SettingsStore.SpeechModel) -> String {
+        let names = VoiceEngineLanguageCatalog.supportedProductLanguages(for: model).map(\.displayName)
+        if names.isEmpty {
+            return "No caption languages available on this Mac right now"
+        }
+        if names.count == TranslationLanguageCatalog.all.count {
+            return "Hears every caption language"
+        }
+        return "Hears \(names.joined(separator: ", "))"
     }
 
     static let translationTitle = "Translation Engine"

@@ -9,10 +9,10 @@ final class AppleSpeechLocaleTests: XCTestCase {
         XCTAssertEqual(VoiceEngineLanguageCatalog.preferredAppleSpeechAnalyzerLocale(forLanguageID: "ja"), "ja-JP")
         XCTAssertEqual(VoiceEngineLanguageCatalog.appleSpeechAnalyzerLocaleIdentifier(for: "fr"), "fr-FR")
         XCTAssertEqual(VoiceEngineLanguageCatalog.appleSpeechAnalyzerLocaleIdentifier(for: "zh"), "zh-CN")
+        // Danish is not a product language: Apple Translation has no supported pairing for it.
         XCTAssertNil(VoiceEngineLanguageCatalog.appleSpeechAnalyzerLocaleIdentifier(for: "da"))
         XCTAssertEqual(VoiceEngineLanguageCatalog.preferredAppleSpeechAnalyzerLocale(forLanguageID: "fr"), "fr-FR")
-        XCTAssertEqual(VoiceEngineLanguageCatalog.preferredAppleSpeechAnalyzerLocale(forLanguageID: "da"), "da-DK")
-        XCTAssertEqual(VoiceEngineLanguageCatalog.preferredAppleSpeechAnalyzerLocale(forLanguageID: "no"), "nb-NO")
+        XCTAssertEqual(VoiceEngineLanguageCatalog.preferredAppleSpeechAnalyzerLocale(forLanguageID: "da"), "en-US")
     }
 
     func testAnalyzerDropsAPreparedLocaleThatIsNotISpeak() {

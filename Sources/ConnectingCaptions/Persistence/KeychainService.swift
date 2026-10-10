@@ -248,6 +248,11 @@ final class KeychainService {
 
         var attributes = self.aggregatedQuery()
         attributes[kSecValueData as String] = data
+        // Only new items pick this up: Keychain does not let SecItemUpdate change
+        // accessibility on an existing item, and this attribute must stay out of
+        // the shared read/delete queries or it would stop matching keys an
+        // earlier build already saved with the default accessibility.
+        attributes[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 
         let status = SecItemAdd(attributes as CFDictionary, nil)
 

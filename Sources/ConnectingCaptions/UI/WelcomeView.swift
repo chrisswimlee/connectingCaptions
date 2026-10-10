@@ -71,6 +71,7 @@ struct WelcomeView: View {
                             .fixedSize(horizontal: false, vertical: true)
 
                         if self.microphoneNeedsAction {
+                            Divider().opacity(0.2)
                             Text(self.microphoneStepDescription)
                                 .font(self.theme.typography.bodySmall)
                                 .foregroundStyle(self.theme.palette.warning)
@@ -84,6 +85,7 @@ struct WelcomeView: View {
                         }
 
                         if self.needsTranslationPack, !self.isLanguagePackReady {
+                            Divider().opacity(0.2)
                             Text(self.languagePackAvailability.isEmpty
                                 ? "This pair still needs its Apple Translation pack."
                                 : self.languagePackAvailability)
@@ -96,6 +98,8 @@ struct WelcomeView: View {
                             .buttonStyle(.theaterText)
                         }
 
+                        Divider().opacity(0.2)
+
                         Button("Open Theater") {
                             self.selectedSidebarItem = .liveTranslation
                             PresenterCaptionController.shared.setVisible(true)
@@ -104,6 +108,7 @@ struct WelcomeView: View {
                         .accessibilityIdentifier("getting-started-theater")
 
                         if !self.accessibilityEnabled {
+                            Divider().opacity(0.2)
                             Text("Typing a caption into another app is optional. Theater captions do not need it.")
                                 .font(self.theme.typography.bodySmall)
                                 .foregroundStyle(self.theme.palette.secondaryText)
@@ -113,6 +118,8 @@ struct WelcomeView: View {
                             }
                             .buttonStyle(.theaterText)
                         }
+
+                        Divider().opacity(0.2)
 
                         Text(TheaterReadiness.macOSNote)
                             .font(self.theme.typography.caption)

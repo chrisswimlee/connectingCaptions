@@ -52,24 +52,18 @@ enum AppLanguageCopy {
     private static let tables: [String: [String: String]] = [
         "ar": Self.arabic,
         "zh": Self.chinese,
-        "da": Self.danish,
         "nl": Self.dutch,
-        "fi": Self.finnish,
         "fr": Self.french,
         "de": Self.german,
-        "he": Self.hebrew,
         "hi": Self.hindi,
         "id": Self.indonesian,
         "it": Self.italian,
         "ja": Self.japanese,
         "ko": Self.korean,
-        "ms": Self.malay,
-        "no": Self.norwegian,
         "pl": Self.polish,
         "pt": Self.portuguese,
         "ru": Self.russian,
         "es": Self.spanish,
-        "sv": Self.swedish,
         "th": Self.thai,
         "tr": Self.turkish,
         "uk": Self.ukrainian,
@@ -152,44 +146,6 @@ enum AppLanguageCopy {
             + "截图和整屏共享都会带上这些字幕。",
     ]
 
-    private static let danish: [String: String] = [
-        "wizardTitle": "Opsætningsguide",
-        "welcome": "Velkommen",
-        "languages": "Sprog",
-        "captions": "Undertekster",
-        "audience": "Publikum",
-        "ready": "Klar",
-        "subWelcome": "En forhåndsvisning af den undertekst, rummet ser.",
-        "subLanguages": "Appsprog er det sprog, denne app bruger. Jeg taler er det, du siger. Vis som er underteksten.",
-        "subCaptions": "Vælg om originalsproget står under hver sætning.",
-        "subAudience": "Hvem der ser underteksten i et skærmbillede eller et opkald.",
-        "subReady": "Afslut her, eller åbn Theater og tryk på Listen.",
-        "welcomeTitle": "Sæt Theater op",
-        "welcomeBody": "Hver sætning vises, når den er klar.",
-        "welcomeSpoken": "Originalsproget kan stå under hver sætning.",
-        "captionsBody": "Hver sætning vises, når den er klar. Intet vises, mens der stadig lyttes.",
-        "accentTitle": "Fremhævningsfarve",
-        "accentDetail": "Undertekst-guld er standard. Den farver knapperne i denne app.",
-        "skip": "Spring over for nu",
-        "back": "Tilbage",
-        "continue": "Fortsæt",
-        "finish": "Afslut",
-        "openTheater": "Åbn Theater",
-        "appLanguage": "Appsprog",
-        "appLanguageDetail": "Det sprog, denne app bruger.",
-        "mode": "Tilstand",
-        "iSpeak": "Jeg taler",
-        "showAs": "Vis som",
-        "shareSlides": "Del slides",
-        "stepFormat": "Trin %d af %d · %@",
-        "sameLanguage": "Samme sprog",
-        "theaterMode": "Theater-tilstand",
-        "swapLanguages": "Byt sprog",
-        "screenShare": "Del slidevinduet, når rummet skal se undertekster, og mødet ikke skal. "
-            + "Del Theater-vinduet, når mødet skal se tavlen. "
-            + "Skærmbilleder og deling af hele skærmen viser disse undertekster.",
-    ]
-
     private static let dutch: [String: String] = [
         "wizardTitle": "Installatiewizard",
         "welcome": "Welkom",
@@ -226,44 +182,6 @@ enum AppLanguageCopy {
         "screenShare": "Deel het diavenster wanneer de zaal onderschriften moet zien en de vergadering niet. "
             + "Deel het Theater-venster wanneer de vergadering het bord moet zien. "
             + "Schermafbeeldingen en het delen van het hele scherm bevatten deze onderschriften.",
-    ]
-
-    private static let finnish: [String: String] = [
-        "wizardTitle": "Asennusopas",
-        "welcome": "Tervetuloa",
-        "languages": "Kielet",
-        "captions": "Tekstitys",
-        "audience": "Yleisö",
-        "ready": "Valmis",
-        "subWelcome": "Esikatselu tekstistä, jonka sali näkee.",
-        "subLanguages": "Sovelluksen kieli on kieli, jota tämä sovellus käyttää. Puhun on se, mitä sanot. Näytä kielenä on tekstitys.",
-        "subCaptions": "Valitse, näkyykö alkuperäinen kieli jokaisen virkkeen alla.",
-        "subAudience": "Kuka näkee tekstityksen kuvakaappauksessa tai puhelussa.",
-        "subReady": "Lopeta tähän, tai avaa Theater ja paina Listen.",
-        "welcomeTitle": "Ota Theater käyttöön",
-        "welcomeBody": "Jokainen virke tulee näkyviin, kun se on valmis.",
-        "welcomeSpoken": "Alkuperäinen kieli voi olla jokaisen virkkeen alla.",
-        "captionsBody": "Jokainen virke tulee näkyviin, kun se on valmis. Kuuntelun aikana ei näy mitään.",
-        "accentTitle": "Korostusväri",
-        "accentDetail": "Tekstityksen kulta on oletus. Se sävyttää tämän sovelluksen painikkeet.",
-        "skip": "Ohita toistaiseksi",
-        "back": "Takaisin",
-        "continue": "Jatka",
-        "finish": "Valmis",
-        "openTheater": "Avaa Theater",
-        "appLanguage": "Sovelluksen kieli",
-        "appLanguageDetail": "Kieli, jota tämä sovellus käyttää.",
-        "mode": "Tila",
-        "iSpeak": "Puhun",
-        "showAs": "Näytä kielenä",
-        "shareSlides": "Jaa diat",
-        "stepFormat": "Vaihe %d / %d · %@",
-        "sameLanguage": "Sama kieli",
-        "theaterMode": "Theater-tila",
-        "swapLanguages": "Vaihda kielet",
-        "screenShare": "Jaa diaikkuna, kun salin pitää nähdä tekstitys eikä kokouksen. "
-            + "Jaa Theater-ikkuna, kun kokouksen pitää nähdä taulu. "
-            + "Kuvakaappaukset ja koko näytön jako sisältävät tämän tekstityksen.",
     ]
 
     private static let french: [String: String] = [
@@ -340,44 +258,6 @@ enum AppLanguageCopy {
         "screenShare": "Teile das Folienfenster, wenn der Raum die Untertitel sehen soll und das Meeting nicht. "
             + "Teile das Theater-Fenster, wenn das Meeting die Tafel sehen soll. "
             + "Screenshots und eine Freigabe des ganzen Bildschirms enthalten diese Untertitel.",
-    ]
-
-    private static let hebrew: [String: String] = [
-        "wizardTitle": "אשף ההגדרה",
-        "welcome": "ברוכים הבאים",
-        "languages": "שפות",
-        "captions": "כתוביות",
-        "audience": "קהל",
-        "ready": "מוכן",
-        "subWelcome": "תצוגה מקדימה של הכתוביות שהחדר רואה.",
-        "subLanguages": "שפת האפליקציה היא השפה שהאפליקציה הזו משתמשת בה. אני מדבר הוא מה שאתה אומר. הצגה בתור היא הכתוביות.",
-        "subCaptions": "בחרו אם שפת המקור מופיעה מתחת לכל משפט.",
-        "subAudience": "מי רואה את הכתוביות בצילום מסך או בשיחה.",
-        "subReady": "סיימו כאן, או פתחו את Theater ולחצו על Listen.",
-        "welcomeTitle": "הגדרת Theater",
-        "welcomeBody": "כל משפט מופיע כשהוא מוכן.",
-        "welcomeSpoken": "שפת המקור יכולה להופיע מתחת לכל משפט.",
-        "captionsBody": "כל משפט מופיע כשהוא מוכן. בזמן ההאזנה לא מוצג דבר.",
-        "accentTitle": "צבע הדגשה",
-        "accentDetail": "זהב הכתוביות הוא ברירת המחדל. הוא צובע את הכפתורים באפליקציה הזו.",
-        "skip": "דילוג לעכשיו",
-        "back": "חזרה",
-        "continue": "המשך",
-        "finish": "סיום",
-        "openTheater": "פתיחת Theater",
-        "appLanguage": "שפת האפליקציה",
-        "appLanguageDetail": "השפה שהאפליקציה הזו משתמשת בה.",
-        "mode": "מצב",
-        "iSpeak": "אני מדבר",
-        "showAs": "הצגה בתור",
-        "shareSlides": "שיתוף שקופיות",
-        "stepFormat": "שלב %d מתוך %d · %@",
-        "sameLanguage": "אותה שפה",
-        "theaterMode": "מצב Theater",
-        "swapLanguages": "החלפת שפות",
-        "screenShare": "שתפו את חלון השקופיות כשהחדר צריך לראות כתוביות והשיחה לא. "
-            + "שתפו את חלון Theater כשהשיחה צריכה לראות את הלוח. "
-            + "צילומי מסך ושיתוף של כל המסך כוללים את הכתוביות האלה.",
     ]
 
     private static let hindi: [String: String] = [
@@ -571,82 +451,6 @@ enum AppLanguageCopy {
             + "스크린샷과 전체 화면 공유에는 이 자막이 포함됩니다.",
     ]
 
-    private static let malay: [String: String] = [
-        "wizardTitle": "Wizard persediaan",
-        "welcome": "Selamat datang",
-        "languages": "Bahasa",
-        "captions": "Sari kata",
-        "audience": "Penonton",
-        "ready": "Sedia",
-        "subWelcome": "Pratonton sari kata yang dilihat oleh dewan.",
-        "subLanguages": "Bahasa apl ialah bahasa yang digunakan apl ini. Saya bercakap ialah apa yang anda kata. Tunjuk sebagai ialah sari kata.",
-        "subCaptions": "Pilih sama ada bahasa asal duduk di bawah setiap ayat.",
-        "subAudience": "Siapa yang melihat sari kata dalam tangkapan skrin atau panggilan.",
-        "subReady": "Selesai di sini, atau buka Theater dan tekan Listen.",
-        "welcomeTitle": "Sediakan Theater",
-        "welcomeBody": "Setiap ayat muncul apabila ia sedia.",
-        "welcomeSpoken": "Bahasa asal boleh duduk di bawah setiap ayat.",
-        "captionsBody": "Setiap ayat muncul apabila ia sedia. Tiada apa yang ditunjukkan semasa masih didengar.",
-        "accentTitle": "Warna aksen",
-        "accentDetail": "Emas sari kata ialah lalai. Ia mewarnakan butang dalam apl ini.",
-        "skip": "Langkau buat masa ini",
-        "back": "Kembali",
-        "continue": "Teruskan",
-        "finish": "Selesai",
-        "openTheater": "Buka Theater",
-        "appLanguage": "Bahasa apl",
-        "appLanguageDetail": "Bahasa yang digunakan apl ini.",
-        "mode": "Mod",
-        "iSpeak": "Saya bercakap",
-        "showAs": "Tunjuk sebagai",
-        "shareSlides": "Kongsi slaid",
-        "stepFormat": "Langkah %d daripada %d · %@",
-        "sameLanguage": "Bahasa yang sama",
-        "theaterMode": "Mod Theater",
-        "swapLanguages": "Tukar bahasa",
-        "screenShare": "Kongsi tetingkap slaid apabila dewan perlu melihat sari kata dan mesyuarat tidak. "
-            + "Kongsi tetingkap Theater apabila mesyuarat perlu melihat papan. "
-            + "Tangkapan skrin dan perkongsian seluruh skrin merangkumi sari kata ini.",
-    ]
-
-    private static let norwegian: [String: String] = [
-        "wizardTitle": "Oppsettsveiviser",
-        "welcome": "Velkommen",
-        "languages": "Språk",
-        "captions": "Undertekster",
-        "audience": "Publikum",
-        "ready": "Klar",
-        "subWelcome": "En forhåndsvisning av underteksten rommet ser.",
-        "subLanguages": "Appspråk er språket denne appen bruker. Jeg snakker er det du sier. Vis som er underteksten.",
-        "subCaptions": "Velg om originalspråket står under hver setning.",
-        "subAudience": "Hvem som ser underteksten i et skjermbilde eller en samtale.",
-        "subReady": "Fullfør her, eller åpne Theater og trykk Listen.",
-        "welcomeTitle": "Sett opp Theater",
-        "welcomeBody": "Hver setning vises når den er klar.",
-        "welcomeSpoken": "Originalspråket kan stå under hver setning.",
-        "captionsBody": "Hver setning vises når den er klar. Ingenting vises mens det fortsatt lyttes.",
-        "accentTitle": "Aksentfarge",
-        "accentDetail": "Undertekstgull er standard. Det farger knappene i denne appen.",
-        "skip": "Hopp over nå",
-        "back": "Tilbake",
-        "continue": "Fortsett",
-        "finish": "Fullfør",
-        "openTheater": "Åpne Theater",
-        "appLanguage": "Appspråk",
-        "appLanguageDetail": "Språket denne appen bruker.",
-        "mode": "Modus",
-        "iSpeak": "Jeg snakker",
-        "showAs": "Vis som",
-        "shareSlides": "Del lysbilder",
-        "stepFormat": "Trinn %d av %d · %@",
-        "sameLanguage": "Samme språk",
-        "theaterMode": "Theater-modus",
-        "swapLanguages": "Bytt språk",
-        "screenShare": "Del lysbildevinduet når rommet skal se undertekster og møtet ikke skal. "
-            + "Del Theater-vinduet når møtet skal se tavlen. "
-            + "Skjermbilder og deling av hele skjermen tar med disse undertekstene.",
-    ]
-
     private static let polish: [String: String] = [
         "wizardTitle": "Kreator konfiguracji",
         "welcome": "Witaj",
@@ -797,44 +601,6 @@ enum AppLanguageCopy {
         "screenShare": "Comparte la ventana de diapositivas cuando la sala debe ver los subtítulos y la reunión no. "
             + "Comparte la ventana de Theater cuando la reunión debe ver el tablero. "
             + "Las capturas y compartir toda la pantalla incluyen estos subtítulos.",
-    ]
-
-    private static let swedish: [String: String] = [
-        "wizardTitle": "Installationsguide",
-        "welcome": "Välkommen",
-        "languages": "Språk",
-        "captions": "Undertexter",
-        "audience": "Publik",
-        "ready": "Klar",
-        "subWelcome": "En förhandsvisning av undertexten som rummet ser.",
-        "subLanguages": "Appspråk är språket den här appen använder. Jag talar är det du säger. Visa som är undertexten.",
-        "subCaptions": "Välj om originalspråket står under varje mening.",
-        "subAudience": "Vem som ser undertexten i en skärmbild eller ett samtal.",
-        "subReady": "Slutför här, eller öppna Theater och tryck på Listen.",
-        "welcomeTitle": "Ställ in Theater",
-        "welcomeBody": "Varje mening visas när den är klar.",
-        "welcomeSpoken": "Originalspråket kan stå under varje mening.",
-        "captionsBody": "Varje mening visas när den är klar. Inget visas medan det fortfarande lyssnas.",
-        "accentTitle": "Accentfärg",
-        "accentDetail": "Undertextguld är standard. Den färgar knapparna i den här appen.",
-        "skip": "Hoppa över nu",
-        "back": "Tillbaka",
-        "continue": "Fortsätt",
-        "finish": "Slutför",
-        "openTheater": "Öppna Theater",
-        "appLanguage": "Appspråk",
-        "appLanguageDetail": "Språket som den här appen använder.",
-        "mode": "Läge",
-        "iSpeak": "Jag talar",
-        "showAs": "Visa som",
-        "shareSlides": "Dela bilder",
-        "stepFormat": "Steg %d av %d · %@",
-        "sameLanguage": "Samma språk",
-        "theaterMode": "Theater-läge",
-        "swapLanguages": "Byt språk",
-        "screenShare": "Dela bildfönstret när rummet ska se undertexter och mötet inte ska det. "
-            + "Dela Theater-fönstret när mötet ska se tavlan. "
-            + "Skärmbilder och delning av hela skärmen tar med de här undertexterna.",
     ]
 
     private static let thai: [String: String] = [

@@ -23,7 +23,7 @@ extension SettingsStore {
 
         /// Voice Engine is Apple Speech plus Whisper Small for Either way.
         /// Other engines keep their implementation; flip to `false` to offer them again.
-        static let appleSpeechOnly = true
+        static let appleSpeechOnly = false
 
         /// Whisper Small is the Either way add-on: one extra download so a
         /// conversation can hear both languages of the pair. Apple Speech stays
@@ -79,25 +79,6 @@ extension SettingsStore {
             case .whisperMedium: return "Whisper Medium"
             case .whisperLargeTurbo: return "Whisper Large Turbo"
             case .whisperLarge: return "Whisper Large"
-            }
-        }
-
-        var languageSupport: String {
-            switch self {
-            case .parakeetTDT:
-                return "English (not Korean, Japanese, or Thai)"
-            case .parakeetTDTv2: return "English Only (Higher Accuracy)"
-            case .parakeetRealtime: return "English Only (Live Streaming)"
-            case .qwen3Asr: return "Korean, English, Thai, Japanese"
-            case .cohereTranscribeSixBit: return "Cohere languages"
-            case .nemotronOffline, .nemotronStreaming, .nemotronStreaming320:
-                return "Most supported languages"
-            case .appleSpeech:
-                return "Supported languages"
-            case .appleSpeechAnalyzer:
-                return "Speech Analyzer languages"
-            case .whisperTiny, .whisperBase, .whisperSmall, .whisperMedium, .whisperLargeTurbo, .whisperLarge:
-                return "Supported languages"
             }
         }
 

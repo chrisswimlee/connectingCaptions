@@ -1,17 +1,32 @@
 import SwiftUI
 
-/// Voice Engine picker. Apple Speech on this Mac, plus Whisper Small for Either way.
+/// Voice Engine picker. Grouped by provider (Apple, NVIDIA, OpenAI, Cohere, Qwen) so
+/// the list stays readable once more than Apple Speech is available; each row says
+/// which caption languages that engine actually hears, not a vague badge.
 struct TheaterVoiceEngineList: View {
     @ObservedObject var viewModel: VoiceEngineSettingsViewModel
     @Environment(\.theme) private var theme
 
-    private var appleModels: [SettingsStore.SpeechModel] {
-        SettingsStore.SpeechModel.availableModels.filter { $0.provider == .apple }
+    /// Apple first (built in, no download), then the rest in rough "try this next" order.
+    private static let providerOrder: [SettingsStore.SpeechModel.Provider] = [
+        .apple, .nvidia, .openai, .cohere, .qwen,
+    ]
+
+    private var availableProviders: [SettingsStore.SpeechModel.Provider] {
+        Self.providerOrder.filter { !SettingsStore.SpeechModel.models(for: $0).isEmpty }
     }
 
+    private var modelsForSelectedProvider: [SettingsStore.SpeechModel] {
+        let provider = self.availableProviders.contains(self.viewModel.selectedSpeechProvider)
+            ? self.viewModel.selectedSpeechProvider
+            : (self.availableProviders.first ?? .apple)
+        return SettingsStore.SpeechModel.models(for: provider).filter { $0 != Self.eitherWayAddOnModel }
+    }
+
+    private static var eitherWayAddOnModel: SettingsStore.SpeechModel { SettingsStore.SpeechModel.eitherWayAddOn }
+
     private var eitherWayAddOn: SettingsStore.SpeechModel? {
-        let addOn = SettingsStore.SpeechModel.eitherWayAddOn
-        return SettingsStore.SpeechModel.availableModels.contains(addOn) ? addOn : nil
+        SettingsStore.SpeechModel.availableModels.contains(Self.eitherWayAddOnModel) ? Self.eitherWayAddOnModel : nil
     }
 
     var body: some View {
@@ -20,7 +35,7 @@ struct TheaterVoiceEngineList: View {
                 FluidPageHeader(
                     systemImage: "waveform",
                     title: TheaterEngineCopy.voiceTitle,
-                    subtitle: "Apple Speech Analyzer is newer. The older Apple Speech hears more languages already on this Mac. Whisper Small is the optional add-on for Either way."
+                    subtitle: "Pick which engine listens. Apple Speech is built in; other engines download once. Whisper Small is the optional add-on for Either way."
                 )
 
                 Text(SpokenLanguageResolver.stageEngineSummary(settings: self.viewModel.settings))
@@ -33,8 +48,12 @@ struct TheaterVoiceEngineList: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("voiceEngine.summary")
 
+                if self.availableProviders.count > 1 {
+                    self.providerPicker
+                }
+
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(self.appleModels) { model in
+                    ForEach(self.modelsForSelectedProvider) { model in
                         self.row(model)
                     }
                     if let addOn = self.eitherWayAddOn {
@@ -44,6 +63,20 @@ struct TheaterVoiceEngineList: View {
             }
         }
         .accessibilityIdentifier("voiceEngine.list")
+    }
+
+    private var providerPicker: some View {
+        Picker("Engine provider", selection: Binding(
+            get: { self.viewModel.selectedSpeechProvider },
+            set: { self.viewModel.setSelectedSpeechProvider($0) }
+        )) {
+            ForEach(self.availableProviders, id: \.self) { provider in
+                Text(provider.rawValue).tag(provider)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .accessibilityIdentifier("voiceEngine.providerPicker")
     }
 
     private func addOnRow(_ model: SettingsStore.SpeechModel) -> some View {

@@ -229,10 +229,17 @@ struct TheaterSetupWizardView: View {
                     title: AppLanguage.text(TheaterSetupWizard.accentTitle),
                     detail: self.settings.accentColorOption.rawValue
                 )
-                self.readyRow(
-                    title: AppLanguage.text("Share slides"),
-                    detail: AppLanguage.text(TheaterReadiness.screenShare)
-                )
+                Divider()
+                    .padding(.vertical, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(AppLanguage.text("Share slides"))
+                        .font(self.theme.typography.bodySmall)
+                        .foregroundStyle(self.theme.palette.secondaryText)
+                    Text(AppLanguage.text(TheaterReadiness.screenShare))
+                        .font(self.theme.typography.bodySmall)
+                        .foregroundStyle(self.theme.palette.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }

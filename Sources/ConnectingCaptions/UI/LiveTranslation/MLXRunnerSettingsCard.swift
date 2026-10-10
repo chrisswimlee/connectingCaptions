@@ -31,12 +31,32 @@ struct MLXRunnerSettingsCard: View {
                     Text(self.runner.statusText)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Button("Install MLX runtime") {
-                        Task { await self.runner.setupRuntime() }
+                    if self.runner.pythonMissing {
+                        HStack {
+                            Button("Copy Install Command") {
+                                self.copyPythonInstallCommand()
+                            }
+                            Button("Get Homebrew") {
+                                NSWorkspace.shared.open(URL(string: "https://brew.sh")!)
+                            }
+                            Button("Retry") {
+                                Task { await self.runner.refresh() }
+                            }
+                            .disabled(self.runner.isBusy)
+                        }
+                        .buttonStyle(.theaterText)
+                        .controlSize(.small)
+                        Text("Paste the copied command into Terminal, press Return, then come back and press Retry.")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Button("Install MLX runtime") {
+                            Task { await self.runner.setupRuntime() }
+                        }
+                        .disabled(self.runner.isBusy)
+                        .buttonStyle(.theaterText)
+                        .controlSize(.small)
                     }
-                    .disabled(self.runner.isBusy)
-                    .buttonStyle(.theaterText)
-                    .controlSize(.small)
                 }
 
                 Picker("Model", selection: self.modelBinding) {
@@ -134,6 +154,10 @@ struct MLXRunnerSettingsCard: View {
     private func pickerLabel(for model: MLXRunnerModel) -> String {
         let installed = self.runner.isInstalled(model.id) ? " · Ready" : ""
         return "\(model.pickerTitle)\(installed)"
+    }
+
+    private func copyPythonInstallCommand() {
+        ClipboardService.copyToClipboard("brew install python@3.12")
     }
 
     private func usePasted() async {

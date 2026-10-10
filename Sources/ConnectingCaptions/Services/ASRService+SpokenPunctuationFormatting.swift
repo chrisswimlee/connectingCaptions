@@ -343,6 +343,7 @@ private enum SpokenPunctuationFormatter {
         return self.matchRule(
             in: tokens,
             at: aliasIndex,
+            phraseStartIndex: index,
             rulesByFirstWord: rulesByFirstWord,
             context: context
         )
@@ -381,9 +382,14 @@ private enum SpokenPunctuationFormatter {
         return cursor < tokens.count ? cursor : nil
     }
 
+    /// `index` is the alias ("dot", "slash", ...). `phraseStartIndex` is the first
+    /// prefix word ("literal") in front of it. Context rules read the neighbor to
+    /// the left of the prefix, not the prefix word itself, so "version 1 literal
+    /// dot 2" sees "1" rather than "literal".
     private static func matchRule(
         in tokens: [Token],
         at index: Int,
+        phraseStartIndex: Int,
         rulesByFirstWord: [String: [PhraseRule]],
         context: FormattingContext
     ) -> (rule: PhraseRule, endIndex: Int)? {
@@ -416,14 +422,14 @@ private enum SpokenPunctuationFormatter {
                !rule.requiresSymbolContext ||
                self.hasSymbolContext(
                    in: tokens,
-                   startIndex: index,
+                   startIndex: phraseStartIndex,
                    endIndex: cursor,
                    rulesByFirstWord: rulesByFirstWord
                ),
                !rule.requiresDotContext ||
-               self.hasDotContext(in: tokens, startIndex: index, endIndex: cursor),
+               self.hasDotContext(in: tokens, startIndex: phraseStartIndex, endIndex: cursor),
                !rule.requiresSlashPathContext ||
-               self.hasSlashPathContext(in: tokens, startIndex: index, endIndex: cursor),
+               self.hasSlashPathContext(in: tokens, startIndex: phraseStartIndex, endIndex: cursor),
                !rule.requiresAtSignPunctuationApp || context.isAtSignPunctuationApp
             {
                 return (rule, cursor)

@@ -13,8 +13,8 @@ final class TheaterListenPolicyTests: XCTestCase {
 
         let candidates = [
             TranslationLanguageCatalog.arabic, TranslationLanguageCatalog.chinese,
-            TranslationLanguageCatalog.danish, TranslationLanguageCatalog.dutch,
-            TranslationLanguageCatalog.finnish, TranslationLanguageCatalog.french,
+            TranslationLanguageCatalog.indonesian, TranslationLanguageCatalog.dutch,
+            TranslationLanguageCatalog.polish, TranslationLanguageCatalog.french,
         ]
         for language in candidates {
             let analyzer = VoiceEngineLanguageCatalog.supports(.appleSpeechAnalyzer, languageID: language.id)

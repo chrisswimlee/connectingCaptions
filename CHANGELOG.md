@@ -15,6 +15,8 @@ All notable changes to connectingCaptions are documented in this file.
 - First run is Welcome, languages, microphone, then Listen. Setup is Voice Engine and Language packs. Setup Wizard, Custom Dictionary, and Experimental stay off the advertised lists. Getting Started treats Apple Speech as ready. The Home license card appears only when a key is on.
 - The language pack downloads on Try Theater. Getting Started explains Listen and only asks for a microphone, a missing pack, or optional typing. Settings leaves dictation shortcuts, clipboard, streaks, and AI enhancement notices off the advertised lists. Search does not open those leftovers. After the first caption, Home no longer says to press Listen.
 - Japanese no longer cuts at 何か / そうだ, a short から, or です when ので still follows. Those leftovers stay on the same line.
+- Dictation: "literal dot", "literal slash", "literal plus", and "literal equals" convert again when the words around them call for a symbol ("version 1 literal dot 2" → "version 1.2", "a literal plus b" → "a + b"). The check had been reading the word "literal" as the neighbor.
+- A pronunciation dictionary file that no longer parses is moved aside as `.corrupt` before anything writes over it, including a backup restore.
 
 ## [1.6.15] — 2026-09-29
 

@@ -289,6 +289,32 @@ extension SettingsStore {
         }
     }
 
+    /// Danish, Finnish, Hebrew, Malay, Norwegian, and Swedish were removed from
+    /// `TranslationLanguageCatalog.all` because Apple Translation has no supported
+    /// pairing for them. The getters for these keys already fall back to English
+    /// on every read when the stored ID no longer resolves; this migration makes
+    /// that reset explicit and one-time instead of leaving the stale, unusable ID
+    /// sitting in defaults forever.
+    func migrateUnsupportedTranslationLanguagesIfNeeded() {
+        let keys = [
+            Keys.translationSourceLanguageID,
+            Keys.translationTargetLanguageID,
+            Keys.onboardingSelectedLanguageID,
+        ]
+        for key in keys {
+            guard let stored = self.defaults.string(forKey: key)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                !stored.isEmpty,
+                TranslationLanguageCatalog.language(id: stored) == nil
+            else { continue }
+            DebugLogger.shared.info(
+                "\"\(stored)\" is no longer a supported caption/translation language; resetting \(key) to English.",
+                source: "SettingsStore"
+            )
+            self.defaults.set(TranslationLanguageCatalog.english.id, forKey: key)
+        }
+    }
+
     func migrateOverlayBottomOffsetTo50IfNeeded() {
         if self.defaults.bool(forKey: Keys.overlayBottomOffsetMigratedTo50) {
             return

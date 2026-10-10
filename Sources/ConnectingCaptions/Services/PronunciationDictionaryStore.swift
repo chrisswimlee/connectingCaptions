@@ -111,6 +111,8 @@ actor PronunciationDictionaryStore {
         }) else {
             throw PronunciationDictionaryStoreError.inconsistentEnrollment
         }
+        // Load first so an unreadable file on disk is quarantined, not overwritten.
+        self.loadIfNeeded()
         try self.persist(Document(version: 1, profiles: profiles))
     }
 
@@ -136,14 +138,36 @@ actor PronunciationDictionaryStore {
 
     private func loadIfNeeded() {
         guard self.document == nil else { return }
-        guard let data = try? Data(contentsOf: self.fileURL),
-              let decoded = try? JSONDecoder().decode(Document.self, from: data),
-              decoded.version == 1
-        else {
+        guard let data = try? Data(contentsOf: self.fileURL) else {
+            self.document = Document(version: 1, profiles: [])
+            return
+        }
+        guard let decoded = try? JSONDecoder().decode(Document.self, from: data), decoded.version == 1 else {
+            // Starting from an empty in-memory document is fine, but the next
+            // mutation would persist() that empty state over this file. Move the
+            // unreadable file aside first so the next write can't destroy it.
+            self.quarantineUnreadableFile()
             self.document = Document(version: 1, profiles: [])
             return
         }
         self.document = decoded
+    }
+
+    private func quarantineUnreadableFile() {
+        let quarantineURL = self.fileURL.appendingPathExtension("corrupt")
+        try? FileManager.default.removeItem(at: quarantineURL)
+        do {
+            try FileManager.default.moveItem(at: self.fileURL, to: quarantineURL)
+            DebugLogger.shared.error(
+                "PronunciationDictionaryStore: unreadable file moved to \(quarantineURL.path)",
+                source: "PronunciationDictionaryStore"
+            )
+        } catch {
+            DebugLogger.shared.error(
+                "PronunciationDictionaryStore: failed to quarantine unreadable file at \(self.fileURL.path): \(error.localizedDescription)",
+                source: "PronunciationDictionaryStore"
+            )
+        }
     }
 
     private func persist(_ updated: Document) throws {

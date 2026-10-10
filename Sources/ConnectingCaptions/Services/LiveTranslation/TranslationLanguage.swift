@@ -29,28 +29,16 @@ enum TranslationLanguageCatalog {
     static let thai = TranslationLanguage(id: "th", displayName: "Thai", appleLanguageCode: "th")
     static let arabic = TranslationLanguage(id: "ar", displayName: "Arabic", appleLanguageCode: "ar")
     static let chinese = TranslationLanguage(id: "zh", displayName: "Chinese", appleLanguageCode: "zh")
-    static let danish = TranslationLanguage(id: "da", displayName: "Danish", appleLanguageCode: "da")
     static let dutch = TranslationLanguage(id: "nl", displayName: "Dutch", appleLanguageCode: "nl")
-    static let finnish = TranslationLanguage(id: "fi", displayName: "Finnish", appleLanguageCode: "fi")
     static let french = TranslationLanguage(id: "fr", displayName: "French", appleLanguageCode: "fr")
     static let german = TranslationLanguage(id: "de", displayName: "German", appleLanguageCode: "de")
-    static let hebrew = TranslationLanguage(id: "he", displayName: "Hebrew", appleLanguageCode: "he")
     static let hindi = TranslationLanguage(id: "hi", displayName: "Hindi", appleLanguageCode: "hi")
     static let indonesian = TranslationLanguage(id: "id", displayName: "Indonesian", appleLanguageCode: "id")
     static let italian = TranslationLanguage(id: "it", displayName: "Italian", appleLanguageCode: "it")
-    static let malay = TranslationLanguage(id: "ms", displayName: "Malay", appleLanguageCode: "ms")
-    /// Voice engines use `no`. Apple Translation lists Norwegian as `nb`.
-    static let norwegian = TranslationLanguage(
-        id: "no",
-        displayName: "Norwegian",
-        appleLanguageCode: "nb",
-        localeLanguage: Locale.Language(identifier: "nb")
-    )
     static let polish = TranslationLanguage(id: "pl", displayName: "Polish", appleLanguageCode: "pl")
     static let portuguese = TranslationLanguage(id: "pt", displayName: "Portuguese", appleLanguageCode: "pt")
     static let russian = TranslationLanguage(id: "ru", displayName: "Russian", appleLanguageCode: "ru")
     static let spanish = TranslationLanguage(id: "es", displayName: "Spanish", appleLanguageCode: "es")
-    static let swedish = TranslationLanguage(id: "sv", displayName: "Swedish", appleLanguageCode: "sv")
     static let turkish = TranslationLanguage(id: "tr", displayName: "Turkish", appleLanguageCode: "tr")
     static let ukrainian = TranslationLanguage(id: "uk", displayName: "Ukrainian", appleLanguageCode: "uk")
     static let vietnamese = TranslationLanguage(id: "vi", displayName: "Vietnamese", appleLanguageCode: "vi")
@@ -59,6 +47,11 @@ enum TranslationLanguageCatalog {
     /// Korean and Japanese work with Apple Speech, Cohere, or Whisper.
     /// Thai works best with Apple Speech or Whisper; Nemotron Thai is experimental.
     /// Chinese is Apple's Simplified `zh`. Traditional locales share that language.
+    /// Danish, Finnish, Hebrew, Malay, Norwegian, and Swedish are deliberately absent:
+    /// Apple's on-device Translation framework reports every pairing for these as
+    /// unsupported (verified against `LanguageAvailability`), even though Apple Speech
+    /// can transcribe them. Advertising them as caption/translation languages would be
+    /// a lie the first time someone tried to use them.
     static let all: [TranslationLanguage] = [
         Self.english,
         Self.korean,
@@ -66,22 +59,16 @@ enum TranslationLanguageCatalog {
         Self.thai,
         Self.arabic,
         Self.chinese,
-        Self.danish,
         Self.dutch,
-        Self.finnish,
         Self.french,
         Self.german,
-        Self.hebrew,
         Self.hindi,
         Self.indonesian,
         Self.italian,
-        Self.malay,
-        Self.norwegian,
         Self.polish,
         Self.portuguese,
         Self.russian,
         Self.spanish,
-        Self.swedish,
         Self.turkish,
         Self.ukrainian,
         Self.vietnamese,

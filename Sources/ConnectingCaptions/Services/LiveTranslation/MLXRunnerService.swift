@@ -36,6 +36,7 @@ final class MLXRunnerService: ObservableObject {
     @Published private(set) var statusText = "Checking local MLX…"
     @Published private(set) var isBusy = false
     @Published private(set) var downloadFraction: Double?
+    @Published private(set) var pythonMissing = false
 
     private var serveProcess: Process?
     private var commandProcess: Process?
@@ -101,8 +102,10 @@ final class MLXRunnerService: ObservableObject {
     func refresh() async {
         do {
             let payload = try await self.run(arguments: ["status"])
+            self.pythonMissing = false
             self.applyStatus(payload)
         } catch {
+            self.pythonMissing = (error as? MLXRunnerError)?.isPythonMissing ?? false
             self.statusText = error.localizedDescription
         }
     }
@@ -113,6 +116,7 @@ final class MLXRunnerService: ObservableObject {
         defer { self.isBusy = false }
         do {
             let payload = try await self.run(arguments: ["setup"], useSetupPython: true)
+            self.pythonMissing = false
             if payload["ok"] as? Bool == false {
                 self.statusText = payload["error"] as? String ?? "Could not install MLX."
             } else {
@@ -121,6 +125,7 @@ final class MLXRunnerService: ObservableObject {
             }
             await self.refresh()
         } catch {
+            self.pythonMissing = (error as? MLXRunnerError)?.isPythonMissing ?? false
             self.statusText = error.localizedDescription
         }
     }
@@ -486,7 +491,13 @@ final class MLXRunnerService: ObservableObject {
             do {
                 try process.run()
             } catch {
-                continuation.resume(throwing: error)
+                // process.run() failing here almost always means the python path
+                // this launched with (resolved moments ago) is no longer valid —
+                // e.g. its Homebrew install was removed between the check and now.
+                continuation.resume(throwing: MLXRunnerError(
+                    message: "Could not launch the MLX runtime: \(error.localizedDescription)",
+                    isPythonMissing: true
+                ))
             }
         }
     }
@@ -525,7 +536,8 @@ final class MLXRunnerService: ObservableObject {
             return pythonPath
         }
         throw MLXRunnerError(
-            message: "Python 3.12 was not found. Install it with brew install python@3.12, or set FLUID_PYTHON."
+            message: "Python 3.12 was not found. Install it with brew install python@3.12, or set FLUID_PYTHON.",
+            isPythonMissing: true
         )
     }
 
@@ -574,6 +586,7 @@ final class MLXRunnerService: ObservableObject {
 
 struct MLXRunnerError: LocalizedError {
     let message: String
+    var isPythonMissing = false
     var errorDescription: String? { self.message }
 }
 

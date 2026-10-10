@@ -96,6 +96,14 @@ enum AppleSpeechLiveCapability {
 enum VoiceEngineLanguageCatalog {
     static let productLanguageIDs: Set<String> = TranslationLanguageCatalog.supportedIDs
 
+    /// Which of this app's caption languages `model` can actually hear right now —
+    /// the same check Theater uses to gate Listen, surfaced for display. Dynamic
+    /// (not a hand-written list) so it never drifts from what `supports(_:languageID:)`
+    /// actually does, including the Apple Speech Analyzer live-capability narrowing.
+    static func supportedProductLanguages(for model: SettingsStore.SpeechModel) -> [TranslationLanguage] {
+        TranslationLanguageCatalog.all.filter { Self.supports(model, languageID: $0.id) }
+    }
+
     static func isProductLanguageID(_ id: String) -> Bool {
         let normalized = id.trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
@@ -649,14 +657,11 @@ enum VoiceEngineLanguageCatalog {
         "ar": ["ar-SA"],
         "ca": ["ca-ES"],
         "cs": ["cs-CZ"],
-        "da": ["da-DK"],
         "de": ["de-DE", "de-AT", "de-CH"],
         "el": ["el-GR"],
         "en": ["en-US", "en-GB", "en-CA", "en-AU", "en-IN"],
         "es": ["es-US", "es-ES", "es-MX", "es-419"],
-        "fi": ["fi-FI"],
         "fr": ["fr-FR", "fr-CA", "fr-BE", "fr-CH"],
-        "he": ["he-IL"],
         "hi": ["hi-IN"],
         "hr": ["hr-HR"],
         "hu": ["hu-HU"],
@@ -664,15 +669,12 @@ enum VoiceEngineLanguageCatalog {
         "it": ["it-IT", "it-CH"],
         "ja": ["ja-JP"],
         "ko": ["ko-KR"],
-        "ms": ["ms-MY"],
         "nl": ["nl-NL", "nl-BE"],
-        "no": ["nb-NO"],
         "pl": ["pl-PL"],
         "pt": ["pt-BR", "pt-PT"],
         "ro": ["ro-RO"],
         "ru": ["ru-RU"],
         "sk": ["sk-SK"],
-        "sv": ["sv-SE"],
         "th": ["th-TH"],
         "tr": ["tr-TR"],
         "uk": ["uk-UA"],

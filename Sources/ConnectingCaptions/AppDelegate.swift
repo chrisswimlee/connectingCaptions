@@ -99,6 +99,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
             group.addTask { @MainActor in
                 await AppServices.shared.shutdownForTermination()
                 await PrivateAIIntegrationService.shared.shutdownForTermination()
+                if MLXRunnerService.shared.status.running {
+                    await MLXRunnerService.shared.stopAndWait(refreshAfter: false)
+                }
                 return true
             }
             group.addTask {

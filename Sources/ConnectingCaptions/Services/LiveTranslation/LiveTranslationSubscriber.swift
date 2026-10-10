@@ -1401,7 +1401,12 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
         let stillGrowing = self.pendingGrowthSource(for: last.id) != nil
         let age = Date().timeIntervalSince(last.committedAt)
-        let utteranceQuiet = self.lastSilenceHoldAt.map { $0 > last.committedAt } ?? false
+        // A hold recorded after this row committed means the room went quiet
+        // at some point in the gap since then, not before it finished. Once
+        // that is true, time past the recent window means the quiet held
+        // through to this new unit, which is a new utterance, not growth.
+        let endedOnAHold = self.lastSilenceHoldAt.map { $0 > last.committedAt } ?? false
+        let utteranceQuiet = endedOnAHold && age > Self.continuationMergeWindow
         let recent = stillGrowing || age <= Self.continuationMergeWindow
         let connective = utteranceQuiet == false && age <= Self.connectiveContinuationWindow
         guard recent || connective else {

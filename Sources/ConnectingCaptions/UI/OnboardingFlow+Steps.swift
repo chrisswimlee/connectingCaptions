@@ -612,12 +612,13 @@ extension OnboardingFlowView {
                                         .padding(.bottom, 8)
                                 }
                                 if !self.isOnboardingTranslationPackReady {
-                                    Button("Download language pack") {
+                                    Button(self.isRequestingLanguagePackDownload ? TheaterReadiness.downloadPackBusy : "Download language pack") {
                                         Task {
                                             await self.refreshLanguagePackAvailability(requestDownload: true)
                                         }
                                     }
                                     .buttonStyle(.bordered)
+                                    .disabled(self.isRequestingLanguagePackDownload)
                                     .padding(.bottom, 16)
                                 }
                             }

@@ -58,6 +58,7 @@ struct OnboardingFlowView: View {
     @State var lastLandingGlowLocation = CGPoint(x: -1000, y: -1000)
     @State var languagePackAvailability = ""
     @State var languagePackIsInstalled = false
+    @State var isRequestingLanguagePackDownload = false
     @State var isFinishingOnboarding = false
     let landingGlowMovementThreshold: CGFloat = 24
 
@@ -606,13 +607,28 @@ struct OnboardingFlowView: View {
         let source = SpokenLanguageResolver.sourceLanguage()
         let target = SpokenLanguageResolver.targetLanguage()
         await AppleTranslationEngine.shared.warm(source: source, target: target)
-        let status = await AppleTranslationEngine.shared.packAvailability(
+        var status = await AppleTranslationEngine.shared.packAvailability(
             source: source,
             target: target
         )
         self.languagePackIsInstalled = status.isReady
         if requestDownload, !status.isReady {
+            self.isRequestingLanguagePackDownload = true
+            defer { self.isRequestingLanguagePackDownload = false }
             AppleTranslationEngine.shared.requestLanguagePackDownload(source: source, target: target)
+            // The download sheet polls and closes itself, but never tells this view —
+            // without this loop, Listen (and Done) stay disabled forever after a
+            // successful download, stranding onboarding at Skip.
+            let deadline = ProcessInfo.processInfo.systemUptime + 180
+            while !status.isReady, status != .unsupported, ProcessInfo.processInfo.systemUptime < deadline {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                if Task.isCancelled { break }
+                guard source.id == SpokenLanguageResolver.sourceLanguage().id,
+                      target.id == SpokenLanguageResolver.targetLanguage().id
+                else { break }
+                status = await AppleTranslationEngine.shared.packAvailability(source: source, target: target)
+                self.languagePackIsInstalled = status.isReady
+            }
         }
         self.languagePackAvailability = await AppleTranslationEngine.shared.checkAvailability(
             source: source,

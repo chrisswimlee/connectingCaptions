@@ -242,6 +242,9 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
             }
         } catch {
             DebugLogger.shared.error("Failed to delete models: \(error)", source: "AISettingsView")
+            self.asr.errorTitle = "Model Delete Failed"
+            self.asr.errorMessage = error.localizedDescription
+            self.asr.showError = true
         }
     }
 
