@@ -46,10 +46,13 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
 
     private let audioFolder = "DictationAudioHistory"
     private let fileManager = FileManager.default
+    private let audioDirectoryOverride: URL?
     private let pendingSaveLock = NSLock()
     private var pendingSaveFileNames: Set<String> = []
 
-    private init() {}
+    init(audioDirectory: URL? = nil) {
+        self.audioDirectoryOverride = audioDirectory
+    }
 
     func save(
         snapshot: DictationAudioSnapshot,
@@ -105,6 +108,11 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         self.pendingSaveLock.withLock {
             _ = self.pendingSaveFileNames.remove(fileName)
         }
+    }
+
+    func discardPendingAudio(fileName: String) {
+        self.deleteAudio(fileName: fileName)
+        self.completePendingSave(fileName: fileName)
     }
 
     func audioFileURL(for entry: TranscriptionHistoryEntry) -> URL? {
@@ -213,12 +221,12 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         }
     }
 
-    func exportAudioArchive(entries: [TranscriptionHistoryEntry], to destinationURL: URL) throws {
-        try self.exportArchive(entries: entries, to: destinationURL)
+    func exportAudioArchive(entries: [TranscriptionHistoryEntry], to destinationURL: URL) async throws {
+        try await self.exportArchive(entries: entries, to: destinationURL)
     }
 
-    func exportPair(entry: TranscriptionHistoryEntry, to destinationURL: URL) throws {
-        try self.exportArchive(entries: [entry], to: destinationURL)
+    func exportPair(entry: TranscriptionHistoryEntry, to destinationURL: URL) async throws {
+        try await self.exportArchive(entries: [entry], to: destinationURL)
     }
 
     func suggestedAudioExportFilename(for date: Date = Date()) -> String {
@@ -241,7 +249,7 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         Int64((gigabytes * 1_073_741_824.0).rounded())
     }
 
-    private func exportArchive(entries: [TranscriptionHistoryEntry], to destinationURL: URL) throws {
+    private func exportArchive(entries: [TranscriptionHistoryEntry], to destinationURL: URL) async throws {
         let exportEntries = entries.filter { self.audioFileExists(for: $0) }
         guard !exportEntries.isEmpty else { throw DictationAudioHistoryError.noAudioEntries }
 
@@ -295,11 +303,11 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         if self.fileManager.fileExists(atPath: destinationURL.path) {
             try self.fileManager.removeItem(at: destinationURL)
         }
-        try self.zip(stagingDirectory: staging, destinationURL: destinationURL)
+        try await self.zip(stagingDirectory: staging, destinationURL: destinationURL)
     }
 
     private func audioDirectory(createIfNeeded: Bool = true) throws -> URL {
-        let directory = AppSupportDirectory.url(fileManager: self.fileManager)
+        let directory = self.audioDirectoryOverride ?? AppSupportDirectory.url(fileManager: self.fileManager)
             .appendingPathComponent(self.audioFolder, isDirectory: true)
         if createIfNeeded {
             try self.fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -336,7 +344,16 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         "\(Self.fileTimestampFormatter.string(from: timestamp))_\(entryID.uuidString.prefix(8)).wav"
     }
 
-    private func zip(stagingDirectory: URL, destinationURL: URL) throws {
+    /// Zips the staging directory off the caller's thread.
+    ///
+    /// Both export paths reach this from the main actor, so the previous
+    /// synchronous `waitUntilExit()` froze the whole UI for the length of the
+    /// export — a beachball with no progress, on a bulk export of saved audio.
+    /// The work now runs on a background queue and suspends the caller
+    /// instead. stderr is drained before the exit wait, because a pipe that
+    /// fills up stalls the writer and leaves the reader waiting on a process
+    /// that can no longer finish (same reason `TheaterTalkPack` drains first).
+    private func zip(stagingDirectory: URL, destinationURL: URL) async throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
         process.arguments = ["-qr", destinationURL.path, "manifest.jsonl", "audio"]
@@ -345,12 +362,25 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         let errorPipe = Pipe()
         process.standardError = errorPipe
         try process.run()
-        process.waitUntilExit()
 
-        guard process.terminationStatus == 0 else {
-            let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
-            let message = String(data: data, encoding: .utf8) ?? ""
-            throw DictationAudioHistoryError.zipFailed(message)
+        let outcome: (status: Int32, errorText: String) = await withCheckedContinuation { (continuation: CheckedContinuation<(status: Int32, errorText: String), Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let handle = errorPipe.fileHandleForReading
+                let drained = handle.readDataToEndOfFile()
+                process.waitUntilExit()
+                continuation.resume(
+                    returning: (
+                        process.terminationStatus,
+                        String(data: drained, encoding: .utf8) ?? ""
+                    )
+                )
+            }
+        }
+
+        guard outcome.status == 0 else {
+            throw DictationAudioHistoryError.zipFailed(
+                outcome.errorText.isEmpty ? "zip exited with status \(outcome.status)." : outcome.errorText
+            )
         }
     }
 

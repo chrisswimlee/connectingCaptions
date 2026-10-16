@@ -36,7 +36,7 @@ struct TranslationEngineSettingsView: View {
 
             ThemedCard(style: .standard, hoverEffect: false) {
                 VStack(alignment: .leading, spacing: 8) {
-                    FluidSectionHeader(title: "Apple Translation", systemImage: "translate")
+                    FluidSectionHeader(title: AppLanguage.text("Apple Translation"), systemImage: "translate")
                     Text(self.appleStatusLine)
                         .font(self.theme.typography.bodySmall)
                         .foregroundStyle(self.appleStatusIsWarning ? self.theme.palette.warning : self.theme.palette.secondaryText)
@@ -54,8 +54,7 @@ struct TranslationEngineSettingsView: View {
         TheaterEngineCopy.translationRunningLine(
             mode: self.settings.theaterSessionMode,
             sameLanguage: SpokenLanguageResolver.isSameLanguagePair(),
-            pack: self.controller.packAvailability,
-            engine: .apple
+            pack: self.controller.packAvailability
         )
     }
 

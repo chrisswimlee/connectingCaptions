@@ -75,6 +75,11 @@ final class TheaterSpokenDelivery {
     private var activeRenderTimeout: Task<Void, Never>?
 
     func notePublished(id: UInt64, text: String, languageID: String) {
+        guard SettingsStore.shared.theaterSpeakCaptions else { return }
+        guard SpokenCaptionAvailability.current(outputUIDs: AudioDevice.listOutputDevices().map(\.uid)) == .ready else {
+            self.dropPending()
+            return
+        }
         guard Self.shouldSpeak(
             enabled: SettingsStore.shared.theaterSpeakCaptions,
             listenKind: LiveTranslationController.shared.listenKind,
@@ -477,16 +482,15 @@ final class TheaterSpokenDelivery {
                 return false
             }
         }
-        let outcome: Bool? = await withTaskGroup(of: Bool?.self) { group in
-            group.addTask { await startTask.value }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: Self.engineStartNanoseconds)
-                return nil
-            }
-            let first = await group.next() ?? nil
-            group.cancelAll()
-            return first
+        let startedInTime = await BoundedWait.completedWithin(
+            Duration.nanoseconds(Int(Self.engineStartNanoseconds))
+        ) {
+            _ = await startTask.value
         }
+        // `nil` means the start was still going when the 2-second budget expired,
+        // not that it failed. The detached start keeps running either way, so the
+        // watcher below still stops the engine if the start lands late.
+        let outcome: Bool? = startedInTime ? (await startTask.value) : nil
         if outcome == true { return true }
         if outcome == false { return false }
         self.engineStartInFlight = true

@@ -29,7 +29,7 @@ struct CommercialLicenseStatusCard: View {
                 .foregroundStyle(self.theme.palette.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             if self.showsLicenseRequest {
-                Link("Email to buy", destination: ConnectingCaptionsProduct.commercialLicenseMailURL)
+                Link(AppLanguage.text("Email to buy"), destination: ConnectingCaptionsProduct.commercialLicenseMailURL)
                     .textLinkPointer()
                     .font(self.theme.typography.bodySmall)
                     .accessibilityIdentifier("commercial.license.request")
@@ -44,7 +44,7 @@ struct CommercialLicenseStatusCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(self.title)
+                        AppText(self.title)
                             .font(self.theme.typography.bodyStrong)
                         Text(self.detail)
                             .font(self.theme.typography.bodySmall)
@@ -56,19 +56,19 @@ struct CommercialLicenseStatusCard: View {
 
                 if self.showsLicenseRequest {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Named license \(ConnectingCaptionsProduct.commercialSeatPriceLine), \(ConnectingCaptionsProduct.commercialSeatMinimum) Macs minimum.")
-                        Text("Written SLA \(ConnectingCaptionsProduct.commercialSLAPriceLine).")
-                        Text("MDM / Jamf pkg \(ConnectingCaptionsProduct.commercialMDMPriceLine).")
+                        AppText("Named license {0}, {1} Macs minimum.", arguments: [String(describing: ConnectingCaptionsProduct.commercialSeatPriceLine), String(describing: ConnectingCaptionsProduct.commercialSeatMinimum)])
+                        AppText("Written SLA {0}.", arguments: [String(describing: ConnectingCaptionsProduct.commercialSLAPriceLine)])
+                        AppText("MDM / Jamf pkg {0}.", arguments: [String(describing: ConnectingCaptionsProduct.commercialMDMPriceLine)])
                     }
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.theme.palette.secondaryText)
                     .accessibilityIdentifier("commercial.license.prices")
 
                     HStack(spacing: 8) {
-                        Link("Email to buy", destination: ConnectingCaptionsProduct.commercialLicenseMailURL)
+                        Link(AppLanguage.text("Email to buy"), destination: ConnectingCaptionsProduct.commercialLicenseMailURL)
                             .textLinkPointer()
                             .accessibilityIdentifier("commercial.license.request")
-                        Link("License page", destination: ConnectingCaptionsProduct.commercialLicenseURL)
+                        Link(AppLanguage.text("License page"), destination: ConnectingCaptionsProduct.commercialLicenseURL)
                             .textLinkPointer()
                             .accessibilityIdentifier("commercial.license.page")
                     }
@@ -76,6 +76,7 @@ struct CommercialLicenseStatusCard: View {
                 }
 
                 if self.showsKeyField {
+                    Divider().opacity(0.3)
                     self.seatLine
                     self.keyField
                     if self.settings.commercialLicenseRecord != nil {
@@ -87,16 +88,16 @@ struct CommercialLicenseStatusCard: View {
         .accessibilityIdentifier("commercial.license")
         .accessibilityElement(children: .contain)
         .confirmationDialog(
-            "Clear the activity log on this Mac?",
+            AppLanguage.text("Clear the activity log on this Mac?"),
             isPresented: self.$confirmClearAudit,
             titleVisibility: .visible
         ) {
-            Button("Clear activity log", role: .destructive) {
+            AppButton("Clear activity log", role: .destructive) {
                 FleetAudit.clear()
             }
-            Button("Cancel", role: .cancel) {}
+            AppButton("Cancel", role: .cancel) {}
         } message: {
-            Text("The log stays on this Mac until you clear it. Captions are not in it.")
+            AppText("The log stays on this Mac until you clear it. Captions are not in it.")
         }
     }
 
@@ -139,7 +140,7 @@ struct CommercialLicenseStatusCard: View {
     }
 
     private var seatLine: some View {
-        Text("Seat ID \(self.settings.commercialSeatID). Give this to IT if they ask which Mac this is.")
+        AppText("Seat ID {0}. Give this to IT if they ask which Mac this is.", arguments: [String(describing: self.settings.commercialSeatID)])
             .font(self.theme.typography.caption)
             .foregroundStyle(self.theme.palette.secondaryText)
             .textSelection(.enabled)
@@ -149,11 +150,11 @@ struct CommercialLicenseStatusCard: View {
     @ViewBuilder
     private var keyField: some View {
         if self.settings.commercialLicenseIsManaged {
-            Text("Installed for this Mac.")
+            AppText("Installed for this Mac.")
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(self.theme.palette.secondaryText)
         } else if self.canRemoveLicense {
-            Button("Remove license") {
+            AppButton("Remove license") {
                 self.settings.removeCommercialLicense()
                 self.draft = ""
                 self.message = nil
@@ -161,17 +162,27 @@ struct CommercialLicenseStatusCard: View {
             .buttonStyle(.theaterTextDestructive)
             .accessibilityIdentifier("commercial.license.remove")
         } else {
-            TextField("Paste a commercial license key", text: self.$draft)
+            TextField(AppLanguage.text("Paste a commercial license key"), text: self.$draft)
                 .textFieldStyle(.roundedBorder)
                 .font(self.theme.typography.bodySmall)
                 .accessibilityIdentifier("commercial.license.field")
+                .onChange(of: self.draft) { _, _ in
+                    self.message = nil
+                }
             HStack(spacing: 8) {
-                Button("Activate") {
+                AppButton("Activate") {
                     self.activate()
                 }
                 .buttonStyle(.theaterTextProminent)
                 .disabled(self.draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityIdentifier("commercial.license.activate")
+            }
+            if let message {
+                AppText(message)
+                    .font(self.theme.typography.caption)
+                    .foregroundStyle(self.theme.palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("commercial.license.error")
             }
         }
     }
@@ -183,24 +194,24 @@ struct CommercialLicenseStatusCard: View {
     private var fleetActions: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Button("Export caption policy") {
+                AppButton("Export caption policy") {
                     self.exportSettings()
                 }
                 .buttonStyle(.theaterText)
                 .accessibilityIdentifier("commercial.fleet.export")
-                Button("Restore caption policy") {
+                AppButton("Restore caption policy") {
                     self.restoreSettings()
                 }
                 .buttonStyle(.theaterText)
                 .accessibilityIdentifier("commercial.fleet.restore")
             }
             HStack(spacing: 8) {
-                Button("Export activity log") {
+                AppButton("Export activity log") {
                     self.exportAudit()
                 }
                 .buttonStyle(.theaterText)
                 .accessibilityIdentifier("commercial.audit.export")
-                Button("Clear activity log") {
+                AppButton("Clear activity log") {
                     self.confirmClearAudit = true
                 }
                 .buttonStyle(.theaterTextDestructive)
@@ -208,7 +219,7 @@ struct CommercialLicenseStatusCard: View {
                 .accessibilityIdentifier("commercial.audit.clear")
             }
             if let message {
-                Text(message)
+                AppText(message)
                     .font(self.theme.typography.caption)
                     .foregroundStyle(self.theme.palette.warning)
                     .fixedSize(horizontal: false, vertical: true)

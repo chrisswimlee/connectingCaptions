@@ -17,32 +17,20 @@ struct VoiceEngineSettingsScreen: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                VoiceEngineSettingsView(
-                    viewModel: self.viewModel,
-                    settings: self.viewModel.settings
-                )
-                .appTheme(self.theme)
-                .fluidPageContent()
-                .id(Self.pageTopID)
-            }
-            .defaultScrollAnchor(.top)
-            .onAppear {
-                self.revealPageTop(using: proxy)
-            }
+        ScrollView(.vertical, showsIndicators: false) {
+            VoiceEngineSettingsView(
+                viewModel: self.viewModel,
+                settings: self.viewModel.settings
+            )
+            .appTheme(self.theme)
+            .fluidPageContent()
         }
-    }
-
-    private static let pageTopID = "voice-engine-page-top"
-
-    private func revealPageTop(using proxy: ScrollViewProxy) {
-        proxy.scrollTo(Self.pageTopID, anchor: .top)
-        DispatchQueue.main.async {
+        .defaultScrollAnchor(.top)
+        .onAppear {
             NSApp.keyWindow?.makeFirstResponder(nil)
-            proxy.scrollTo(Self.pageTopID, anchor: .top)
         }
     }
+
 }
 
 struct AIEnhancementSettingsScreen: View {

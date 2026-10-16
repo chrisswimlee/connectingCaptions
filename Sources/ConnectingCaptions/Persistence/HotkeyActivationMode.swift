@@ -7,9 +7,9 @@ enum HotkeyActivationMode: String, Codable, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .toggle: return "Toggle"
-        case .hold: return "Hold"
-        case .automatic: return "Automatic (Both)"
+        case .toggle: return AppLanguage.text("Toggle")
+        case .hold: return AppLanguage.text("Hold")
+        case .automatic: return AppLanguage.text("Automatic (Both)")
         }
     }
 

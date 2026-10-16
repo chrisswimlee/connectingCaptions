@@ -35,6 +35,9 @@ final class LiveTranslationSubscriber: ObservableObject {
     private var captionLog = LectureCaptionLog()
     private let archive: LectureCaptionArchive
     private var latencyTracker = LiveTranslationLatencyTracker()
+    private var speechTimeline = CaptionSpeechTimeline()
+    private var pendingSpeechTimings: [String: CaptionSpeechTiming] = [:]
+    private var pendingSpeechEvidence: [String: Bool?] = [:]
     private var listenBatchStart = 0
     private var postedLineCount = 0
     private var inFlightSources: [String] = []
@@ -52,8 +55,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     private var settledPrintTask: Task<Void, Never>?
     private var settledPrintSentence = ""
     /// Smoothed gap between partials while talking. Sizes the lone-sentence settle.
-    private var partialCadence: TimeInterval = 0
-    private var lastPartialUptime: TimeInterval?
+    private let publicationTiming = CaptionPublicationTiming()
     /// `commitOrder` indexes left unpublished. The walker steps over these.
     private var skippedCommitIndexes: Set<Int> = []
     /// Printed failure rows, keyed by clause identity, so Retry can replace that line.
@@ -73,6 +75,10 @@ final class LiveTranslationSubscriber: ObservableObject {
     /// Last voiced packet. A late ASR tick after this goes quiet must still
     /// flush leftover — skipped silence ticks can miss while a chunk is busy.
     private var lastVoicedUptime: TimeInterval?
+    /// Confirmed voice-energy verdict for the most recent chunk that produced
+    /// text, so admission can tell real speech from a hallucinated line over
+    /// silence. `nil` until the first chunk reports.
+    private var lastChunkAudioContainsSpeech: Bool?
     private var lastSilenceHoldAt: Date?
     private var didAutoRetryFailure = false
     private var commitTasks: [Task<Void, Never>] = []
@@ -84,6 +90,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     private var commitOrder: [String] = []
     private var nextCommitToPublish = 0
     private var commitIdentities: Set<String> = []
+    private var recognizedSpeech = CaptionRecognizedOccurrences.State()
     private var readyTranslations: [String: String] = [:]
     private var publishedCommits: [String] = []
     /// Insert Stop may admit one fragment the clause cutter refused.
@@ -95,7 +102,6 @@ final class LiveTranslationSubscriber: ObservableObject {
     private var translatedDraftSource: String = ""
     private let appleEngine: AppleTranslationEngine
     private let translator: TranslationEngine
-    private let llmEngine: LLMTranslationEngine
     private let prefetchCache = LiveTranslationPrefetchCache()
     let contextStreak = LiveTranslationContextStreak()
     private var lastFailedSource: String?
@@ -106,6 +112,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     /// Pause freezes unaccepted speech. Accepted translations already in flight may still land.
     private var liveSpeechHeld = false
     var confirmTranscript: (() async -> String)?
+    var confirmPauseTranscript: (() async -> String)?
     var canRetryTranslation: Bool { self.lastFailedSource != nil }
 
     var sessionLineCount: Int { self.captionLog.entries.count }
@@ -223,14 +230,6 @@ final class LiveTranslationSubscriber: ObservableObject {
         if leftover.isEmpty { return "" }
         if Self.isSameCaption(leftover, lastText) { return "" }
         return leftover
-    }
-
-    private static func isSameCaption(_ left: String, _ right: String) -> Bool {
-        let a = left.trimmingCharacters(in: .whitespacesAndNewlines)
-        let b = right.trimmingCharacters(in: .whitespacesAndNewlines)
-        if a.isEmpty || b.isEmpty { return false }
-        if a == b { return true }
-        return TranslationClauseSegmenter.isSameClause(a, b)
     }
 
     private func resolvedLiveCaptionDraft() -> String {
@@ -483,21 +482,19 @@ final class LiveTranslationSubscriber: ObservableObject {
     init(
         appleEngine: AppleTranslationEngine? = nil,
         translator: TranslationEngine? = nil,
-        archive: LectureCaptionArchive? = nil,
-        llmEngine: LLMTranslationEngine? = nil
+        archive: LectureCaptionArchive? = nil
     ) {
         let engine = appleEngine ?? .shared
         self.appleEngine = engine
         self.translator = translator ?? engine
         self.archive = archive ?? LectureCaptionArchive()
-        self.llmEngine = llmEngine ?? LLMTranslationEngine()
         self.archive.recount()
     }
 
     func reset(clearArchive: Bool = false) {
         let heard = self.latestHypothesis
         self.cancelSettles()
-        self.cancelCommitsAndPolish()
+        self.cancelCommitsAndPublishes()
         self.prefetchCache.invalidate()
         self.generation += 1
         self.liveSpeechHeld = false
@@ -509,6 +506,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.sessionEntries = []
         self.listenHistory = []
         self.suppressedSources = Self.suppressionUnits(from: heard)
+        self.recognizedSpeech.discard(heard, languageID: SpokenLanguageResolver.listenLanguageID(for: heard), timeline: self.speechTimeline)
         if clearArchive {
             self.archive.reset()
         }
@@ -524,10 +522,10 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.didPauseReviseThisUtterance = false
         self.didAutoRetryFailure = false
         self.lastVoicedUptime = nil
+        self.lastChunkAudioContainsSpeech = nil
         self.lastSilenceHoldAt = nil
         self.heldLiveSpoken = ""
         self.previousPartialLeftover = ""
-        self.llmEngine.resetListenEchoTally()
         self.contextStreak.reset()
         self.refreshInbox()
     }
@@ -535,7 +533,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     /// Stop settling new speech. Keep captions already committed this session.
     func endListening() {
         self.cancelSettles()
-        self.cancelCommitsAndPolish()
+        self.cancelCommitsAndPublishes()
         self.prefetchCache.invalidate()
         self.archive.flush()
         self.generation += 1
@@ -552,8 +550,10 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     /// Start another listen without wiping captions already on Theater.
     func beginListening(preserveSuppressed: Bool = false) {
+        self.speechTimeline = CaptionSpeechTimeline()
+        self.pendingSpeechTimings = [:]
         self.cancelSettles()
-        self.cancelCommitsAndPolish()
+        self.cancelCommitsAndPublishes()
         self.prefetchCache.invalidate()
         if !preserveSuppressed {
             self.suppressedSources = []
@@ -570,10 +570,10 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.didPauseReviseThisUtterance = false
         self.didAutoRetryFailure = false
         self.lastVoicedUptime = nil
+        self.lastChunkAudioContainsSpeech = nil
         self.lastSilenceHoldAt = nil
         self.heldLiveSpoken = ""
         self.previousPartialLeftover = ""
-        self.llmEngine.resetListenEchoTally()
         self.contextStreak.reset()
         self.listenBatchStart = self.captionLog.sourceLines.count
         self.listenHistory = []
@@ -585,7 +585,7 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     func noteLanguagePairChanged() {
         self.cancelSettles()
-        self.cancelCommitsAndPolish()
+        self.cancelCommitsAndPublishes()
         self.prefetchCache.invalidate()
         self.generation += 1
         self.liveSpeechHeld = false
@@ -598,7 +598,6 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.failedPrintedRowIDs = [:]
         self.heldLiveSpoken = ""
         self.previousPartialLeftover = ""
-        self.llmEngine.resetListenEchoTally()
         self.contextStreak.reset()
         self.listenBatchStart = self.captionLog.sourceLines.count
         self.listenHistory = []
@@ -608,6 +607,15 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     func noteFirstBuffer() {
         self.latencyTracker.markFirstBuffer(ProcessInfo.processInfo.systemUptime)
+    }
+
+    func noteTimedSegments(_ segments: [ASRTimedSegment]) {
+        guard !self.liveSpeechHeld else { return }
+        self.speechTimeline.ingest(segments)
+    }
+
+    func noteAudioContainsSpeech(_ containsSpeech: Bool) {
+        self.lastChunkAudioContainsSpeech = containsSpeech
     }
 
     func noteSpeechStart(hostTime: UInt64) {
@@ -668,6 +676,8 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     func dropUnacceptedSpeech() {
         self.cancelDelayedSpeechTasks()
+        self.recognizedSpeech.discard(self.latestHypothesis,
+            languageID: SpokenLanguageResolver.listenLanguageID(for: self.latestHypothesis), timeline: self.speechTimeline)
         self.sourceDraft = ""
         self.translatedDraft = ""
         self.translatedDraftSource = ""
@@ -680,16 +690,23 @@ final class LiveTranslationSubscriber: ObservableObject {
     func noteSilenceHold() {
         guard !self.liveSpeechHeld else { return }
         self.lastSilenceHoldAt = Date()
-        // Silence confirm owns this leftover. The revision wait must not print
-        // the pre-confirm wording first, or each draft becomes its own row.
-        self.cancelSettledPrint()
-        if self.eouHoldTask != nil { return }
         // The caption that closes this utterance still needs speech-start.
         // Resetting here made that line publish with no end-to-end time.
         // `finishPublishedCaption` resets after the sample is written.
         let pendingCaption = !self.sourceDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !self.lastHeardText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             || !self.inFlightSources.isEmpty
+        if self.publicationTiming.isFlushing {
+            self.cancelSettledPrint()
+            return
+        }
+        if self.didPauseReviseThisUtterance {
+            if pendingCaption, self.settledPrintTask == nil, self.tailSettleTask == nil, self.voiceCatchUpTask == nil {
+                self.scheduleOpenTailSettle(generation: self.generation)
+            }
+            return
+        }
+        self.cancelSettledPrint()
         if self.pauseRevisionTask == nil, !self.didPauseReviseThisUtterance, !pendingCaption {
             self.latencyTracker.resetUtterance()
         }
@@ -727,7 +744,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.voiceCatchUpTask?.cancel()
         self.tailSettleTask = nil
         self.voiceCatchUpTask = nil
-        self.eouHoldTask = Task { [weak self] in
+        self.eouHoldTask = self.publicationTiming.flush(onFinish: { [weak self] in
+            self?.eouHoldTask = nil
+        }) { [weak self] in
             try? await Task.sleep(nanoseconds: LiveTranslationTiming.eouHoldNanoseconds)
             guard !Task.isCancelled else { return }
             await self?.advance(.pauseConfirm, generation: token)
@@ -815,7 +834,7 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     func restore(_ snapshot: TheaterBoardSnapshot) {
         self.cancelSettles()
-        self.cancelCommitsAndPolish()
+        self.cancelCommitsAndPublishes()
         self.generation += 1
         self.publish(.restore(snapshot))
         self.translatedDraftSource = ""
@@ -887,6 +906,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { return }
         let previous = self.latestHypothesis
+        if cleaned != previous || self.lastChunkAudioContainsSpeech == true {
+            self.recognizedSpeech.audioContainsSpeech = self.lastChunkAudioContainsSpeech
+        }
         let confirmed = StreamingTranscriptStitcher.confirmedPrefix(
             previous: previous,
             incoming: cleaned
@@ -894,14 +916,26 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.latestHypothesis = cleaned
         let languageID = SpokenLanguageResolver.listenLanguageID(for: cleaned)
         let now = ProcessInfo.processInfo.systemUptime
-        self.notePartialCadence(at: now)
+        self.publicationTiming.notePartial(at: now)
         if self.latencyTracker.speechStart == nil {
             self.latencyTracker.markSpeechStart(now)
         }
         self.latencyTracker.markASRReady(now)
 
+        self.recognizedSpeech.confirmation = confirmed
+        self.recognizedSpeech.isFinal = false
+        if self.advanceRecognizedOccurrences() {
+            // The repeat waits for confirmation. If the silence tick already
+            // passed, only the pause flush can confirm it before the next utterance.
+            if self.isPastVoicedSilenceHold() {
+                self.noteSilenceHold()
+            }
+            return
+        }
+
         let leftover = self.rememberUnreadSpeech(cleaned, languageID: languageID)
         if self.shouldCancelPauseRevision(leftover: leftover) {
+            self.publicationTiming.cancelFlush()
             self.pauseRevisionTask?.cancel()
             self.pauseRevisionTask = nil
             self.didPauseReviseThisUtterance = false
@@ -935,6 +969,40 @@ final class LiveTranslationSubscriber: ObservableObject {
         if self.isPastVoicedSilenceHold() {
             self.noteSilenceHold()
         }
+    }
+
+    /// Explicit copies in one cumulative hypothesis carry occurrence ordinals.
+    /// Reserve them in spoken order, waiting if an identical sentence is still
+    /// translating: translation caches are keyed by text, not by occurrence.
+    /// The same hypothesis on a later tick then has no unaccepted occurrences.
+    @discardableResult
+    private func advanceRecognizedOccurrences() -> Bool {
+        guard !self.liveSpeechHeld else { return false }
+        let languageID = SpokenLanguageResolver.listenLanguageID(for: self.latestHypothesis)
+        guard let plan = CaptionRecognizedOccurrences.plan(self.latestHypothesis, languageID: languageID,
+            accepted: self.recognizedSpeech.acceptedCounts, speechEnds: self.recognizedSpeech.speechEnds, timeline: self.speechTimeline),
+              plan.hasUnaccepted(self.recognizedSpeech.acceptedCounts)
+        else {
+            return false
+        }
+        let remaining = plan.drain(
+            accepted: self.recognizedSpeech.acceptedCounts, confirmed: self.recognizedSpeech.confirmation,
+            languageID: languageID, isFinal: self.recognizedSpeech.isFinal,
+            isWaiting: { unit in
+                (self.orderedPendingSources + self.inFlightSources).contains {
+                    TranslationClauseSegmenter.isSameClause($0, unit)
+                }
+            }, accept: { unit in
+                self.recognizedSpeech.reservedKeys.insert(TranslationClauseSegmenter.clauseIdentity(unit))
+                self.enqueueCommit(unit)
+            }
+        )
+        self.sourceDraft = remaining
+        self.lastHeardText = remaining
+        self.heldLiveSpoken = remaining
+        self.previousPartialLeftover = remaining
+        self.showActivityStatus()
+        return true
     }
 
     /// A finished sentence on the recognition tick. Pause, open tail, and Stop
@@ -1118,10 +1186,11 @@ final class LiveTranslationSubscriber: ObservableObject {
             return
         }
         let sentence = next.unit.trimmingCharacters(in: .whitespacesAndNewlines)
+        if self.settledPrintTask != nil, self.settledPrintSentence == sentence { return }
         self.settledPrintTask?.cancel()
         self.settledPrintSentence = sentence
         let delay = LiveTranslationTiming.loneSentenceSettleNanoseconds(
-            partialCadence: self.partialCadence
+            partialCadence: self.publicationTiming.partialCadence
         )
         let generation = self.generation
         self.settledPrintTask = Task { [weak self] in
@@ -1172,57 +1241,10 @@ final class LiveTranslationSubscriber: ObservableObject {
         )
     }
 
-    private func notePartialCadence(at now: TimeInterval) {
-        defer { self.lastPartialUptime = now }
-        guard let last = self.lastPartialUptime else { return }
-        let gap = now - last
-        guard gap > 0, gap <= LiveTranslationTiming.partialCadenceMaxSeconds else { return }
-        self.partialCadence = self.partialCadence > 0 ? self.partialCadence * 0.7 + gap * 0.3 : gap
-    }
-
     private func cancelSettledPrint() {
         self.settledPrintTask?.cancel()
         self.settledPrintTask = nil
         self.settledPrintSentence = ""
-    }
-
-    /// Words that start the next sentence mean this one is done. A lowercase
-    /// continuation, or "and" / "but" / "so", stays on this line. A period with
-    /// nothing after it can still be taken back.
-    private static func followingSpeechConfirms(
-        unit: String,
-        rest: String,
-        languageID: String
-    ) -> Bool {
-        guard TranslationClauseSegmenter.looksComplete(unit, languageID: languageID) else {
-            return false
-        }
-        return TranslationClauseSegmenter.continuesAsNewSentence(rest, languageID: languageID)
-    }
-
-    /// The confirmed prefix already includes this sentence, ending included.
-    /// The rest of the confirmed text may still be an open tail. A period that
-    /// exists only on this tick does not count.
-    private static func confirmedSentenceAgreed(
-        unit: String,
-        confirmed: String,
-        languageID: String
-    ) -> Bool {
-        let unit = unit.trimmingCharacters(in: .whitespacesAndNewlines)
-        let confirmed = confirmed.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !unit.isEmpty, !confirmed.isEmpty else { return false }
-        guard TranslationClauseSegmenter.looksComplete(unit, languageID: languageID) else {
-            return false
-        }
-        if confirmed == unit || confirmed.hasPrefix(unit) || confirmed.hasPrefix(unit + " ") {
-            return true
-        }
-        let stripped = unit.trimmingCharacters(in: CharacterSet(charactersIn: ".?!。！？…"))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !stripped.isEmpty, stripped != unit, confirmed.hasPrefix(stripped) else { return false }
-        let after = confirmed.dropFirst(stripped.count)
-        guard let first = after.first else { return false }
-        return ".?!。！？…".contains(first)
     }
 
     /// A later decode put a period back inside the newest line, or added a
@@ -1401,7 +1423,12 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
         let stillGrowing = self.pendingGrowthSource(for: last.id) != nil
         let age = Date().timeIntervalSince(last.committedAt)
-        let utteranceQuiet = self.lastSilenceHoldAt.map { $0 > last.committedAt } ?? false
+        // A hold recorded after this row committed means the room went quiet
+        // at some point in the gap since then, not before it finished. Once
+        // that is true, time past the recent window means the quiet held
+        // through to this new unit, which is a new utterance, not growth.
+        let endedOnAHold = self.lastSilenceHoldAt.map { $0 > last.committedAt } ?? false
+        let utteranceQuiet = endedOnAHold && age > Self.continuationMergeWindow
         let recent = stillGrowing || age <= Self.continuationMergeWindow
         let connective = utteranceQuiet == false && age <= Self.connectiveContinuationWindow
         guard recent || connective else {
@@ -1410,6 +1437,8 @@ final class LiveTranslationSubscriber: ObservableObject {
         if TranslationClauseSegmenter.wordsAlreadyPrinted(unit, in: source) {
             return true
         }
+        // A display-size limit is not a grammatical sentence boundary. The
+        // continuation helpers preserve phrases that ASR split across windows.
         if let merged = TranslationClauseSegmenter.mergedContinuation(
             row: source,
             hypothesis: self.latestHypothesis,
@@ -1472,13 +1501,11 @@ final class LiveTranslationSubscriber: ObservableObject {
             TranslationClauseSegmenter.isSameClause($0, pending)
         }
         let generation = self.generation
-        let allowLocal = self.inFlightSources.isEmpty
         self.inFlightSources.append(candidate)
         self.inFlightStartedAt[candidate] = Date()
         self.inFlightTranslations[candidate] = self.startCommitTranslation(
             candidate,
-            generation: generation,
-            allowLocal: allowLocal
+            generation: generation
         )
         let task = Task { [weak self] in
             guard let self else { return }
@@ -1563,12 +1590,14 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
         let languageID = SpokenLanguageResolver.listenLanguageID(for: cleaned)
 
+        let confirm = isFinal ? self.confirmTranscript : (self.confirmPauseTranscript ?? self.confirmTranscript)
+
         if LiveTranslationConfirm.shouldReDecode(
             isFinal: isFinal,
             isPause: !isFinal && !allowPauseFinalize && !forceOpenTail,
             languageID: languageID
         ),
-           let confirmed = await self.confirmTranscript?() {
+           let confirmed = await confirm?() {
             guard token == self.generation else { return }
             let cleanedConfirm = confirmed.trimmingCharacters(in: .whitespacesAndNewlines)
             if LiveTranslationCommitContext.shouldPreferConfirmation(
@@ -1582,6 +1611,11 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
         guard token == self.generation else { return }
 
+        if CaptionRecognizedOccurrences.plan(self.latestHypothesis, languageID: languageID) != nil {
+            self.recognizedSpeech.confirmation = self.latestHypothesis
+            self.recognizedSpeech.isFinal = isFinal
+            if self.advanceRecognizedOccurrences() { return }
+        }
         let remaining = self.rememberUnreadSpeech(cleaned, languageID: languageID)
         self.commitNextSettledUnit(
             remaining: remaining,
@@ -1594,18 +1628,6 @@ final class LiveTranslationSubscriber: ObservableObject {
             forceOpenTail: forceOpenTail,
             generation: token
         )
-    }
-
-    /// Drop the committed unit from leftover by range. Do not wipe the rest
-    /// of the draft when peel cannot find a prefix.
-    static func remainingAfterCommittedUnit(_ unit: String, in remaining: String) -> String {
-        let unit = unit.trimmingCharacters(in: .whitespacesAndNewlines)
-        let remaining = remaining.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !unit.isEmpty, !remaining.isEmpty else { return remaining }
-        if remaining.hasPrefix(unit) {
-            return remaining.dropFirst(unit.count).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        return remaining
     }
 
     private func commitNextSettledUnit(
@@ -1719,7 +1741,22 @@ final class LiveTranslationSubscriber: ObservableObject {
     func translateFinal(_ text: String, drainRemainder: Bool = true) async -> String {
         let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if !cleaned.isEmpty {
+            if cleaned != self.latestHypothesis || self.lastChunkAudioContainsSpeech == true {
+                self.recognizedSpeech.audioContainsSpeech = self.lastChunkAudioContainsSpeech
+            }
             self.latestHypothesis = cleaned
+            self.recognizedSpeech.confirmation = cleaned
+            self.recognizedSpeech.isFinal = true
+            if self.advanceRecognizedOccurrences() {
+                await self.awaitAcceptedCommits()
+                if drainRemainder {
+                    self.commitTrailingFragment()
+                    await self.awaitAcceptedCommits()
+                }
+                self.sourceDraft = ""
+                self.refreshInbox()
+                return self.pendingInsertDocument()
+            }
             let incomingLanguage = SpokenLanguageResolver.listenLanguageID(for: cleaned)
             _ = self.rememberUnreadSpeech(cleaned, languageID: incomingLanguage)
         }
@@ -1774,12 +1811,30 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
         switch self.admissionDecision(cleaned, phase: .propose) {
         case .skip:
+            self.recognizedSpeech.reservedKeys.remove(TranslationClauseSegmenter.clauseIdentity(cleaned))
             self.forgetTrailingFragment(cleaned)
             return
         case .admit:
             break
         }
         let token = generation ?? self.generation
+        let key = TranslationClauseSegmenter.clauseIdentity(cleaned)
+        let evidence = self.recognizedSpeech.reservedKeys.contains(key) ? self.recognizedSpeech.audioContainsSpeech : self.lastChunkAudioContainsSpeech
+        self.pendingSpeechEvidence.updateValue(evidence, forKey: cleaned)
+        let occurrence = self.recognizedSpeech.reservedKeys.contains(key) ? self.recognizedSpeech.acceptedCounts[key, default: 0] : nil
+        // Only an accepted occurrence needs the count to disambiguate timing —
+        // skip resplitting the whole hypothesis for the common single-copy commit.
+        let matches: Int? = occurrence != nil
+            ? TranslationClauseSegmenter.split(self.latestHypothesis,
+                languageID: SpokenLanguageResolver.listenLanguageID(for: cleaned)).completed.filter {
+                    TranslationClauseSegmenter.clauseIdentity($0) == key
+                }.count
+            : nil
+        self.pendingSpeechTimings[cleaned] = self.speechTimeline.nextTiming(for: cleaned, occurrence: occurrence,
+            expectedOccurrences: matches, after: self.recognizedSpeech.speechEnds[key])
+        if let timing = self.pendingSpeechTimings[cleaned] ?? self.speechTimeline.timing(for: cleaned) {
+            self.recognizedSpeech.speechEnds[key] = max(self.recognizedSpeech.speechEnds[key, default: 0], timing.end)
+        }
         if SpokenLanguageResolver.isSameLanguagePair() {
             self.commitVoiceCaption(cleaned, generation: token)
             return
@@ -1791,11 +1846,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.syncBoardState()
         self.showActivityStatus()
         if self.cachedCommitTranslation(for: cleaned) == nil {
-            let allowLocal = self.inFlightSources.count <= 1
             self.inFlightTranslations[cleaned] = self.startCommitTranslation(
                 cleaned,
-                generation: token,
-                allowLocal: allowLocal
+                generation: token
             )
         }
         let task = Task { [weak self] in
@@ -1808,8 +1861,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     /// Start Apple Translation now. The board still prints in order.
     private func startCommitTranslation(
         _ cleaned: String,
-        generation: UInt64,
-        allowLocal: Bool
+        generation: UInt64
     ) -> Task<Result<String, Error>, Never> {
         Task { [weak self] in
             guard let self else { return .failure(CancellationError()) }
@@ -1817,8 +1869,7 @@ final class LiveTranslationSubscriber: ObservableObject {
             do {
                 let translated = try await self.performTranslation(
                     cleaned,
-                    kind: .commit,
-                    allowLocal: allowLocal
+                    kind: .commit
                 )
                 return .success(translated)
             } catch {
@@ -1935,22 +1986,6 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.inboxOpenTail = next.openTail
     }
 
-    private static func translatingStatus(for source: String) -> String {
-        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "Translating…" }
-        let limit = 60
-        if trimmed.count <= limit {
-            return "Translating… \(trimmed)"
-        }
-        let head = trimmed.prefix(limit)
-        if let space = head.lastIndex(of: " "),
-           trimmed.distance(from: head.startIndex, to: space) > 24
-        {
-            return "Translating… \(head[..<space])…"
-        }
-        return "Translating… \(head)…"
-    }
-
     private enum BoardChange {
         case append(source: String, translated: String)
         case grow(id: UInt64, source: String, translated: String)
@@ -1969,7 +2004,10 @@ final class LiveTranslationSubscriber: ObservableObject {
             commitIdentities: self.commitIdentities,
             latestHypothesis: self.latestHypothesis,
             requiresTrackedIdentity: requiresTrackedIdentity,
-            allowTrailingFragment: !key.isEmpty && self.trailingFragmentKeys.contains(key)
+            allowTrailingFragment: !key.isEmpty && self.trailingFragmentKeys.contains(key),
+            audioContainsSpeech: self.pendingSpeechEvidence[source]
+                ?? (self.recognizedSpeech.reservedKeys.contains(key) ? self.recognizedSpeech.audioContainsSpeech : self.lastChunkAudioContainsSpeech),
+            hasNewRecognizedOccurrence: self.recognizedSpeech.reservedKeys.contains(key)
         )
     }
 
@@ -2015,14 +2053,27 @@ final class LiveTranslationSubscriber: ObservableObject {
     private func publish(_ change: BoardChange) -> UInt64? {
         switch change {
         case .append(let source, let translated):
+            defer { self.pendingSpeechEvidence[source] = nil }
+            defer { self.recognizedSpeech.reservedKeys.remove(TranslationClauseSegmenter.clauseIdentity(source)) }
             switch self.admissionDecision(source, phase: .publish) {
             case .skip:
+                self.pendingSpeechTimings[source] = nil
                 self.forgetTrailingFragment(source)
                 return nil
             case .admit:
                 break
             }
-            guard let committed = self.captionLog.commit(source: source, translated: translated) else {
+            let pair = SpokenLanguageResolver.pairForSpokenText(source)
+            let isOccurrence = self.recognizedSpeech.reservedKeys.contains(TranslationClauseSegmenter.clauseIdentity(source))
+            let timing = self.pendingSpeechTimings.removeValue(forKey: source)
+                ?? (isOccurrence ? nil : self.speechTimeline.timing(for: source))
+            guard let committed = self.captionLog.commit(
+                source: source,
+                translated: translated,
+                speechTiming: timing,
+                sourceLanguageID: pair.source.id,
+                targetLanguageID: pair.target.id
+            ) else {
                 self.forgetTrailingFragment(source)
                 return nil
             }
@@ -2048,12 +2099,14 @@ final class LiveTranslationSubscriber: ObservableObject {
             }
             return committed.id
         case .grow(let id, let source, let translated):
-            guard self.captionLog.applyGrowth(id: id, source: source, translated: translated) else {
+            let timing = self.speechTimeline.timing(for: source)
+            guard self.captionLog.applyGrowth(id: id, source: source, translated: translated, speechTiming: timing) else {
                 return nil
             }
             if let index = self.listenHistory.lastIndex(where: { $0.id == id }) {
                 self.listenHistory[index].source = source
                 self.listenHistory[index].translated = translated
+                self.listenHistory[index].speechTiming = self.captionLog.entries.first(where: { $0.id == id })?.speechTiming
             } else if let entry = self.captionLog.entries.first(where: { $0.id == id }),
                       !TheaterCaptionFailure.isLine(entry.translated)
             {
@@ -2112,6 +2165,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         let key = TranslationClauseSegmenter.clauseIdentity(source)
         guard !key.isEmpty else { return }
         self.commitIdentities.insert(key)
+        self.recognizedSpeech.acceptedCounts[key, default: 0] += 1
     }
 
     private func forgetTrailingFragment(_ source: String) {
@@ -2151,6 +2205,7 @@ final class LiveTranslationSubscriber: ObservableObject {
                 translated: translated,
                 generation: generation
             )
+            _ = self.advanceRecognizedOccurrences()
             self.scheduleNextReadyCommit(generation: generation)
             return
         }
@@ -2178,14 +2233,13 @@ final class LiveTranslationSubscriber: ObservableObject {
         defer {
             if generation == self.generation {
                 self.inFlightSources.removeAll { $0 == incoming || $0 == cleaned }
+                self.inFlightTranslations[incoming]?.cancel()
+                self.inFlightTranslations[cleaned]?.cancel()
+                self.inFlightTranslations[incoming] = nil
+                self.inFlightTranslations[cleaned] = nil
                 self.syncBoardState()
-            }
-            self.inFlightTranslations[incoming]?.cancel()
-            self.inFlightTranslations[cleaned]?.cancel()
-            self.inFlightTranslations[incoming] = nil
-            self.inFlightTranslations[cleaned] = nil
-            if generation == self.generation {
                 self.showActivityStatus()
+                _ = self.advanceRecognizedOccurrences()
             }
         }
         guard generation == self.generation else { return }
@@ -2211,7 +2265,7 @@ final class LiveTranslationSubscriber: ObservableObject {
             if error is CancellationError { return }
             self.lastFailedSource = cleaned
             DebugLogger.shared.error(
-                "Lecture translation failed: \(error.localizedDescription)",
+                "Lecture translation failed: \(DiagnosticMetadata.error(error))",
                 source: "LiveTranslation"
             )
             if !self.didAutoRetryFailure {
@@ -2237,25 +2291,25 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
         if let cached = self.cachedCommitTranslation(for: cleaned) {
             self.inFlightTranslations.removeValue(forKey: cleaned)?.cancel()
-            let sharpened = await self.sharpenCachedCaption(cleaned, draft: cached)
+            self.lastLatencyMilliseconds = 0
             guard generation == self.generation else { throw CancellationError() }
-            return sharpened
+            return cached
         }
         if let task = self.inFlightTranslations.removeValue(forKey: cleaned) {
             let translated = try await task.value.get()
             guard generation == self.generation else { throw CancellationError() }
-            guard let safe = LLMTranslationEngine.captionSafeForBoard(translated, sourceText: cleaned)
+            guard let safe = LiveTranslationCaptionGate.captionSafeForBoard(translated, sourceText: cleaned)
             else {
-                throw TranslationEngineError.localRejected
+                throw TranslationEngineError.captionRejected
             }
             return safe
         }
         self.showActivityStatus()
         let translated = try await self.performTranslation(cleaned, kind: .commit)
         guard generation == self.generation else { throw CancellationError() }
-        guard let safe = LLMTranslationEngine.captionSafeForBoard(translated, sourceText: cleaned)
+        guard let safe = LiveTranslationCaptionGate.captionSafeForBoard(translated, sourceText: cleaned)
         else {
-            throw TranslationEngineError.localRejected
+            throw TranslationEngineError.captionRejected
         }
         return safe
     }
@@ -2340,30 +2394,6 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.translatedDraftSource = unit
     }
 
-    private func sharpenCachedCaption(_ source: String, draft: String) async -> String {
-        let settings = SettingsStore.shared
-        let pair = SpokenLanguageResolver.pairForSpokenText(source, settings: settings)
-        let terms = TranslationGlossary.protectedTerms(from: settings)
-        let prior = self.priorClausesForContextualTranslation(incoming: source)
-        let started = ProcessInfo.processInfo.systemUptime
-        if let sharpened = await LiveTranslationMT.localFirstPrint(
-            source,
-            draft: draft,
-            prior: prior,
-            source: pair.source,
-            target: pair.target,
-            terms: terms,
-            llmEngine: self.llmEngine
-        ) {
-            self.lastLatencyMilliseconds = Int(
-                ((ProcessInfo.processInfo.systemUptime - started) * 1000).rounded()
-            )
-            return sharpened
-        }
-        self.lastLatencyMilliseconds = 0
-        return draft
-    }
-
     private func schedulePrefetchIfNeeded(leftover: String, languageID: String, generation: UInt64) {
         self.dropStaleLiveDraftIfNewClause(leftover)
         let unit = LiveTranslationPrefetch.unitToPrefetch(
@@ -2417,7 +2447,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         let target = pair.target
         let terms = TranslationGlossary.protectedTerms(from: settings)
         do {
-            let translated = try await LiveTranslationMT.translateClause(
+            let translated = try await LiveTranslationMT.appleClause(
                 unit,
                 source: source,
                 target: target,
@@ -2425,18 +2455,16 @@ final class LiveTranslationSubscriber: ObservableObject {
                 kind: .live,
                 prior: prior,
                 translator: self.translator,
-                llmEngine: self.llmEngine,
-                allowLocal: false,
                 contextStreak: self.contextStreak
             )
             guard generation == self.generation else { return }
-            guard let safe = LLMTranslationEngine.captionSafeForBoard(translated, sourceText: unit)
+            guard let safe = LiveTranslationCaptionGate.captionSafeForBoard(translated, sourceText: unit)
             else { return }
             self.prefetchCache.finish(key, caption: safe, generation: cacheGeneration)
             self.publishLivePrefetch(unit: unit, caption: safe)
         } catch {
             DebugLogger.shared.debug(
-                "Live prefetch skipped: \(error.localizedDescription)",
+                "Live prefetch skipped: \(DiagnosticMetadata.error(error))",
                 source: "LiveTranslation"
             )
         }
@@ -2445,8 +2473,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     private func performTranslation(
         _ text: String,
         kind: TranslationRequestKind = .commit,
-        excludingNewestLine: Bool = false,
-        allowLocal: Bool = true
+        excludingNewestLine: Bool = false
     ) async throws -> String {
         let kind = kind == .commit && self.listenHistory.isEmpty ? .firstCommit : kind
         let settings = SettingsStore.shared
@@ -2471,8 +2498,7 @@ final class LiveTranslationSubscriber: ObservableObject {
             target: target,
             terms: terms,
             kind: kind,
-            prior: prior,
-            allowLocal: allowLocal
+            prior: prior
         )
         let ms = Int(((ProcessInfo.processInfo.systemUptime - started) * 1000).rounded())
         self.lastLatencyMilliseconds = ms
@@ -2483,17 +2509,23 @@ final class LiveTranslationSubscriber: ObservableObject {
         return translated
     }
 
-    /// A hung Apple Translation call must not hold `inFlightSources`
-    /// non-empty forever. Admission refuses a replacement while a call is
-    /// in flight, so a stuck call would jam the caption stream.
+    /// A slow Apple Translation call must not hold `inFlightSources`
+    /// non-empty forever. Admission refuses a replacement while a call is in
+    /// flight, so a stuck call would jam the caption stream.
+    ///
+    /// This race covers a call that is slow, and a truly wedged one only for as
+    /// long as Apple's session honours cancellation: a task group joins on every
+    /// child, so the deadline expires early only when the work child stops too.
+    /// A call that ignores cancellation still parks this await, and the shared
+    /// mailbox serializes session calls anyway, so a bounded wait here would not
+    /// unblock the stream behind it.
     private func translateWithTimeout(
         _ text: String,
         source: TranslationLanguage,
         target: TranslationLanguage,
         terms: [String],
         kind: TranslationRequestKind,
-        prior: (sources: [String], translations: [String]),
-        allowLocal: Bool = true
+        prior: (sources: [String], translations: [String])
     ) async throws -> String {
         let timeout = LiveTranslationTiming.mailboxTimeoutNanoseconds(for: kind)
         let apple = try await withThrowingTaskGroup(of: String.self) { group in
@@ -2516,17 +2548,6 @@ final class LiveTranslationSubscriber: ObservableObject {
             defer { group.cancelAll() }
             let result = try await group.next()!
             return result
-        }
-        if allowLocal, let sharpened = await LiveTranslationMT.localFirstPrint(
-            text,
-            draft: apple,
-            prior: prior,
-            source: source,
-            target: target,
-            terms: terms,
-            llmEngine: self.llmEngine
-        ) {
-            return sharpened
         }
         return apple
     }
@@ -2573,20 +2594,6 @@ final class LiveTranslationSubscriber: ObservableObject {
             translations.append(translation)
         }
         return (sources, translations)
-    }
-
-    static func priorClauses(
-        entries: [LectureCaptionEntry],
-        listenBatchStart: Int,
-        incoming: String,
-        limit: Int = LiveTranslationTiming.contextSentenceCount
-    ) -> (sources: [String], translations: [String]) {
-        LiveTranslationCommitContext.priorClauses(
-            entries: entries,
-            listenBatchStart: listenBatchStart,
-            incoming: incoming,
-            limit: limit
-        )
     }
 
     private func publishLatencySample(mtMilliseconds: Int) {
@@ -2667,8 +2674,7 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     private func cancelSettles() {
         self.latestHypothesis = ""
-        self.partialCadence = 0
-        self.lastPartialUptime = nil
+        self.publicationTiming.reset()
         self.tailSettleTask?.cancel()
         self.eouHoldTask?.cancel()
         self.pauseRevisionTask?.cancel()
@@ -2716,7 +2722,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         guard !self.didPauseReviseThisUtterance else { return }
         guard self.pauseRevisionTask == nil else { return }
         let token = self.generation
-        self.pauseRevisionTask = Task { [weak self] in
+        self.pauseRevisionTask = self.publicationTiming.flush(onFinish: { [weak self] in
+            self?.pauseRevisionTask = nil
+        }) { [weak self] in
             try? await Task.sleep(nanoseconds: LiveTranslationTiming.eouHoldNanoseconds)
             guard !Task.isCancelled else { return }
             await self?.reviseOnPause(generation: token)
@@ -2784,11 +2792,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.syncBoardState()
         self.showActivityStatus()
         if self.cachedCommitTranslation(for: cleaned) == nil {
-            let allowLocal = self.inFlightSources.count <= 1
             self.inFlightTranslations[cleaned] = self.startCommitTranslation(
                 cleaned,
-                generation: generation,
-                allowLocal: allowLocal
+                generation: generation
             )
         }
         let task = Task { [weak self] in
@@ -2845,7 +2851,7 @@ final class LiveTranslationSubscriber: ObservableObject {
                 if error is CancellationError { return }
                 self.lastFailedSource = cleaned
                 DebugLogger.shared.error(
-                    "Lecture translation failed: \(error.localizedDescription)",
+                    "Lecture translation failed: \(DiagnosticMetadata.error(error))",
                     source: "LiveTranslation"
                 )
             }
@@ -2882,6 +2888,7 @@ final class LiveTranslationSubscriber: ObservableObject {
     }
 
     private func cancelDelayedSpeechTasks() {
+        self.publicationTiming.cancelFlush()
         self.eouHoldTask?.cancel()
         self.eouHoldTask = nil
         self.pauseRevisionTask?.cancel()
@@ -2893,7 +2900,9 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.tailSettleTask = nil
     }
 
-    private func cancelCommitsAndPolish() {
+    private func cancelCommitsAndPublishes() {
+        self.pendingSpeechTimings = [:]
+        self.pendingSpeechEvidence = [:]
         for task in self.commitTasks {
             task.cancel()
         }
@@ -2907,6 +2916,7 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.nextCommitToPublish = 0
         self.skippedCommitIndexes = []
         self.commitIdentities = []
+        self.recognizedSpeech = CaptionRecognizedOccurrences.State()
         self.trailingFragmentKeys = []
         self.readyTranslations = [:]
         self.publishedCommits = []
@@ -2976,18 +2986,6 @@ final class LiveTranslationSubscriber: ObservableObject {
                 ? entry.id
                 : nil
         }
-    }
-
-    private static func suppressionUnits(from text: String) -> [String] {
-        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleaned.isEmpty else { return [] }
-        let languageID = SpokenLanguageResolver.listenLanguageID(for: cleaned)
-        let split = TranslationClauseSegmenter.split(cleaned, languageID: languageID)
-        var units = split.completed
-        let tail = split.tail.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !tail.isEmpty { units.append(tail) }
-        units.append(cleaned)
-        return units
     }
 
     private func adjustIndexes(trimmedCount: Int) {

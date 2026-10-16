@@ -10,6 +10,19 @@ private final class KeychainServiceBox: @unchecked Sendable {
 }
 
 final class KeychainServiceCacheTests: XCTestCase {
+    func testSharedServiceUsesIsolatedCredentialsDuringXCTest() throws {
+        XCTAssertTrue(SettingsStore.isRunningTests)
+        let service = KeychainService.shared
+        let prior = try service.fetchAllKeys()
+        defer { try? service.storeAllKeys(prior) }
+        let provider = "test-\(UUID())"
+        try service.storeKey("isolated-fixture", for: provider)
+        XCTAssertEqual(try service.fetchKey(for: provider), "isolated-fixture")
+        XCTAssertEqual(try service.legacyProviderEntries(), [:])
+        try service.removeLegacyEntries(providerIDs: [provider])
+        XCTAssertEqual(try service.fetchKey(for: provider), "isolated-fixture")
+    }
+
     func testConcurrentStoresDoNotLoseUpdates() throws {
         let storageLock = NSLock()
         var storage: [String: String] = [:]

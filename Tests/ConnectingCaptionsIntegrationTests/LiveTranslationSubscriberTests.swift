@@ -2,6 +2,160 @@ import XCTest
 @testable import ConnectingCaptions_Debug
 
 @MainActor
+final class CaptionPublicationDelayTests: XCTestCase {
+    private var source = ""
+    private var target = ""
+    private var mode = TheaterSessionMode.translation
+
+    override func setUp() async throws {
+        try await super.setUp()
+        let settings = SettingsStore.shared
+        self.source = settings.translationSourceLanguageID
+        self.target = settings.translationTargetLanguageID
+        self.mode = settings.theaterSessionMode
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "en"
+        settings.theaterSessionMode = .transcription
+    }
+
+    override func tearDown() async throws {
+        SettingsStore.shared.translationSourceLanguageID = self.source
+        SettingsStore.shared.translationTargetLanguageID = self.target
+        SettingsStore.shared.theaterSessionMode = self.mode
+        try await super.tearDown()
+    }
+
+    func testLateFinishedSentencePrintsAfterAnEmptySilenceFlush() async {
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        subscriber.noteSpeechStart(uptime: ProcessInfo.processInfo.systemUptime - 3)
+        subscriber.noteSilenceHold()
+        await subscriber.waitForIdleForTesting()
+        subscriber.handlePartial("The captions should appear promptly.")
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, ["The captions should appear promptly."])
+        subscriber.endListening()
+    }
+
+    func testLateFinishedSentencePrintsAfterAnEmptyEndOfUtterance() async {
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        subscriber.noteSpeechStart(uptime: ProcessInfo.processInfo.systemUptime - 3)
+        subscriber.handleEndOfUtterance()
+        await subscriber.waitForIdleForTesting()
+        subscriber.handlePartial("The captions should appear promptly.")
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, ["The captions should appear promptly."])
+        subscriber.endListening()
+    }
+
+    func testLateOpenClauseGetsItsOwnQuietFlush() async {
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        subscriber.noteSpeechStart(uptime: ProcessInfo.processInfo.systemUptime - 3)
+        subscriber.noteSilenceHold()
+        await subscriber.waitForIdleForTesting()
+        subscriber.handlePartial("Then we shipped the captions today")
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, ["Then we shipped the captions today"])
+        subscriber.endListening()
+    }
+
+    func testCompletedUpdateDuringOpenTailWaitKeepsItsSentenceTimer() async {
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        subscriber.handlePartial("Then we shipped")
+        subscriber.noteSpeechStart(uptime: ProcessInfo.processInfo.systemUptime - 3)
+        subscriber.handleEndOfUtterance()
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        subscriber.handlePartial("Then we shipped the captions today.")
+        try? await Task.sleep(nanoseconds: 900_000_000)
+        XCTAssertEqual(subscriber.committedSourceLines, ["Then we shipped the captions today."])
+        subscriber.endListening()
+    }
+
+    func testEnglishToKoreanCompletedUpdatePublishesWithoutTheOldTailDelay() async {
+        SettingsStore.shared.translationTargetLanguageID = "ko"
+        SettingsStore.shared.theaterSessionMode = .translation
+        let engine = FakeTranslationEngine()
+        engine.result = .success("오늘 자막을 출시했습니다.")
+        let subscriber = LiveTranslationSubscriber(translator: engine)
+        subscriber.beginListening()
+        subscriber.handlePartial("Then we shipped")
+        subscriber.noteSpeechStart(uptime: ProcessInfo.processInfo.systemUptime - 3)
+        subscriber.handleEndOfUtterance()
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        subscriber.handlePartial("Then we shipped the captions today.")
+        try? await Task.sleep(nanoseconds: 900_000_000)
+        XCTAssertTrue(engine.calls.contains("Then we shipped the captions today."))
+        XCTAssertEqual(subscriber.committedLines, ["오늘 자막을 출시했습니다."])
+        subscriber.endListening()
+    }
+
+    func testUnchangedRecognitionTicksDoNotRestartTheSentenceTimer() async {
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        let sentence = "The captions should appear promptly."
+        subscriber.handlePartial(sentence)
+        for _ in 0..<4 {
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            subscriber.handlePartial(sentence)
+        }
+        XCTAssertEqual(subscriber.committedSourceLines, [sentence])
+        subscriber.endListening()
+    }
+
+    func testPauseAndStopUseTheirOwnConfirmationBudgets() async {
+        SettingsStore.shared.translationSourceLanguageID = "th"
+        SettingsStore.shared.translationTargetLanguageID = "th"
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        var pauseCalls = 0
+        var stopCalls = 0
+        subscriber.confirmPauseTranscript = {
+            pauseCalls += 1
+            return "วันนี้เราทดสอบระบบคำบรรยายภาษาไทย"
+        }
+        subscriber.confirmTranscript = {
+            stopCalls += 1
+            return "พรุ่งนี้เราจะทดสอบระบบอีกครั้ง"
+        }
+        subscriber.beginListening()
+        subscriber.handlePartial("วันนี้เราทดสอบระบบคำบรรยายภาษาไทย")
+        subscriber.noteSilenceHold()
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(pauseCalls, 1)
+        XCTAssertEqual(stopCalls, 0)
+        subscriber.endListening()
+        subscriber.beginListening()
+        _ = await subscriber.translateFinal("พรุ่งนี้เราจะทดสอบระบบอีกครั้ง")
+        XCTAssertEqual(stopCalls, 1)
+        subscriber.endListening()
+    }
+
+    func testAnOlderFlushFinishingCannotClearItsReplacement() async {
+        let timing = CaptionPublicationTiming()
+        var finishCount = 0
+        let first = timing.flush(onFinish: { finishCount += 1 }) {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+        }
+        // Held open by the test, not by a sleep a slow runner can outlast.
+        let (gate, release) = AsyncStream<Void>.makeStream()
+        let replacement = timing.flush(onFinish: { finishCount += 1 }) {
+            for await _ in gate { break }
+        }
+        await first.value
+        XCTAssertTrue(timing.isFlushing)
+        XCTAssertEqual(finishCount, 0)
+        release.yield()
+        release.finish()
+        await replacement.value
+        XCTAssertFalse(timing.isFlushing)
+        XCTAssertEqual(finishCount, 1)
+    }
+
+}
+
+@MainActor
 final class FakeTranslationEngine: TranslationEngine {
     let name = "Fake"
     var result: Result<String, Error> = .success("translated")

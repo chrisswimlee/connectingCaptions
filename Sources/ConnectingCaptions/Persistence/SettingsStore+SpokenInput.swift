@@ -22,11 +22,11 @@ extension SettingsStore {
         var displayName: String {
             switch self {
             case .enter:
-                return "Enter"
+                return AppLanguage.text("Enter")
             case .shiftEnter:
-                return "Shift + Enter"
+                return AppLanguage.text("Shift + Enter")
             case .commandEnter:
-                return "Command + Enter"
+                return AppLanguage.text("Command + Enter")
             }
         }
 
@@ -92,9 +92,9 @@ extension SettingsStore {
         var displayName: String {
             switch self {
             case .standard:
-                return "Clipboard Free Insert"
+                return AppLanguage.text("Clipboard Free Insert")
             case .reliablePaste:
-                return "Clipboard Paste"
+                return AppLanguage.text("Clipboard Paste")
             }
         }
 
@@ -150,11 +150,11 @@ extension SettingsStore {
 
         var displayName: String {
             switch self {
-            case .tiny: return "Tiny (~75 MB)"
-            case .base: return "Base (~142 MB)"
-            case .small: return "Small (~466 MB)"
-            case .medium: return "Medium (~1.5 GB)"
-            case .large: return "Large (~2.9 GB)"
+            case .tiny: return AppLanguage.text("Tiny (~75 MB)")
+            case .base: return AppLanguage.text("Base (~142 MB)")
+            case .small: return AppLanguage.text("Small (~466 MB)")
+            case .medium: return AppLanguage.text("Medium (~1.5 GB)")
+            case .large: return AppLanguage.text("Large (~2.9 GB)")
             }
         }
 

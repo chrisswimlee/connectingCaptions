@@ -270,8 +270,10 @@ enum StreamingTranscriptStitcher {
         while cut < trimmed.endIndex, trimmed[cut].isWhitespace {
             cut = trimmed.index(after: cut)
         }
+        // cut never moves before tailStart, so trimmed[cut...] can only be as long
+        // as trimmed[tailStart...] (exactly maximumLiveCharacters) or shorter.
         let bounded = String(trimmed[cut...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        if bounded.isEmpty || bounded.count > Self.maximumLiveCharacters {
+        guard !bounded.isEmpty else {
             return String(trimmed.suffix(Self.maximumLiveCharacters))
         }
         return bounded

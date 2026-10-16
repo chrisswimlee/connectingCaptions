@@ -206,7 +206,10 @@ final class FleetCommercialTests: XCTestCase {
 
         let exported = try store.exportData()
         let text = try XCTUnwrap(String(bytes: exported, encoding: .utf8))
-        XCTAssertFalse(text.contains("120"))
+        let document = try JSONDecoder().decode(FleetAuditStore.ExportDocument.self, from: exported)
+        // Hashes and signatures may contain these digits by chance; inspect
+        // retained event fields rather than random proof material.
+        XCTAssertFalse(document.events.flatMap { $0.fields.values }.contains { $0.contains("120") })
         XCTAssertFalse(text.contains(store.signingKeyMaterialForTesting))
         XCTAssertEqual(try FleetAudit.verifyExport(exported).get(), 2)
 

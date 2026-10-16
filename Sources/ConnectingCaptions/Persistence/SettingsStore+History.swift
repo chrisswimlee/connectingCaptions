@@ -17,20 +17,20 @@ enum HistoryRetention: String, CaseIterable, Identifiable, Sendable {
 
     var displayName: String {
         switch self {
-        case .days90: return "90 days"
-        case .year: return "1 year"
-        case .forever: return "Forever"
+        case .days90: return AppLanguage.text("90 days")
+        case .year: return AppLanguage.text("1 year")
+        case .forever: return AppLanguage.text("Forever")
         }
     }
 
     var detail: String {
         switch self {
         case .days90:
-            return "Drop rows older than 90 days. At most 20,000 rows stay."
+            return AppLanguage.text("Drop rows older than 90 days. At most 20,000 rows stay.")
         case .year:
-            return "Drop rows older than a year. At most 20,000 rows stay."
+            return AppLanguage.text("Drop rows older than a year. At most 20,000 rows stay.")
         case .forever:
-            return "Keep text until you clear History. A 50,000-row cap still bounds the database."
+            return AppLanguage.text("Keep text until you clear History. A 50,000-row cap still bounds the database.")
         }
     }
 

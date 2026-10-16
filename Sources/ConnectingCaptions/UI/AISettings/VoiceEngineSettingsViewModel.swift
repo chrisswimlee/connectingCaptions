@@ -11,7 +11,7 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
     var asr: ASRService { self.appServices.asr }
 
     var areSpeechModelActionsBlocked: Bool {
-        self.asr.isRunning
+        self.asr.isRunningOrStarting
             || self.downloadingModel != nil
             || self.asr.hasActiveModelDownload
             || self.asr.hasActiveModelPreparation
@@ -42,6 +42,17 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
         self.appServices = appServices
         self.previewSpeechModel = settings.selectedSpeechModel
         self.selectedSpeechProvider = settings.selectedSpeechModel.provider
+        settings.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &self.cancellables)
+        NotificationCenter.default.publisher(for: AppleSpeechLiveCapability.didRefresh)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &self.cancellables)
+        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+            .sink { _ in Task { @MainActor in await AppleSpeechLiveCapability.refreshAnalyzer() } }
+            .store(in: &self.cancellables)
         appServices.objectWillChange
             .sink { [weak self] _ in
                 Task { @MainActor in
@@ -49,6 +60,10 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
                 }
             }
             .store(in: &self.cancellables)
+    }
+
+    func requestSpeechLanguageAccess() {
+        AppleSpeechLiveCapability.requestLegacyAccess()
     }
 
     func onAppear() {
@@ -81,6 +96,8 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
 
     func activateSpeechModel(_ model: SettingsStore.SpeechModel) {
         guard !self.areSpeechModelActionsBlocked else { return }
+        let language = SpokenLanguageResolver.sourceLanguage(settings: self.settings)
+        guard VoiceEngineLanguageReadiness.current(model: model, languageID: language.id) == .ready else { return }
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             self.settings.selectedSpeechModel = model
             self.previewSpeechModel = model
@@ -108,6 +125,7 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
             guard let self else { return }
             do {
                 try await self.asr.downloadModel(model, progressHandler: nil)
+                await AppleSpeechLiveCapability.refreshAnalyzer()
                 DebugLogger.shared.info("Model download completed: \(model.displayName)", source: "VoiceEngineVM")
             } catch is CancellationError {
                 DebugLogger.shared.info("Model download cancelled: \(model.displayName)", source: "VoiceEngineVM")
@@ -135,6 +153,8 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
     /// Listen uses, so errors surface here instead of only in the debug log.
     func testSpeechModel(_ model: SettingsStore.SpeechModel) {
         guard self.testingModel == nil, !self.areSpeechModelActionsBlocked else { return }
+        let language = SpokenLanguageResolver.sourceLanguage(settings: self.settings)
+        guard VoiceEngineLanguageReadiness.current(model: model, languageID: language.id) == .ready else { return }
         let previousActive = self.settings.selectedSpeechModel
         let shouldRestore = previousActive != model
         self.testingModel = model
@@ -235,6 +255,7 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
     func deleteModels() async {
         do {
             try await self.asr.clearModelCache()
+            await AppleSpeechLiveCapability.refreshAnalyzer()
             let model = self.settings.selectedSpeechModel
             if model.requiresExternalArtifacts {
                 self.settings.setExternalCoreMLArtifactsDirectory(nil, for: model)
@@ -242,6 +263,9 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
             }
         } catch {
             DebugLogger.shared.error("Failed to delete models: \(error)", source: "AISettingsView")
+            self.asr.errorTitle = "Model Delete Failed"
+            self.asr.errorMessage = error.localizedDescription
+            self.asr.showError = true
         }
     }
 

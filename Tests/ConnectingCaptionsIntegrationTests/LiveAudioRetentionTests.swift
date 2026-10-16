@@ -2,6 +2,57 @@ import XCTest
 @testable import ConnectingCaptions_Debug
 
 final class LiveAudioRetentionTests: XCTestCase {
+    func testCaptureTimelinePreservesRealPauseAcrossSyntheticResumeWall() throws {
+        var timeline = CaptureAudioTimeline()
+        timeline.append(start: 0, count: 16_000, hostTime: LiveTranslationHostClock.ticks(forSeconds: 100))
+        timeline.append(start: 40_000, count: 16_000, hostTime: LiveTranslationHostClock.ticks(forSeconds: 110))
+        XCTAssertNil(timeline.seconds(at: 20_000), "Synthetic silence is not a microphone timestamp")
+        XCTAssertEqual(try XCTUnwrap(timeline.seconds(at: 40_000)), 10, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(timeline.seconds(at: 56_000, isEnd: true)), 11, accuracy: 0.001)
+        timeline.trim(before: 40_000)
+        XCTAssertNil(timeline.seconds(at: 0))
+        XCTAssertEqual(try XCTUnwrap(timeline.seconds(at: 40_000)), 10, accuracy: 0.001)
+    }
+
+    func testRecognizerTimingMapsBackAcrossRemovedSilence() throws {
+        let prepared = PauseIntervalAudio.Prepared(
+            samples: [], isPauseOnly: false, sourceRanges: [0..<16_000, 48_000..<64_000]
+        )
+        var timeline = CaptureAudioTimeline()
+        timeline.append(start: 0, count: 64_000, hostTime: LiveTranslationHostClock.ticks(forSeconds: 100))
+        let mapped = timeline.map([
+            ASRTimedSegment(text: "one", start: 0, end: 1),
+            ASRTimedSegment(text: "two", start: 1, end: 2),
+        ], sourceStart: 0, removedSilence: prepared)
+        XCTAssertEqual(mapped, [
+            ASRTimedSegment(text: "one", start: 0, end: 1),
+            ASRTimedSegment(text: "two", start: 3, end: 4),
+        ])
+        XCTAssertTrue(timeline.map([ASRTimedSegment(text: "outside", start: 3, end: 4)], sourceStart: 0, removedSilence: prepared).isEmpty)
+    }
+
+    func testSpeechTimelineUsesCompleteSegmentsAndAcceptsRecognitionCorrections() {
+        var timeline = CaptionSpeechTimeline()
+        timeline.ingest([
+            ASRTimedSegment(text: "hello", start: 2, end: 2.5),
+            ASRTimedSegment(text: "world", start: 2.6, end: 3),
+        ])
+        XCTAssertEqual(timeline.timing(for: "Hello, world!"), CaptionSpeechTiming(start: 2, end: 3))
+        XCTAssertNil(timeline.timing(for: "hell"), "A partial word has no invented speech range")
+        timeline.ingest([ASRTimedSegment(text: "everyone", start: 2.6, end: 3.2)])
+        XCTAssertNil(timeline.timing(for: "hello world"))
+        XCTAssertEqual(timeline.timing(for: "hello everyone"), CaptionSpeechTiming(start: 2, end: 3.2))
+    }
+
+    func testSpeechTimelineFindsAWholeWordBeforeALaterSubstring() {
+        var timeline = CaptionSpeechTimeline()
+        timeline.ingest([
+            ASRTimedSegment(text: "the", start: 1, end: 2),
+            ASRTimedSegment(text: "other", start: 3, end: 4),
+        ])
+        XCTAssertEqual(timeline.timing(for: "the"), CaptionSpeechTiming(start: 1, end: 2))
+    }
+
     func testRingBufferDropsSamplesPastCapAndKeepsLogicalIndices() {
         let buffer = ThreadSafeAudioBuffer(maximumRetainedSamples: 8)
         buffer.append([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -212,6 +263,72 @@ final class LiveAudioRetentionTests: XCTestCase {
         XCTAssertEqual(handoff.pop()?.frames, [4, 5])
     }
 
+    @MainActor
+    func testIncrementalPCMIsConsumedExactlyOnceIncludingEmptyFinalTail() {
+        let service = ASRService()
+        var accepted = 0
+        var consumed: [Float] = []
+        for tick in 0..<3 {
+            service.audioBuffer.append(Array((tick * 16_000)..<((tick + 1) * 16_000)).map(Float.init))
+            let preview = service.previewChunk(
+                logicalSampleCount: service.audioBuffer.count,
+                logicalStart: service.audioBuffer.logicalStart,
+                incrementalDeltaStart: accepted
+            )
+            consumed.append(contentsOf: preview.samples)
+            accepted = service.audioBuffer.count
+            service.audioBuffer.dropSamples(before: accepted - LiveAudioRetention.incrementalOverlapSamples)
+        }
+        let final = service.previewChunk(
+            logicalSampleCount: service.audioBuffer.count,
+            logicalStart: service.audioBuffer.logicalStart,
+            incrementalDeltaStart: accepted
+        )
+        XCTAssertEqual(consumed, Array(0..<48_000).map(Float.init))
+        XCTAssertEqual(final.kind, .incrementalDelta)
+        XCTAssertTrue(final.samples.isEmpty, "Retained overlap must not become new PCM on Stop")
+    }
+
+    @MainActor
+    func testQuarantineReplacesAllStatefulCachedProviders() {
+        let service = ASRService()
+        let flash = service.getParakeetRealtimeProvider()
+        let nemotron = service.getNemotronProvider(mode: .streaming)
+        let parakeet = service.getFluidAudioProvider()
+        service.quarantineTranscriptionProvider()
+        XCTAssertFalse(service.getParakeetRealtimeProvider() === flash)
+        XCTAssertFalse(service.getNemotronProvider(mode: .streaming) === nemotron)
+        XCTAssertFalse(service.getFluidAudioProvider() === parakeet)
+    }
+
+    func testFinalDecodeUsesProviderModeAndResetDropsPreviousListen() async throws {
+        let windowed = SessionTestProvider(mode: .trailingWindow)
+        let incremental = SessionTestProvider(mode: .incrementalDelta)
+        let full = try await windowed.transcribeStoppedAudio([1, 2], totalSampleCount: 2)
+        XCTAssertEqual(full.text, "full")
+        _ = try await incremental.transcribeStreamingDelta([1, 2], totalSampleCount: 2)
+        await incremental.resetStreamingSession()
+        _ = try await incremental.transcribeStreamingDelta([3], totalSampleCount: 1)
+        let delta = try await incremental.transcribeStoppedAudio([], totalSampleCount: 1)
+        XCTAssertEqual(delta.text, "delta")
+        XCTAssertEqual(incremental.samples, [3], "A new Listen cannot retain old audio")
+    }
+
+    func testDiscardedRecordingIsRemovedWhilePendingSavesStayProtected() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("audio-discard-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = DictationAudioHistoryStore(audioDirectory: directory)
+        let metadata = try store.save(
+            snapshot: DictationAudioSnapshot(samples: [0.25, -0.25], sampleRate: 16_000, channels: 1),
+            entryID: UUID(), timestamp: Date(), model: "test"
+        )
+        let url = directory.appendingPathComponent(metadata.fileName)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+        XCTAssertEqual(store.deleteUnreferencedAudioFiles(referencedFileNames: []).fileCount, 0)
+        store.discardPendingAudio(fileName: metadata.fileName)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+    }
+
     private func write(
         _ samples: [Float],
         to handoff: CapturePacketHandoff,
@@ -229,4 +346,28 @@ final class LiveAudioRetentionTests: XCTestCase {
             )
         }
     }
+}
+
+private final class SessionTestProvider: TranscriptionProvider {
+    let name = "Session test"
+    let isAvailable = true
+    let isReady = true
+    let streamingPreviewMode: StreamingPreviewMode
+    var samples: [Float] = []
+    var acceptedStreamingSampleCount: Int? { self.samples.count }
+
+    init(mode: StreamingPreviewMode) { self.streamingPreviewMode = mode }
+    func prepare(progressHandler: ((ModelPreparationProgress) -> Void)?) async throws {}
+    func transcribe(_ samples: [Float]) async throws -> ASRTranscriptionResult {
+        ASRTranscriptionResult(text: "full")
+    }
+    func transcribeStreamingDelta(_ newSamples: [Float], totalSampleCount: Int) async throws -> ASRTranscriptionResult {
+        self.samples.append(contentsOf: newSamples)
+        return ASRTranscriptionResult(text: "preview")
+    }
+    func transcribeFinalDelta(_ newSamples: [Float], totalSampleCount: Int) async throws -> ASRTranscriptionResult {
+        self.samples.append(contentsOf: newSamples)
+        return ASRTranscriptionResult(text: "delta")
+    }
+    func resetStreamingSession() async { self.samples.removeAll() }
 }

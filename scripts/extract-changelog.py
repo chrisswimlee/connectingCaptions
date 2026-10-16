@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print the CHANGELOG section for a git tag, or [Unreleased] as a fallback."""
+"""Print the CHANGELOG section for an exact git tag (or explicit Unreleased)."""
 
 from __future__ import annotations
 
@@ -26,8 +26,9 @@ def main() -> int:
     tag = sys.argv[1].strip()
     version = tag[1:] if tag.startswith("v") else tag
     text = Path("CHANGELOG.md").read_text(encoding="utf-8")
-    notes = section(text, f"[{version}]") or section(text, "[Unreleased]")
+    notes = section(text, f"[{version}]")
     if not notes:
+        print(f"CHANGELOG.md has no notes for [{version}].", file=sys.stderr)
         return 1
     print(notes)
     return 0

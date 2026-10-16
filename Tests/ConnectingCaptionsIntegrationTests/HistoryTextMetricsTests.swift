@@ -1,7 +1,17 @@
-import XCTest
 @testable import ConnectingCaptions_Debug
+import XCTest
 
 final class HistoryTextMetricsTests: XCTestCase {
+    func testHistorySearchSelectsAVisibleResultAndKeepsAnExistingSelection() {
+        let previous = UUID()
+        let firstMatch = UUID()
+        let secondMatch = UUID()
+        XCTAssertEqual(HistorySelection.resolve(previous, availableIDs: [firstMatch, secondMatch]), firstMatch)
+        XCTAssertEqual(HistorySelection.resolve(secondMatch, availableIDs: [firstMatch, secondMatch]), secondMatch)
+        XCTAssertNil(HistorySelection.resolve(previous, availableIDs: []))
+        XCTAssertEqual(HistorySelection.resolve(nil, availableIDs: [firstMatch]), firstMatch)
+    }
+
     func testEnglishWhitespaceCountUnchanged() {
         XCTAssertEqual(HistoryTextMetrics.wordCount(in: ""), 0)
         XCTAssertEqual(HistoryTextMetrics.wordCount(in: " \n "), 0)
@@ -32,7 +42,7 @@ final class HistoryRetentionAndSearchTests: XCTestCase {
         let old = Self.entry(text: "old row", timestamp: Date(timeIntervalSince1970: 10))
         let kept = Self.entry(text: "kept row", timestamp: Date())
         try database.write(
-            upserts: [try Self.record(old), try Self.record(kept)],
+            upserts: [Self.record(old), Self.record(kept)],
             deletes: [],
             replacing: true
         )
@@ -51,7 +61,7 @@ final class HistoryRetentionAndSearchTests: XCTestCase {
         let match = Self.entry(text: "unique caption zebra", timestamp: Date())
         let other = Self.entry(text: "unrelated note", timestamp: Date().addingTimeInterval(-1))
         try database.write(
-            upserts: [try Self.record(match), try Self.record(other)],
+            upserts: [Self.record(match), Self.record(other)],
             deletes: [],
             replacing: true
         )
@@ -102,6 +112,6 @@ final class HistoryRetentionAndSearchTests: XCTestCase {
     }
 
     private static func record(_ entry: TranscriptionHistoryEntry) throws -> TranscriptionHistoryDatabase.Record {
-        TranscriptionHistoryDatabase.Record(id: entry.id, payload: try JSONEncoder().encode(entry))
+        try TranscriptionHistoryDatabase.Record(id: entry.id, payload: JSONEncoder().encode(entry))
     }
 }

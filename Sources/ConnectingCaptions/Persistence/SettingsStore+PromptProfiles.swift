@@ -66,9 +66,9 @@ extension SettingsStore {
         var displayName: String {
             switch self {
             case .primary:
-                return "Primary Dictation Shortcut"
+                return AppLanguage.text("Primary Dictation Shortcut")
             case .secondary:
-                return "Secondary Dictation Shortcut"
+                return AppLanguage.text("Secondary Dictation Shortcut")
             }
         }
     }
@@ -84,9 +84,9 @@ extension SettingsStore {
         var displayName: String {
             switch self {
             case .system:
-                return "Use macOS Default"
+                return AppLanguage.text("Use macOS Default")
             case .manual:
-                return "Use Preferred Microphone"
+                return AppLanguage.text("Use Preferred Microphone")
             }
         }
     }

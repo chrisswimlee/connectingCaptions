@@ -174,6 +174,9 @@ struct ContentView: View {
         let observed = self.applyShortcutStateChanges(to: sized)
 
         return observed
+            .environment(\.locale, Locale(identifier: AppLanguage.localeIdentifier(for: self.settings.appLanguageID)))
+            .environment(\.layoutDirection, AppLanguage.layoutIsRightToLeft() ? .rightToLeft : .leftToRight)
+            .background(AppInterfaceTranslationHost())
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 self.refreshAccessibilityPermissionState()
             }
@@ -199,8 +202,8 @@ struct ContentView: View {
                         Button(action: self.openIssueReportingPage) {
                             Image(systemName: "ladybug.fill")
                         }
-                        .help("Report an issue")
-                        .accessibilityLabel("Report an issue")
+                        .help(AppLanguage.text("Report an issue"))
+                        .accessibilityLabel(AppLanguage.text("Report an issue"))
                     }
                 }
             }
@@ -213,25 +216,25 @@ struct ContentView: View {
                     set: { self.asr.showError = $0 }
                 )
             ) {
-                Button("OK", role: .cancel) {}
+                AppButton("OK", role: .cancel) {}
             } message: {
                 Text(self.asr.errorMessage)
             }
             .alert(
-                "Accessibility permission needed",
+                AppLanguage.text("Accessibility permission needed"),
                 isPresented: Binding(
                     get: { self.accessibilityAlert.isPresented },
                     set: { if !$0 { self.accessibilityAlert.dismiss() } }
                 )
             ) {
-                Button("Open System Settings") {
+                AppButton("Open System Settings") {
                     self.accessibilityAlert.openSystemSettings()
                 }
-                Button("Not Now", role: .cancel) {
+                AppButton("Not Now", role: .cancel) {
                     self.accessibilityAlert.dismiss()
                 }
             } message: {
-                Text("\(ConnectingCaptionsProduct.displayName) can't type into other apps without Accessibility access. Open System Settings → Privacy & Security → Accessibility and turn it on for \(ConnectingCaptionsProduct.displayName).")
+                AppText("{0} can't type into other apps without Accessibility access. Open System Settings → Privacy & Security → Accessibility and turn it on for {1}.", arguments: [String(describing: ConnectingCaptionsProduct.displayName), String(describing: ConnectingCaptionsProduct.displayName)])
             }
             .onChange(of: self.audioObserver.changeTick) { _, _ in
                 // Hardware change detected → refresh device lists
@@ -257,6 +260,8 @@ struct ContentView: View {
                 self.removeShortcutCaptureMonitor()
             }
             .onChange(of: self.primaryDictationShortcuts) { _, newValue in
+                // The store normalizes on both write and read, so reading it back
+                // yields the canonical list. Compare against that to converge in one pass.
                 SettingsStore.shared.primaryDictationShortcuts = newValue
                 let storedShortcuts = SettingsStore.shared.primaryDictationShortcuts
                 if storedShortcuts != newValue {
@@ -552,6 +557,8 @@ struct ContentView: View {
         if let recordingTarget {
             self.assignRecordedShortcut(newShortcut, to: recordingTarget)
         }
+        // Arming the next recorder does not clear pending modifiers, so drop them
+        // here; otherwise the previous capture's modifiers union into the next one.
         self.resetPendingShortcutState()
         DebugLogger.shared.debug("NSEvent monitor: Finished recording shortcut", source: "ContentView")
         return nil
@@ -719,6 +726,12 @@ struct ContentView: View {
             self.navigateToApp(.aiEnhancements)
         case .history:
             self.navigateToApp(.history)
+        case .audioSettings:
+            self.openSettings(.audio)
+        case .voiceEngine:
+            self.navigateToApp(.voiceEngine)
+        case .languagePacks:
+            self.navigateToApp(.languagePacks)
         }
     }
 
@@ -1015,9 +1028,9 @@ struct ContentView: View {
     var preferencesView: some View {
         if self.isSettingsSearchActive, self.settingsSearchResults.isEmpty {
             ContentUnavailableView {
-                Label("No Settings Found", systemImage: "magnifyingglass")
+                AppLabel("No Settings Found", systemImage: "magnifyingglass")
             } description: {
-                Text("No settings match “\(self.settingsSearchQuery)”.")
+                AppText("No settings match “{0}”.", arguments: [String(describing: self.settingsSearchQuery)])
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .combine)
@@ -1240,7 +1253,7 @@ struct ContentView: View {
         let info = self.getCurrentAppInfo()
         self.recordingAppInfo = info
         DebugLogger.shared.debug(
-            "Captured recording app context: app=\(info.name), bundleId=\(info.bundleId), title=\(info.windowTitle)",
+            "Captured recording app context: app=\(info.name), bundleId=\(info.bundleId), windowTitleCharacters=\(info.windowTitle.count)",
             source: "ContentView"
         )
     }
@@ -1562,6 +1575,9 @@ struct ContentView: View {
 
         LiveTranslationController.shared.subscriber.confirmTranscript = {
             await self.asr.confirmStreamingTranscript()
+        }
+        LiveTranslationController.shared.subscriber.confirmPauseTranscript = {
+            await self.asr.confirmStreamingTranscript(timeoutNanoseconds: LiveTranslationConfirm.pauseReDecodeTimeoutNanoseconds)
         }
         LiveTranslationController.shared.onStartCaptionListening = {
             self.startCaptionListening()

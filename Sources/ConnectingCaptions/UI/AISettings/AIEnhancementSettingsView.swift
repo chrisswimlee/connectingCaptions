@@ -113,22 +113,22 @@ struct AIEnhancementSettingsView: View {
                 self.viewModel.presentKeychainAccessAlert(message: self.viewModel.keychainPermissionMessage)
                 self.viewModel.showKeychainPermissionAlert = false
             }
-            .alert("Delete Prompt?", isPresented: self.$viewModel.showingDeletePromptConfirm) {
-                Button("Delete", role: .destructive) {
+            .alert(AppLanguage.text("Delete Prompt?"), isPresented: self.$viewModel.showingDeletePromptConfirm) {
+                AppButton("Delete", role: .destructive) {
                     self.viewModel.deletePendingPrompt()
                 }
-                Button("Cancel", role: .cancel) {
+                AppButton("Cancel", role: .cancel) {
                     self.viewModel.clearPendingDeletePrompt()
                 }
             } message: {
                 if self.viewModel.pendingDeletePromptName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Text("This cannot be undone.")
+                    AppText("This cannot be undone.")
                 } else {
-                    Text("Delete “\(self.viewModel.pendingDeletePromptName)”? This cannot be undone.")
+                    AppText("Delete “{0}”? This cannot be undone.", arguments: [String(describing: self.viewModel.pendingDeletePromptName)])
                 }
             }
             .alert(
-                "Couldn't Add App Override",
+                AppLanguage.text("Couldn't Add App Override"),
                 isPresented: Binding(
                     get: { !self.viewModel.appPromptBindingErrorMessage.isEmpty },
                     set: { isPresented in
@@ -138,7 +138,7 @@ struct AIEnhancementSettingsView: View {
                     }
                 )
             ) {
-                Button("OK", role: .cancel) {
+                AppButton("OK", role: .cancel) {
                     self.viewModel.appPromptBindingErrorMessage = ""
                 }
             } message: {
@@ -154,10 +154,10 @@ struct AIEnhancementSettingsView: View {
                 .frame(width: 24, height: 24)
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("Send Custom Prompt Only")
+                AppText("Send Custom Prompt Only")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(self.theme.palette.primaryText)
-                Text("For custom Dictate prompts, send your prompt without prepending the built-in dictation prompt.")
+                AppText("For custom Dictate prompts, send your prompt without prepending the built-in dictation prompt.")
                     .font(.caption2)
                     .foregroundStyle(self.theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -171,7 +171,7 @@ struct AIEnhancementSettingsView: View {
             ))
             .toggleStyle(.switch)
             .labelsHidden()
-            .help("Send custom Dictate prompts without prepending the built-in dictation prompt.")
+            .help(AppLanguage.text("Send custom Dictate prompts without prepending the built-in dictation prompt."))
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 10)

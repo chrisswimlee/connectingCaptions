@@ -27,7 +27,7 @@ struct TheaterEngineCards: View {
                         accessibilityIdentifier: "theater.voiceEngine"
                     ) {
                         if self.showsVoiceCustomize, let openVoiceEngine {
-                            Button(TheaterEngineCopy.voiceTitle, action: openVoiceEngine)
+                            AppButton("Change Model in Voice Engine", action: openVoiceEngine)
                                 .buttonStyle(.theaterText)
                                 .accessibilityIdentifier("theater.customizeVoiceEngine")
                         }
@@ -40,31 +40,23 @@ struct TheaterEngineCards: View {
                     title: TheaterEngineCopy.translationTitle,
                     systemImage: "translate",
                     purpose: self.showsPurpose ? TheaterEngineCopy.translationPurpose : nil,
-                    engineName: TheaterEngineCopy.translationName(),
+                    engineName: TheaterEngineCopy.translationName,
                     running: self.translationRunningLine,
                     runningIsWarning: self.translationRunningIsWarning,
                     accessibilityIdentifier: "theater.translationEngine"
                 ) {
                     if self.showsTranslationCustomize, let openTranslationEngine {
-                        Button("Language packs", action: openTranslationEngine)
+                        AppButton("Language packs", action: openTranslationEngine)
                             .buttonStyle(.theaterText)
                             .accessibilityIdentifier("theater.customizeTranslationEngine")
                     }
                 }
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("theater.engines")
-        .task {
+        .task(id: TranslationPairKey.current()) {
             await self.controller.refreshPackAvailability()
-        }
-        .onChange(of: self.settings.theaterSessionMode) { _, _ in
-            Task { await self.controller.refreshPackAvailability() }
-        }
-        .onChange(of: self.settings.translationSourceLanguageID) { _, _ in
-            Task { await self.controller.refreshPackAvailability() }
-        }
-        .onChange(of: self.settings.translationTargetLanguageID) { _, _ in
-            Task { await self.controller.refreshPackAvailability() }
         }
     }
 
@@ -79,8 +71,7 @@ struct TheaterEngineCards: View {
         TheaterEngineCopy.translationRunningLine(
             mode: self.settings.theaterSessionMode,
             sameLanguage: SpokenLanguageResolver.isSameLanguagePair(),
-            pack: self.controller.packAvailability,
-            engine: self.settings.theaterTranslationEngine
+            pack: self.controller.packAvailability
         )
     }
 
@@ -113,7 +104,7 @@ struct TheaterEngineCards: View {
                 accessory()
             }
             if let purpose {
-                Text(purpose)
+                AppText(purpose)
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -123,7 +114,7 @@ struct TheaterEngineCards: View {
                 .foregroundStyle(self.theme.palette.primaryText)
                 .accessibilityIdentifier("\(accessibilityIdentifier).name")
             if !running.isEmpty {
-                Text(running)
+                AppText(running)
                     .font(self.theme.typography.caption)
                     .foregroundStyle(
                         runningIsWarning ? self.theme.palette.warning : self.theme.palette.secondaryText

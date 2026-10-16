@@ -143,6 +143,12 @@ final class TheaterYouTubeReplayTests: XCTestCase {
         )
     }
 
+    /// A long quiet is not just elapsed time. A real gap also records silence
+    /// holds: `ASRService+DevicesAndStreaming` marks a hold on every silent
+    /// chunk it skips, so eight quiet seconds produce holds before the next
+    /// utterance lands. Replaying only the elapsed time describes an input the
+    /// app cannot produce, and merges two utterances that a live listen keeps
+    /// apart.
     func testLowercaseUtteranceAfterALongQuietStaysItsOwnRow() async {
         let subscriber = Self.makeSubscriber()
         subscriber.handlePartial("Please take a seat near the door.")
@@ -151,20 +157,22 @@ final class TheaterYouTubeReplayTests: XCTestCase {
         await subscriber.waitForIdleForTesting()
         XCTAssertEqual(subscriber.committedSourceLines, ["Please take a seat near the door."])
 
-        try? await Task.sleep(nanoseconds: 8_200_000_000)
+        // Eight seconds of quiet, holding the way a silent chunk holds.
+        subscriber.noteSilenceHold()
+        try? await Task.sleep(nanoseconds: 4_100_000_000)
+        subscriber.noteSilenceHold()
+        try? await Task.sleep(nanoseconds: 4_100_000_000)
+        subscriber.noteSilenceHold()
 
         subscriber.handlePartial("near the door before the lecture starts.")
         subscriber.handlePartial("near the door before the lecture starts.")
-        subscriber.noteSilenceHold()
         await subscriber.waitForIdleForTesting()
-        XCTAssertEqual(
-            subscriber.committedSourceLines.count,
-            2,
-            subscriber.committedSourceLines.joined(separator: " | ")
-        )
-        XCTAssertEqual(subscriber.committedSourceLines[0], "Please take a seat near the door.")
+        let rows = subscriber.committedSourceLines
+        XCTAssertEqual(rows.count, 2, rows.joined(separator: " | "))
+        XCTAssertEqual(rows.first, "Please take a seat near the door.")
         XCTAssertTrue(
-            subscriber.committedSourceLines[1].localizedCaseInsensitiveContains("before the lecture")
+            rows.dropFirst().contains { $0.localizedCaseInsensitiveContains("before the lecture") },
+            rows.joined(separator: " | ")
         )
     }
 

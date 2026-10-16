@@ -33,7 +33,7 @@ extension ContentView {
     }
 
     func logDictationPromptTrace(_ title: String, value: String) {
-        let line = "[PromptTrace][Dictate] \(title):\n\(value)"
+        let line = DiagnosticMetadata.promptTrace(title: title, value: value)
         if self.forcePromptTraceToConsole {
             print(line)
         }
@@ -136,7 +136,7 @@ extension ContentView {
             let result = try await processTextWithAI(aiInputText)
             await MainActor.run { self.aiOutputText = result }
         } catch {
-            DebugLogger.shared.error("callOpenAIChat failed: \(error.localizedDescription)", source: "ContentView")
+            DebugLogger.shared.error("callOpenAIChat failed: \(DiagnosticMetadata.error(error))", source: "ContentView")
             await MainActor.run { self.aiOutputText = "Error: \(error.localizedDescription)" }
         }
     }
@@ -701,7 +701,7 @@ struct AccessibilitySettingsFloatingGuideView: View {
                         value: self.isArrowRaised
                     )
 
-                Text("Drag \(self.appName) into the Accessibility apps list as shown")
+                AppText("Drag {0} into the Accessibility apps list as shown", arguments: [String(describing: self.appName)])
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.78))
                     .lineLimit(1)
@@ -720,7 +720,7 @@ struct AccessibilitySettingsFloatingGuideView: View {
                 }
                 .buttonStyle(.plain)
                 .focusable(false)
-                .help("Close guide")
+                .help(AppLanguage.text("Close guide"))
             }
 
             HStack(spacing: 12) {
@@ -736,7 +736,7 @@ struct AccessibilitySettingsFloatingGuideView: View {
                 }
                 .buttonStyle(.plain)
                 .focusable(false)
-                .help("Return to \(self.appName)")
+                .help(AppLanguage.format("Return to {0}", String(describing: self.appName)))
 
                 Image(nsImage: self.appIcon)
                     .resizable()
@@ -777,7 +777,7 @@ struct AccessibilitySettingsFloatingGuideView: View {
             .onDrag {
                 NSItemProvider(object: self.appURL as NSURL)
             }
-            .accessibilityLabel("Drag \(self.appName) to the Accessibility list")
+            .accessibilityLabel(AppLanguage.format("Drag {0} to the Accessibility list", String(describing: self.appName)))
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -864,14 +864,14 @@ struct TodayStatsToolbarButton: View {
             HStack(spacing: 4) {
                 Image(systemName: hasActivity ? "captions.bubble" : "clock.arrow.circlepath")
                 if hasActivity {
-                    Text("\(summary.words) words")
+                    AppText("{0} words", arguments: [String(describing: summary.words)])
                 } else {
-                    Text("History")
+                    AppText("History")
                 }
             }
             .font(.system(size: 12, weight: .medium))
         }
         .help(hasActivity ? "Today: \(summary.words) words. Open History for the talk." : "Open History")
-        .accessibilityLabel("History")
+        .accessibilityLabel(AppLanguage.text("History"))
     }
 }

@@ -18,6 +18,7 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
 
     private var mailbox = TranslationRequestMailbox()
     private var lastPair: String = ""
+    private var pairGeneration: UInt64 = 0
     /// Default strategy: prefers Apple Intelligence when the Mac has it,
     /// falls back to the small packs automatically otherwise. Drives actual
     /// translating and "can this pair translate right now" (Listen gating).
@@ -48,6 +49,7 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         if pair == self.lastPair, self.configuration != nil {
             return
         }
+        self.pairGeneration &+= 1
         self.lastPair = pair
         self.mailbox.cancelAll(TranslationEngineError(message: "Language pair changed."))
         self.configuration = TranslationSession.Configuration(
@@ -83,7 +85,10 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         guard source.id != target.id else { return trimmed }
 
         self.prepare(source: source, target: target)
+        let generation = self.pairGeneration
         await self.waitUntilMailboxReady()
+        try Task.checkCancellation()
+        guard generation == self.pairGeneration else { throw TranslationEngineError.superseded }
 
         // Live may wait behind a commit. The mailbox already refuses to let
         // prefetch preempt a queued or running commit.
@@ -100,6 +105,8 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
                     return installed
                 }
             }
+            try Task.checkCancellation()
+            guard generation == self.pairGeneration else { throw TranslationEngineError.superseded }
             return try await self.mailbox.submit(trimmed, kind: kind)
         }
     }
@@ -130,16 +137,22 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
     /// A new attach (pack sheet, configuration invalidate, extra host) claims the
     /// mailbox so the previous serve loop exits instead of overwriting its waiter.
     func attachSession(_ session: TranslationSession) async {
+        let pairGeneration = self.pairGeneration
+        guard self.sessionMatchesConfiguration(session) else { return }
         do {
             try await session.prepareTranslation()
             self.lastError = nil
         } catch {
             self.lastError = error.localizedDescription
             DebugLogger.shared.debug(
-                "Apple Translation prepare failed: \(error.localizedDescription)",
+                "Apple Translation prepare failed: \(DiagnosticMetadata.error(error))",
                 source: "AppleTranslationEngine"
             )
         }
+        guard !Task.isCancelled,
+              pairGeneration == self.pairGeneration,
+              self.sessionMatchesConfiguration(session)
+        else { return }
         let generation = self.mailbox.claimServe()
         let mailbox = self.mailbox
         await withTaskCancellationHandler {
@@ -149,8 +162,19 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         }
     }
 
+    private func sessionMatchesConfiguration(_ session: TranslationSession) -> Bool {
+        guard let source = self.configuration?.source,
+              let target = self.configuration?.target,
+              let sessionSource = session.sourceLanguage,
+              let sessionTarget = session.targetLanguage
+        else { return false }
+        return source.maximalIdentifier == sessionSource.maximalIdentifier
+            && target.maximalIdentifier == sessionTarget.maximalIdentifier
+    }
+
     private func tearDownSession(reason: String) {
         guard !self.lastPair.isEmpty || self.configuration != nil else { return }
+        self.pairGeneration &+= 1
         self.lastPair = ""
         self.mailbox.cancelAll(TranslationEngineError(message: reason))
         self.configuration = nil
@@ -168,11 +192,12 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
 
     func packAvailability(
         source: TranslationLanguage,
-        target: TranslationLanguage
+        target: TranslationLanguage,
+        refresh: Bool = false
     ) async -> TranslationPackAvailability {
         if source.id == target.id { return .installed }
         let key = Self.packCacheKey(source: source, target: target)
-        if let cached = self.packStatusByPair[key], cached == .installed || cached == .unsupported {
+        if !refresh, let cached = self.packStatusByPair[key], cached == .installed || cached == .unsupported {
             return cached
         }
         let status = await self.languageAvailability.status(
@@ -199,11 +224,12 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
     /// tell the Language packs screen whether the discrete pack is on disk.
     func fastPackAvailability(
         source: TranslationLanguage,
-        target: TranslationLanguage
+        target: TranslationLanguage,
+        refresh: Bool = false
     ) async -> TranslationPackAvailability {
         if source.id == target.id { return .installed }
         let key = Self.packCacheKey(source: source, target: target)
-        if let cached = self.fastPackStatusByPair[key], cached == .installed || cached == .unsupported {
+        if !refresh, let cached = self.fastPackStatusByPair[key], cached == .installed || cached == .unsupported {
             return cached
         }
         let status = await self.fastLanguageAvailability.status(
@@ -234,13 +260,13 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         target: TranslationLanguage
     ) async -> LanguagePackCoverage {
         if source.id == target.id { return .packDownloaded }
-        let fast = await self.fastPackAvailability(source: source, target: target)
+        let fast = await self.fastPackAvailability(source: source, target: target, refresh: true)
         if let decided = Self.coverage(forFastStatus: fast) { return decided }
         // Fast status alone was inconclusive (.supported or .unknown): the
         // discrete pack isn't confirmed installed or unsupported, so only
         // now ask the AI-preferring check to see if Apple Intelligence
         // already covers the pair without it.
-        let rich = await self.packAvailability(source: source, target: target)
+        let rich = await self.packAvailability(source: source, target: target, refresh: true)
         return Self.coverage(forRichStatus: rich)
     }
 
@@ -258,7 +284,8 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         switch status {
         case .installed: return .appleIntelligence
         case .unsupported: return .unsupported
-        case .supported, .unknown: return .needsDownload
+        case .supported: return .needsDownload
+        case .unknown: return .checking
         }
     }
 
@@ -290,7 +317,8 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         for candidate in candidates where candidate.id != fixed.id {
             let source = fixedIsSource ? fixed : candidate
             let target = fixedIsSource ? candidate : fixed
-            _ = await self.packAvailability(source: source, target: target)
+            guard !Task.isCancelled else { return }
+            _ = await self.packAvailability(source: source, target: target, refresh: true)
         }
     }
 
@@ -331,7 +359,7 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
             return response.targetText
         } catch {
             DebugLogger.shared.debug(
-                "Apple Translation installed session unavailable, using SwiftUI host: \(error.localizedDescription)",
+                "Apple Translation installed session unavailable, using SwiftUI host: \(DiagnosticMetadata.error(error))",
                 source: "AppleTranslationEngine"
             )
             return nil
@@ -387,35 +415,53 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         }
     }
 
-    /// This loop serves one request at a time, so a single hung or slow
-    /// `translate` call (e.g. a cold on-device session still warming up on
-    /// the first sentence) would otherwise block every later sentence's
-    /// commit behind it indefinitely — the caller's own timeout only
-    /// abandons its wait, it does not stop this shared loop. Racing the call
-    /// against the same deadline the caller uses keeps the queue moving so a
-    /// slow first sentence cannot starve every sentence that follows it.
+    /// This loop serves one request at a time, so a single slow or wedged
+    /// `translate` call (e.g. a cold on-device session still warming up, or a
+    /// non-cooperative call that ignores cancellation) would otherwise block
+    /// every later sentence's commit behind it — the caller's own timeout only
+    /// abandons its wait, it does not stop this shared loop.
+    ///
+    /// A `withThrowingTaskGroup` cannot express this: leaving its body
+    /// implicitly awaits every child task, including one still stuck inside
+    /// `session.translate`, so the deadline would only ever expire once the
+    /// work itself stopped. These three racers are unstructured `Task`s
+    /// instead, joined through a `FirstClaimant`-guarded continuation, so the
+    /// deadline or supersede check returns to the mailbox loop even while
+    /// `session.translate` is still abandoned in the background.
     private static func translate(
         _ text: String,
         session: TranslationSession,
         kind: TranslationRequestKind = .commit,
         isCancelled: @escaping () -> Bool = { false }
     ) async throws -> String {
-        try await withThrowingTaskGroup(of: String.self) { group in
-            group.addTask {
-                try await session.translate(text).targetText
+        let gate = FirstClaimant()
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            let timeoutTask = Task.detached {
+                try? await Task.sleep(nanoseconds: LiveTranslationTiming.mailboxTimeoutNanoseconds(for: kind))
+                if gate.claim() { continuation.resume(throwing: TranslationEngineError.timeout) }
             }
-            group.addTask {
-                try await Task.sleep(nanoseconds: LiveTranslationTiming.mailboxTimeoutNanoseconds(for: kind))
-                throw TranslationEngineError.timeout
-            }
-            group.addTask {
+            let supersedeTask = Task.detached {
                 while !isCancelled() {
-                    try await Task.sleep(nanoseconds: 20_000_000)
+                    try? await Task.sleep(nanoseconds: 20_000_000)
                 }
-                throw TranslationEngineError.superseded
+                if gate.claim() { continuation.resume(throwing: TranslationEngineError.superseded) }
             }
-            defer { group.cancelAll() }
-            return try await group.next()!
+            Task.detached {
+                do {
+                    let result = try await session.translate(text).targetText
+                    if gate.claim() {
+                        continuation.resume(returning: result)
+                        timeoutTask.cancel()
+                        supersedeTask.cancel()
+                    }
+                } catch {
+                    if gate.claim() {
+                        continuation.resume(throwing: error)
+                        timeoutTask.cancel()
+                        supersedeTask.cancel()
+                    }
+                }
+            }
         }
     }
 
@@ -442,6 +488,7 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
 /// translation works right now; they differ in how they got there, which is
 /// worth saying since "download" would be a lie for the first one.
 enum LanguagePackCoverage: Equatable {
+    case checking
     case packDownloaded
     case appleIntelligence
     case needsDownload
@@ -661,24 +708,24 @@ private final class TranslationPackDownloadStatus: ObservableObject {
     var title: String {
         switch self.phase {
         case .waiting, .installing:
-            return "Downloading \(self.languageLabel)…"
+            return AppLanguage.format("Downloading {0}…", String(describing: self.languageLabel))
         case .installed:
-            return "\(self.languageLabel) is ready"
+            return AppLanguage.format("{0} is ready", String(describing: self.languageLabel))
         case .unsupported:
-            return "\(self.languageLabel) is not supported"
+            return AppLanguage.format("{0} is not supported", String(describing: self.languageLabel))
         }
     }
 
     var detail: String {
         switch self.phase {
         case .waiting:
-            return "If macOS shows a download sheet, keep this window open until it finishes."
+            return AppLanguage.text("If macOS shows a download sheet, keep this window open until it finishes.")
         case .installing:
-            return "Installing the language pack. This can take a few minutes depending on your connection."
+            return AppLanguage.text("Installing the language pack. This can take a few minutes depending on your connection.")
         case .installed:
-            return "You can press Listen on Theater now. This window will close automatically."
+            return AppLanguage.text("You can press Listen on Theater now. This window will close automatically.")
         case .unsupported:
-            return "Apple Translation does not support this language pair yet."
+            return AppLanguage.text("Apple Translation does not support this language pair yet.")
         }
     }
 
@@ -761,7 +808,7 @@ private struct TranslationPackDownloadView: View {
                         try await session.prepareTranslation()
                     } catch {
                         DebugLogger.shared.debug(
-                            "Language pack prepare ended: \(error.localizedDescription)",
+                            "Language pack prepare ended: \(DiagnosticMetadata.error(error))",
                             source: "AppleTranslationEngine"
                         )
                     }

@@ -25,23 +25,19 @@ extension ContentView {
     var sidebarLinks: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 2) {
-                self.sidebarSectionHeader("Board")
-                self.sidebarNavigationLink(.liveTranslation, title: "Theater", systemImage: "captions.bubble")
+                self.sidebarSectionHeader("Features")
+                self.sidebarNavigationLink(.liveTranslation, title: AppLanguage.text("Theater"), systemImage: "captions.bubble")
+                self.sidebarNavigationLink(.speakAndType, title: AppLanguage.text("Speak & Type"), systemImage: "text.cursor")
 
-                self.sidebarSectionHeader("Insert")
-                self.sidebarNavigationLink(.speakAndType, title: "Speak and type", systemImage: "text.cursor")
+                self.sidebarSectionHeader("Configuration")
+                self.sidebarNavigationLink(.voiceEngine, title: AppLanguage.text("Voice Engine"), systemImage: "waveform")
+                self.sidebarNavigationLink(.languagePacks, title: AppLanguage.text("Language Packs"), systemImage: "arrow.down.circle")
 
-                self.sidebarSectionHeader("Setup")
-                self.sidebarNavigationLink(.voiceEngine, title: "Voice Engine", systemImage: "waveform")
-                self.sidebarNavigationLink(.languagePacks, title: "Language packs", systemImage: "arrow.down.circle")
-
-                self.sidebarSectionHeader("Activity")
-                self.sidebarNavigationLink(.history, title: "History", systemImage: "clock.arrow.circlepath")
-
-                self.sidebarSectionHeader("Help")
-                self.sidebarNavigationLink(.welcome, title: "Getting Started", systemImage: "book.closed")
-                self.sidebarNavigationLink(.changelog, title: "Changelog", systemImage: "list.bullet.rectangle")
-                self.sidebarNavigationLink(.feedback, title: "Feedback", systemImage: "envelope.fill")
+                self.sidebarSectionHeader("Activity & Help")
+                self.sidebarNavigationLink(.history, title: AppLanguage.text("History"), systemImage: "clock.arrow.circlepath")
+                self.sidebarNavigationLink(.welcome, title: AppLanguage.text("Getting Started"), systemImage: "book.closed")
+                self.sidebarNavigationLink(.changelog, title: AppLanguage.text("Changelog"), systemImage: "list.bullet.rectangle")
+                self.sidebarNavigationLink(.feedback, title: AppLanguage.text("Feedback"), systemImage: "envelope.fill")
             }
             .padding(.horizontal, self.theme.metrics.spacing.md)
             .padding(.bottom, self.theme.metrics.spacing.md)
@@ -53,7 +49,7 @@ extension ContentView {
             Button {
                 self.closeSettings()
             } label: {
-                Text("Back")
+                AppText("Back")
                     .font(self.theme.typography.sidebarItem)
                 .padding(.horizontal, self.theme.metrics.spacing.md)
                 .padding(.top, self.theme.metrics.spacing.sm)
@@ -66,8 +62,8 @@ extension ContentView {
                 reduceMotion: self.accessibilityReduceMotion
             ))
             .onHover { self.isSettingsBackHovered = $0 }
-            .help("Back to \(ConnectingCaptionsProduct.displayName)")
-            .accessibilityLabel("Back to \(ConnectingCaptionsProduct.displayName)")
+            .help(AppLanguage.format("Back to {0}", String(describing: ConnectingCaptionsProduct.displayName)))
+            .accessibilityLabel(AppLanguage.format("Back to {0}", String(describing: ConnectingCaptionsProduct.displayName)))
 
             SettingsSearchField(text: Binding(
                 get: { self.settingsSearchQuery },
@@ -88,7 +84,7 @@ extension ContentView {
                         Button {
                             self.selectSettingsSection(section)
                         } label: {
-                            Text(section.title)
+                            AppText(section.title)
                                 .font(self.theme.typography.sidebarItem)
                                 .fontWeight(isSelected ? .medium : .regular)
                                 .foregroundStyle(rowColor)
@@ -166,7 +162,7 @@ extension ContentView {
         } label: {
             HStack(spacing: self.theme.metrics.spacing.sm) {
                 SettingsIconTile(systemName: "gearshape", size: 16)
-                Text("Settings")
+                AppText("Settings")
                     .font(self.theme.typography.sidebarItem)
             }
             .padding(.horizontal, self.theme.metrics.spacing.md)
@@ -178,8 +174,8 @@ extension ContentView {
             reduceMotion: self.accessibilityReduceMotion
         ))
         .onHover { self.isSettingsEntryHovered = $0 }
-        .help("Settings")
-        .accessibilityLabel("Settings")
+        .help(AppLanguage.text("Settings"))
+        .accessibilityLabel(AppLanguage.text("Settings"))
     }
 
     var modeTransitionAnimation: Animation {
@@ -194,7 +190,7 @@ extension ContentView {
     }
 
     func sidebarSectionHeader(_ title: String) -> some View {
-        Text(title)
+        AppText(title)
             .font(self.theme.typography.sidebarSection)
             .foregroundStyle(.secondary)
             .textCase(nil)
@@ -223,7 +219,7 @@ extension ContentView {
                 emphasized: isSelected,
                 tint: isSelected ? rowColor : nil
             )
-            Text(title)
+            AppText(title)
                 .font(self.theme.typography.sidebarItem)
                 .fontWeight(isSelected ? .medium : .regular)
                 .foregroundStyle(rowColor)
@@ -255,8 +251,8 @@ extension ContentView {
         } label: {
             Image(systemName: self.settings.themePreference.systemImageName)
         }
-        .help("Theme: \(self.settings.themePreference.displayName)")
-        .accessibilityLabel("Theme")
+        .help(AppLanguage.format("Theme: {0}", String(describing: self.settings.themePreference.displayName)))
+        .accessibilityLabel(AppLanguage.text("Theme"))
     }
 
     func nextThemePreference(after preference: SettingsStore.ThemePreference) -> SettingsStore.ThemePreference {
@@ -348,7 +344,8 @@ extension ContentView {
                 ? self.shortcutRecordingMessage
                 : nil,
             accessibilityTrusted: self.accessibilityEnabled,
-            openAccessibility: self.openAccessibilitySettings
+            openAccessibility: self.openAccessibilitySettings,
+            openVoiceEngine: { self.navigateToApp(.voiceEngine) }
         )
     }
 

@@ -7,6 +7,29 @@ nonisolated enum TheaterCaptionExport {
             .joined(separator: "\n\n")
     }
 
+    /// A review worksheet, never a measured score. Human references start empty.
+    static func qualityReview(pairs: [CaptionHistoryPair]) -> String {
+        struct ReviewLine: Encodable {
+            var captionID: Int
+            var kind: String
+            var languageID: String
+            var reference = ""
+            var hypothesis: String
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        return pairs.enumerated().flatMap { index, pair in
+            var rows = [ReviewLine(captionID: index + 1, kind: "asr", languageID: pair.sourceLanguageID ?? "", hypothesis: pair.source)]
+            if pair.source != pair.translated {
+                rows.append(ReviewLine(captionID: index + 1, kind: "translation", languageID: pair.targetLanguageID ?? "", hypothesis: pair.translated))
+            }
+            return rows.compactMap { row -> String? in
+                guard let data = try? encoder.encode(row) else { return nil }
+                return String(data: data, encoding: .utf8)
+            }
+        }.joined(separator: "\n")
+    }
+
     static func srt(pairs: [CaptionHistoryPair], secondsPerCue: Int = 4) -> String {
         Self.srt(cues: Self.cues(from: pairs, secondsPerCue: secondsPerCue))
     }
@@ -28,7 +51,9 @@ nonisolated enum TheaterCaptionExport {
         var lines = [
             "# \(ConnectingCaptionsProduct.displayName)",
             "",
-            "Times are when each caption was accepted, not when the word was spoken.",
+            pairs.contains(where: { $0.speechTiming?.isValid == true })
+                ? "Speech timestamps use the microphone capture clock. Captions without speech timestamps use estimated timing."
+                : "Times are when each caption was accepted, not when the word was spoken.",
             "",
         ]
         for cue in Self.cues(from: pairs, secondsPerCue: secondsPerCue) {
@@ -64,12 +89,16 @@ nonisolated enum TheaterCaptionExport {
 
     static func pairs(from entries: [LectureCaptionEntry]) -> [CaptionHistoryPair] {
         entries.map { entry in
-            CaptionHistoryPair(
+            var pair = CaptionHistoryPair(
                 source: entry.source,
                 translated: entry.translated,
                 wasPolished: entry.wasPolished,
                 committedAt: Self.usableCommittedAt(entry.committedAt)
             )
+            pair.speechTiming = entry.speechTiming
+            pair.sourceLanguageID = entry.sourceLanguageID
+            pair.targetLanguageID = entry.targetLanguageID
+            return pair
         }
     }
 
@@ -114,18 +143,30 @@ nonisolated enum TheaterCaptionExport {
     }
 
     private static func cues(from pairs: [CaptionHistoryPair], secondsPerCue: Int) -> [Cue] {
-        let items: [(text: String, committedAt: Date?)] = pairs.compactMap { pair in
+        let items: [(text: String, committedAt: Date?, speechTiming: CaptionSpeechTiming?)] = pairs.compactMap { pair in
             guard let text = Self.cueText(for: pair) else { return nil }
-            return (text, Self.usableCommittedAt(pair.committedAt))
+            return (text, Self.usableCommittedAt(pair.committedAt), pair.speechTiming?.isValid == true ? pair.speechTiming : nil)
         }
         guard !items.isEmpty else { return [] }
         let slot = TimeInterval(max(2, secondsPerCue))
+        let estimated: [Cue]
         if let dates = Self.timelineDates(from: items.map(\.committedAt), slot: slot) {
-            return Self.timedCues(texts: items.map(\.text), dates: dates, fallbackDuration: slot)
+            estimated = Self.timedCues(texts: items.map(\.text), dates: dates, fallbackDuration: slot)
+        } else {
+            estimated = items.enumerated().map { index, item in
+                let start = TimeInterval(index) * slot
+                return Cue(start: start, end: start + slot, text: item.text)
+            }
         }
+        guard let anchor = items.firstIndex(where: { $0.speechTiming != nil }),
+              let timing = items[anchor].speechTiming else { return estimated }
+        let adjustment = timing.start - estimated[anchor].start
         return items.enumerated().map { index, item in
-            let start = TimeInterval(index) * slot
-            return Cue(start: start, end: start + slot, text: item.text)
+            if let speech = item.speechTiming {
+                return Cue(start: speech.start, end: speech.end, text: item.text)
+            }
+            let start = max(0, estimated[index].start + adjustment)
+            return Cue(start: start, end: max(start + 0.5, estimated[index].end + adjustment), text: item.text)
         }
     }
 

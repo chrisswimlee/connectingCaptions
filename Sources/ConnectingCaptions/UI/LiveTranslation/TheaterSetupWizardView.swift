@@ -64,7 +64,7 @@ struct TheaterSetupWizardView: View {
                 }
             }
             .frame(height: 2)
-            .accessibilityLabel("Setup progress")
+            .accessibilityLabel(AppLanguage.text("Setup progress"))
             .accessibilityValue(
                 AppLanguage.stepLabel(
                     current: self.step.rawValue + 1,
@@ -129,7 +129,7 @@ struct TheaterSetupWizardView: View {
         VStack(alignment: .leading, spacing: 16) {
             ThemedCard(style: .standard, hoverEffect: false) {
                 TheaterLanguageMenu(
-                    title: "App language",
+                    title: AppLanguage.text("App language"),
                     selection: self.appLanguageID,
                     menuHelp: AppLanguage.text("The language this app uses."),
                     accessibilityIdentifier: "theater.setupWizard.appLanguage"
@@ -229,10 +229,17 @@ struct TheaterSetupWizardView: View {
                     title: AppLanguage.text(TheaterSetupWizard.accentTitle),
                     detail: self.settings.accentColorOption.rawValue
                 )
-                self.readyRow(
-                    title: AppLanguage.text("Share slides"),
-                    detail: AppLanguage.text(TheaterReadiness.screenShare)
-                )
+                Divider()
+                    .padding(.vertical, 2)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(AppLanguage.text("Share slides"))
+                        .font(self.theme.typography.bodySmall)
+                        .foregroundStyle(self.theme.palette.secondaryText)
+                    Text(AppLanguage.text(TheaterReadiness.screenShare))
+                        .font(self.theme.typography.bodySmall)
+                        .foregroundStyle(self.theme.palette.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
@@ -248,11 +255,11 @@ struct TheaterSetupWizardView: View {
 
     private func readyRow(title: String, detail: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(title)
+            AppText(title)
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(self.theme.palette.secondaryText)
             Spacer()
-            Text(detail)
+            AppText(detail)
                 .font(self.theme.typography.bodyStrong)
                 .foregroundStyle(self.theme.palette.primaryText)
                 .multilineTextAlignment(.trailing)

@@ -35,20 +35,15 @@ struct TranslationEngineError: LocalizedError {
     let message: String
     var errorDescription: String? { self.message }
     var isSuperseded: Bool { self.message == Self.supersededMessage }
-    var isLocalEcho: Bool { self.message == Self.localEchoedMessage }
+    var isCaptionRejected: Bool { self.message == Self.captionRejectedMessage }
     var isTimeout: Bool { self.message == Self.timeoutMessage }
-    var isSharpenWithdrawn: Bool { self.message == Self.sharpenWithdrawnMessage }
     static let supersededMessage = "Superseded by a newer caption."
-    static let localEchoedMessage = "Local caption translation echoed the source."
+    static let captionRejectedMessage = "Caption text was not safe to print."
     static let timeoutMessage = "Apple Translation timed out."
-    static let sharpenWithdrawnMessage = "Local sharpening paused while this Mac is hot or short on memory."
     static var superseded: TranslationEngineError { TranslationEngineError(message: Self.supersededMessage) }
     static var timeout: TranslationEngineError { TranslationEngineError(message: Self.timeoutMessage) }
-    static var localEchoed: TranslationEngineError { TranslationEngineError(message: Self.localEchoedMessage) }
-    static var sharpenWithdrawn: TranslationEngineError {
-        TranslationEngineError(message: Self.sharpenWithdrawnMessage)
-    }
-    static var localRejected: TranslationEngineError {
-        TranslationEngineError(message: "Local caption translation was rejected.")
+    /// A line that failed `LiveTranslationCaptionGate.captionSafeForBoard`.
+    static var captionRejected: TranslationEngineError {
+        TranslationEngineError(message: Self.captionRejectedMessage)
     }
 }

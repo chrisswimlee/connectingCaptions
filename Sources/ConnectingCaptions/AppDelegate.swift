@@ -42,9 +42,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
         SettingsStore.shared.applyManagedFleetIfNeeded()
 
         let firstOpenKey = "AnalyticsFirstOpenAt"
-        let isTrueFirstOpen = UserDefaults.standard.object(forKey: firstOpenKey) == nil
+        let isTrueFirstOpen = SettingsStore.backingDefaults.object(forKey: firstOpenKey) == nil
         if isTrueFirstOpen {
-            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: firstOpenKey)
+            SettingsStore.backingDefaults.set(Date().timeIntervalSince1970, forKey: firstOpenKey)
         }
         SettingsStore.shared.bootstrapOnboardingState(isTrueFirstOpen: isTrueFirstOpen)
         SettingsStore.shared.bootstrapSetupWizardState()
@@ -95,19 +95,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     private func shutdownRuntimesForTermination() async {
-        let finished = await withTaskGroup(of: Bool.self) { group in
-            group.addTask { @MainActor in
-                await AppServices.shared.shutdownForTermination()
-                await PrivateAIIntegrationService.shared.shutdownForTermination()
-                return true
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: 8_000_000_000)
-                return false
-            }
-            let first = await group.next() ?? false
-            group.cancelAll()
-            return first
+        let finished = await BoundedWait.completedWithin(.nanoseconds(8_000_000_000)) {
+            await AppServices.shared.shutdownForTermination()
+            await PrivateAIIntegrationService.shared.shutdownForTermination()
         }
         if !finished {
             DebugLogger.shared.warning(

@@ -84,7 +84,7 @@ struct SearchableProviderPicker: View {
                 HStack {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    TextField("Search providers...", text: self.$searchText)
+                    TextField(AppLanguage.text("Search providers..."), text: self.$searchText)
                         .textFieldStyle(.plain)
                 }
                 .searchablePickerSearchFieldChrome()
@@ -97,7 +97,7 @@ struct SearchableProviderPicker: View {
                         // Built-in section
                         let builtIns = self.filteredProviders.filter { $0.isBuiltIn }
                         if !builtIns.isEmpty {
-                            Text("BUILT-IN")
+                            AppText("BUILT-IN")
                                 .font(.caption2)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
@@ -118,7 +118,7 @@ struct SearchableProviderPicker: View {
                                     .padding(.vertical, 4)
                             }
 
-                            Text("CUSTOM")
+                            AppText("CUSTOM")
                                 .font(.caption2)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(.secondary)
@@ -132,7 +132,7 @@ struct SearchableProviderPicker: View {
                         }
 
                         if self.filteredProviders.isEmpty {
-                            Text("No providers match '\(self.searchText)'")
+                            AppText("No providers match '{0}'", arguments: [String(describing: self.searchText)])
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .padding()

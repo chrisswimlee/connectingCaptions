@@ -21,10 +21,10 @@ extension SettingsStore {
 
         var displayName: String {
             switch self {
-            case .pill: return "Pill"
-            case .small: return "Small"
-            case .medium: return "Medium"
-            case .large: return "Large"
+            case .pill: return AppLanguage.text("Pill")
+            case .small: return AppLanguage.text("Small")
+            case .medium: return AppLanguage.text("Medium")
+            case .large: return AppLanguage.text("Large")
             }
         }
     }
@@ -36,8 +36,8 @@ extension SettingsStore {
 
         var displayName: String {
             switch self {
-            case .top: return "Top of Screen"
-            case .bottom: return "Bottom of Screen"
+            case .top: return AppLanguage.text("Top of Screen")
+            case .bottom: return AppLanguage.text("Bottom of Screen")
             }
         }
     }
@@ -51,9 +51,9 @@ extension SettingsStore {
         var displayName: String {
             switch self {
             case .standard:
-                return "Standard Notch"
+                return AppLanguage.text("Standard Notch")
             case .minimal:
-                return "Compact"
+                return AppLanguage.text("Compact")
             }
         }
     }
@@ -196,9 +196,9 @@ extension SettingsStore {
 
         var displayName: String {
             switch self {
-            case .system: return "System"
-            case .light: return "Light"
-            case .dark: return "Dark"
+            case .system: return AppLanguage.text("System")
+            case .light: return AppLanguage.text("Light")
+            case .dark: return AppLanguage.text("Dark")
             }
         }
 
@@ -233,12 +233,12 @@ extension SettingsStore {
 
         var displayName: String {
             switch self {
-            case .none: return "None"
-            case .fluidSfx0: return "Fluid SFX 0"
-            case .fluidSfx1: return "Fluid SFX 1"
-            case .fluidSfx2: return "Fluid SFX 2"
-            case .fluidSfx3: return "Fluid SFX 3"
-            case .fluidSfx4: return "Fluid SFX 4"
+            case .none: return AppLanguage.text("None")
+            case .fluidSfx0: return AppLanguage.text("Fluid SFX 0")
+            case .fluidSfx1: return AppLanguage.text("Fluid SFX 1")
+            case .fluidSfx2: return AppLanguage.text("Fluid SFX 2")
+            case .fluidSfx3: return AppLanguage.text("Fluid SFX 3")
+            case .fluidSfx4: return AppLanguage.text("Fluid SFX 4")
             }
         }
 

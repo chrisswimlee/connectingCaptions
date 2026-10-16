@@ -21,6 +21,21 @@ nonisolated enum PauseIntervalAudio {
     struct Prepared: Equatable {
         var samples: [Float]
         var isPauseOnly: Bool
+        var sourceRanges: [Range<Int>] = []
+
+        /// Undo silence removal when mapping recognizer timestamps to captured audio.
+        func sourceSample(at decodedSample: Int, isEnd: Bool = false) -> Int? {
+            guard decodedSample >= 0 else { return nil }
+            var offset = 0
+            for range in self.sourceRanges {
+                let boundary = offset + range.count
+                if decodedSample < boundary || (isEnd && decodedSample == boundary) {
+                    return range.lowerBound + decodedSample - offset
+                }
+                offset = boundary
+            }
+            return decodedSample == offset ? self.sourceRanges.last?.upperBound : nil
+        }
     }
 
     static func preparingForDecode(
@@ -52,7 +67,7 @@ nonisolated enum PauseIntervalAudio {
         if output.isEmpty {
             return Prepared(samples: [], isPauseOnly: true)
         }
-        return Prepared(samples: output, isPauseOnly: false)
+        return Prepared(samples: output, isPauseOnly: false, sourceRanges: spans.map { $0.lower..<$0.upper })
     }
 
     /// A trailing-window engine re-reads its window, so a pause can be left

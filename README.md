@@ -6,7 +6,7 @@
 
 **Each sentence appears when it is ready.**
 
-Connecting Captions is live subtitles for macOS, with translation on the machine. Set **I speak** and **Show as** to any language in the setup list, the languages both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. The same language needs no download. A sentence appears when it is ready. Best with one speaker and a close mic.
+Connecting Captions is live subtitles for macOS, with translation on the machine. Choose **I speak** and **Show as** from the compatible language choices. Voice Engine shows which languages each model supports and which are ready on this Mac. Translate follows I speak into Show as. The same language needs no translation pack. A sentence appears when it is ready. Best with one speaker and a close mic. It listens through any input device you pick — the built-in microphone, a wired, USB, or line-in mic, a Bluetooth headset in call mode, or a virtual loopback input (BlackHole or Loopback) when you route other audio into it.
 
 ![Translate home](docs/screenshots/translate-home.png)
 
@@ -25,9 +25,11 @@ By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 ## Theater captions
 
 1. Use **macOS 15** or later on Apple Silicon. First run uses Apple Speech (Analyzer on macOS 26). Same-language captions need no translation pack.
-2. First run is Welcome, your languages, the microphone, then **Listen**. It ends when a sentence appears. **Spoken line** is Off or On the board. On the board prints the original under Show-as when the sentence is ready. Line print defaults to at once. **Voice Engine** and **Language packs** are Setup tabs. Voice Engine is Apple Speech on this Mac. Translation Engine is Apple Translation (not a chat model). A language pack downloads only when I speak and Show as differ.
+2. First run covers Welcome, your languages, Voice Engine, the microphone, then **Listen**. It ends when a sentence appears. **Show original text** is Off or On the board. On the board prints the original under Show-as when the sentence is ready. Line print defaults to at once. **Voice Engine** and **Language packs** are Setup tabs. Voice Engine recognizes speech using the selected model. Translation Engine is Apple Translation. Speech assets and translation packs download separately.
 3. Allow the microphone. **Listen** stays off until Voice Engine and (for Translate) the pack are green.
 4. Optional: import notes or a deck on Theater Home for this talk. Names stay on this Mac. Speak one sentence. **Listen, then type** unlocks after that first caption. **Type the board** types captions already printed. **Copy** always takes everything on screen. **Clear** wipes the board. Talk notes stay. Listen can keep going.
+
+In **Overlay**, choose **Unlock text area** from the hover controls or the menu-bar Theater menu. Drag to move it, resize its edges or corners, then choose **Lock text area**. The saved area stays fixed even while Tools are visible.
 
 Accessibility permission is only required if you want a translation typed into other apps. Theater captions on your screen do not need it.
 
@@ -37,7 +39,7 @@ Accessibility permission is only required if you want a translation typed into o
 
 Theater is a measured on-device pipeline, not a cloud caption API.
 
-1. **Capture** — The microphone is a first-party Core Audio HAL path, not `AVAudioEngine` on the live path. Voice and Translate both use it.
+1. **Capture** — A first-party Core Audio HAL path, not `AVAudioEngine` on the live path. It captures from any Core Audio input device, not just the built-in microphone: wired, USB, or line-in gear, Bluetooth headsets in call (HFP) mode, and virtual loopback inputs such as BlackHole or Loopback when you route system or app audio into them. Voice and Translate both use it.
 2. **Speech edges** — Live PCM stays in a 30-second ring. The first ASR tick is immediate. After 400 ms of RMS silence, later ticks are skipped so a long pause does not keep the Neural Engine hot. There is no neural VAD in front of first words.
 3. **Appear when ready** — What you are saying stays in the bar under the board until the sentence prints. A real clause (finished sentence, or silence/Stop confirmation of a leftover clause) is accepted and appears once. Caption Pause and Stop drop a fragment that is not a real clause. Listen, then type Stop is the only path that still types a trailing fragment. Apple Translation may warm the clause before it appears. Same-language pairs skip the pack. Korean, Japanese, and Thai send the last 4 source clauses from this Listen, then peel the new caption.
 4. **Stage window** — A nonactivating panel over Keynote. Screenshots and a whole-screen Zoom or Meet share include Theater. Share the slides window when remote viewers should not see captions. The Show-as title sits above a smaller spoken undertone. Wrap fills left to right. YouTube boilerplate is dropped before print.
@@ -50,12 +52,13 @@ The systems write-up is [docs/APPLE_SILICON_STREAMING.md](docs/APPLE_SILICON_STR
 
 ## Features
 
-- **Languages** — I speak and Show as are the setup list. Translate follows I speak into Show as. The same language needs no pack. Apple Speech hears that list.
+- **Languages** — I speak lists the selected engine’s confirmed speech languages. Show as lists compatible translation pairs. The same language needs no translation pack.
 - **Theater captions** — a floating window you turn on and close. Use **Pop-up** for a solid board or **Overlay** so only caption text sits on slides. Change Overlay font, size, and plate from the menu-bar Theater menu. On-screen `mic · e2e · ASR · MT` clock. Screenshots and a whole-screen Zoom or Meet share include Theater. Share the slides window when remote viewers should not see captions. Pause holds capture and drops a leftover; Resume does not bring that leftover back. Minimize hides Theater; Listen stays. Clear wipes the board. Talk notes stay. Lines past the latest 48 leave the board. Translate shows Behind or Caught up so you do not outrun the caption. A sentence appears once when it is accepted. The board is not a text field.
-- **Voice / Translate** — Voice Engine is Apple Speech. Translate uses Apple Translation on this Mac for the pair you set. Press the mode control to switch. Both use the microphone.
+- **Any input device** — capture works with any Mac input, not just the built-in microphone: wired, USB, or line-in gear, Bluetooth headsets in call (HFP) mode, and virtual loopback devices (BlackHole, Loopback) when audio is routed to them. Choose devices in Settings → **Audio Devices**: the **Input Device Priority** list can be dragged to reorder, and a cleared list falls back to the last device you used if it is still connected, otherwise the system default input. A newly connected device becomes the fallback at once and takes over as soon as the top choice is unplugged.
+- **Original language / Translate** — both use the selected Voice Engine. Translate uses Apple Translation on this Mac for the pair you set. Press the mode control to switch. Both use the selected input device.
 - **Translate into an app** — a separate shortcut from dictation; types this listen’s translation into the app you clicked, including a trailing fragment. Korean, Japanese, and Thai depend on that app’s input method. Accessibility is required.
 - **On-device translation** — Apple Translation language packs, processed locally
-- **Apple Speech** — Analyzer on macOS 26, otherwise the older Apple Speech. No download.
+- **Apple Speech** — Analyzer on macOS 26, otherwise the older Apple Speech. Offline language support varies by Mac; Analyzer may need speech assets.
 - **Local-first** — voice and text stay on your Mac. Theater does not send captions to a cloud API.
 - **Menu bar access** — start, stop, and open settings from the menu bar
 
@@ -63,12 +66,22 @@ The systems write-up is [docs/APPLE_SILICON_STREAMING.md](docs/APPLE_SILICON_STR
 
 ## Supported Models
 
-I speak and Show as are the setup list: every language both Apple Translation and Apple Speech can use. No Voice Engine download.
+Voice Engine lists every available model with **Supported languages**, **Ready on
+this Mac**, and the status of the current I speak language. Apple engines are built
+in, but this does not guarantee that a particular language works offline or has
+its speech assets installed. Other engines use a model download.
 
-| Model | Best for | Hears here | Download size | Hardware |
-| --- | --- | --- | --- | --- |
-| Apple Speech Analyzer | Newer on-device speech on macOS 26 | Speech Analyzer languages on this Mac | Built-in | Apple Silicon + Intel |
-| Apple Speech | The recognizer macOS has included for years | Setup languages | Built-in | Apple Silicon + Intel |
+Whisper, Parakeet, Cohere, and Nemotron appear where enabled for this Mac. The
+app’s supported language lists reflect its integrated routes. For example,
+Parakeet is currently exposed for English, Cohere excludes Thai, and Nemotron’s
+Thai route remains experimental. Whisper supports Thai.
+
+**Language Packs** only shows supported Apple Translation pairs for I speak.
+**Either way** appears when Whisper Small is installed and translation is ready in
+both directions. Turning it off keeps the selected engine.
+
+See [Speech and translation support](docs/LANGUAGE_SUPPORT.md) for the capability
+checks and download behavior.
 
 ---
 
@@ -128,7 +141,7 @@ You need an Apple Silicon Mac on macOS 15 or later, **Xcode 26** (CI uses 26.3),
 
 3. **Launch** `DerivedData/Build/Products/Debug/Connecting Captions Debug.app`. Always launch this same path after rebuilding so macOS keeps its permissions.
 
-4. **First run.** Open **Theater**, allow the microphone, pick **Voice** or **Translate**, and press **Listen**. For Translate, download the Apple Translation pack when asked. Allow Accessibility only if you use Type the board or Listen, then type.
+4. **First run.** Open **Theater**, allow the microphone, pick **Original language** or **Translate**, and press **Listen**. For Translate, download the Apple Translation pack when asked. Allow Accessibility only if you use Type the board or Listen, then type.
 
 5. **Update later:**
 
@@ -153,6 +166,16 @@ When a change belongs in the upstream dictation engine rather than translation o
 
 ## Run tests
 
+For a complete local validation with saved logs, run `sh scripts/validate-release.sh`.
+The [release validation guide](docs/RELEASE_VALIDATION.md) covers real microphone,
+IME, offline, installer and demo checks. Export **Quality review (JSONL)** from
+Theater to prepare human-reviewed recognition and translation measurements.
+
+Settings → General → **App language** offers all setup languages for interface
+copy. Additional interface translations run on this Mac and are cached locally;
+Apple may request a language pack. English remains available during preparation.
+The app language is independent of I speak and Show as.
+
 Full local run, matching the `Build and Test` CI gate (CI skips the Theater smoke and
 the flaky Tiny Whisper E2E because hosted runners can't prove either):
 
@@ -163,11 +186,15 @@ xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions
   -skip-testing:ConnectingCaptionsIntegrationTests/DictationE2ETests/testDictationEndToEnd_whisperTiny_transcribesFixture
 ```
 
-CI runs the two standalone harnesses before that test command, and `scripts/test-omitted-tests.sh`
-as the first lint-job step (it fails the build if a file under `Tests/` compiles in no target or harness):
+CI runs the guard chain before that test command, in this order: test wiring, team ID, UI copy, quality-scorer vectors, interface catalog, Python tooling tests, SwiftLint strict, then the two standalone harnesses and `xcodebuild test` with the two skips above:
 
 ```bash
 sh scripts/test-omitted-tests.sh
+bash scripts/check-team-id.sh
+sh scripts/test-ui-copy.sh
+sh scripts/test-quality-score.sh
+python3 scripts/update-interface-catalog.py --check
+python3 -m unittest discover -s scripts -p 'test_*.py'
 sh Tests/run_paste_key_cache_tests.sh
 sh Tests/run_history_persistence_tests.sh
 ```

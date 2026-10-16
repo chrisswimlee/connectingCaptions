@@ -28,8 +28,8 @@ struct FeedbackView: View {
             VStack(alignment: .leading, spacing: 20) {
                 FluidPageHeader(
                     systemImage: "envelope.fill",
-                    title: "Feedback",
-                    subtitle: "Report a problem or suggest a change."
+                    title: AppLanguage.text("Feedback"),
+                    subtitle: AppLanguage.text("Report a problem or suggest a change.")
                 )
 
                 // Friendly Message & GitHub CTA
@@ -41,11 +41,11 @@ struct FeedbackView: View {
                                 .foregroundStyle(.pink)
 
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("What should change?")
+                                AppText("What should change?")
                                     .font(.system(size: 18, weight: .semibold))
                                     .foregroundStyle(self.theme.palette.primaryText)
 
-                                Text("A short note is enough. It stays on this Mac until you paste it into GitHub.")
+                                AppText("A short note is enough. It stays on this Mac until you paste it into GitHub.")
                                     .font(.system(size: 14))
                                     .foregroundStyle(self.theme.palette.secondaryText)
                             }
@@ -60,11 +60,11 @@ struct FeedbackView: View {
                                 .foregroundStyle(.yellow)
 
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("Loving \(ConnectingCaptionsProduct.displayName)?")
+                                AppText("Loving {0}?", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                                     .font(.system(size: 16, weight: .semibold))
                                     .foregroundStyle(self.theme.palette.primaryText)
 
-                                Text("\(ConnectingCaptionsProduct.displayName) is a product of \(ConnectingCaptionsProduct.publisherName).")
+                                AppText("{0} is a product of {1}.", arguments: [String(describing: ConnectingCaptionsProduct.displayName), String(describing: ConnectingCaptionsProduct.publisherName)])
                                     .font(.system(size: 13))
                                     .foregroundStyle(self.theme.palette.secondaryText)
                                     .fixedSize(horizontal: false, vertical: true)
@@ -109,7 +109,7 @@ struct FeedbackView: View {
                 ThemedCard(style: .standard, hoverEffect: false) {
                     VStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Email (optional)")
+                            AppText("Email (optional)")
                                 .font(.headline)
                                 .fontWeight(.semibold)
 
@@ -117,7 +117,7 @@ struct FeedbackView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .font(.system(size: 14))
 
-                            Text("Feedback")
+                            AppText("Feedback")
                                 .font(.headline)
                                 .fontWeight(.semibold)
                                 .padding(.top, 8)
@@ -134,7 +134,7 @@ struct FeedbackView: View {
                                 .overlay(
                                     Group {
                                         if self.feedbackText.isEmpty {
-                                            Text("Share your thoughts, report bugs, or suggest features...")
+                                            AppText("Share your thoughts, report bugs, or suggest features...")
                                                 .font(.subheadline)
                                                 .foregroundStyle(.secondary)
                                                 .padding(.leading, 4)
@@ -144,7 +144,7 @@ struct FeedbackView: View {
                                 )
 
                             // Debug logs option
-                            Toggle("Include debug logs", isOn: self.$includeDebugLogs)
+                            AppToggle("Include debug logs", isOn: self.$includeDebugLogs)
                                 .toggleStyle(GlassToggleStyle())
 
                             // Send Button
@@ -185,18 +185,18 @@ struct FeedbackView: View {
         .onAppear {
             self.appear = true
         }
-        .alert("Draft Ready", isPresented: self.$showFeedbackConfirmation) {
-            Button("OK") {}
+        .alert(AppLanguage.text("Draft Ready"), isPresented: self.$showFeedbackConfirmation) {
+            AppButton("OK") {}
         } message: {
-            Text("The note is on your clipboard and in Application Support. GitHub is open so you can paste it. Nothing was uploaded.")
+            AppText("The note is on your clipboard and in Application Support. GitHub is open so you can paste it. Nothing was uploaded.")
         }
-        .alert("Could Not Open GitHub", isPresented: self.$showFeedbackError) {
-            Button("Try Again") {
+        .alert(AppLanguage.text("Could Not Open GitHub"), isPresented: self.$showFeedbackError) {
+            AppButton("Try Again") {
                 Task {
                     await self.sendFeedback()
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            AppButton("Cancel", role: .cancel) {}
         } message: {
             Text(self.feedbackErrorMessage)
         }
@@ -213,7 +213,7 @@ struct FeedbackView: View {
         defer { self.isSendingFeedback = false }
 
         do {
-            _ = try LocalFeedbackDraft.share(title: "\(ConnectingCaptionsProduct.displayName) feedback", body: self.feedbackBody())
+            _ = try LocalFeedbackDraft.share(title: AppLanguage.format("{0} feedback", String(describing: ConnectingCaptionsProduct.displayName)), body: self.feedbackBody())
             self.showFeedbackConfirmation = true
             self.feedbackText = ""
             self.feedbackEmail = ""

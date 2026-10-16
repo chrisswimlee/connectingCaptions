@@ -1,0 +1,33 @@
+name: Dependency Pin Health
+
+# Weekly + manual. Machine-independent by design: this repo has no Mac in the
+# cloud, and the second dev Mac is not a second source of truth (it clones
+# from origin, exactly like this runner does). The only failure this catches
+# is pin drift: a fork commit in one of the two tracked Package.resolved
+# files that the remote can no longer serve (branch force-pushed, commit
+# garbage-collected). When that happens the next clean resolve fails
+# everywhere at once, so it is caught here first - weekly, and on demand
+# before any release that depends on a pin still resolving identically.
+#
+# scripts/check-pin-health.sh does the work (sh + git + network only, no
+# Xcode, no secrets). Non-live locally: sh scripts/check-pin-health.sh
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"  # Mondays ~05:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pin-health:
+    name: Dependency Pin Health
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Fetch every pinned revision (pin drift tripwire)
+        run: sh scripts/check-pin-health.sh

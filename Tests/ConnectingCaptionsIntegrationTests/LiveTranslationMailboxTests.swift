@@ -25,12 +25,7 @@ final class LiveTranslationMailboxTests: XCTestCase {
         )
         for language in TranslationLanguageCatalog.all {
             XCTAssertFalse(language.localeLanguage.minimalIdentifier.isEmpty)
-            // Norwegian is the sole exception: voice engines use "no", Apple Translation uses "nb".
-            if language.id == TranslationLanguageCatalog.norwegian.id {
-                XCTAssertEqual(language.appleLanguageCode, "nb")
-            } else {
-                XCTAssertEqual(language.appleLanguageCode, language.id)
-            }
+            XCTAssertEqual(language.appleLanguageCode, language.id)
         }
     }
 
@@ -188,6 +183,25 @@ final class LiveTranslationMailboxTests: XCTestCase {
         let secondRequest = await second.value
         XCTAssertNil(secondRequest)
         XCTAssertFalse(mailbox.isReady)
+    }
+
+    @MainActor
+    func testPairChangeSupersedesARequestStillWaitingForReadiness() async throws {
+        let engine = AppleTranslationEngine()
+        let en = TranslationLanguageCatalog.english
+        let ko = TranslationLanguageCatalog.korean
+        let pending = Task { try await engine.translate("English sentence.", source: en, target: ko) }
+        try await Task.sleep(nanoseconds: 40_000_000)
+        engine.prepare(source: ko, target: en)
+        // Switching back also needs a new generation; comparing only the pair
+        // string would miss that this waiter belonged to the old configuration.
+        engine.prepare(source: en, target: ko)
+        do {
+            _ = try await pending.value
+            XCTFail("A stale request must not submit to a reminted session")
+        } catch {
+            XCTAssertTrue((error as? TranslationEngineError)?.isSuperseded == true)
+        }
     }
 
     func testStaleGenerationDoesNotTakeANewWaiter() async {

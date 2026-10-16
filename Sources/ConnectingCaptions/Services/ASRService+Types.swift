@@ -10,14 +10,70 @@ import Foundation
 import FluidAudio
 #endif
 
+/// Raised when a caller stops waiting on a pending transcription rather than
+/// letting it run to completion. A call wedged inside a non-cooperative CoreML
+/// invocation cannot be cancelled, so abandoning the wait is the only way to keep
+/// the caption path moving.
+nonisolated enum TranscriptionExecutorError: LocalizedError {
+    case timedOut
+    /// Refused before the operation ever started, because an earlier call on
+    /// this chain already used its whole budget. Distinct from `.timedOut`
+    /// (which means this specific call spent its own budget), so a caller can
+    /// tell "never got a chance" apart from "ran and gave up."
+    case chainAlreadyWedged
+
+    var errorDescription: String? {
+        switch self {
+        case .timedOut:
+            "The pending transcription was still running when its budget expired."
+        case .chainAlreadyWedged:
+            "The transcription chain was already wedged by an earlier call that used its whole budget."
+        }
+    }
+}
+
 /// Serializes transcription operations and lets teardown cancel the real queued work.
 actor TranscriptionExecutor {
     var lastTask: Task<Void, Never>?
     var operationCancellations: [UUID: () -> Void] = [:]
 
-    func run<T>(benchmarkSessionID: Int? = nil, _ operation: @escaping () async throws -> T) async throws -> T {
+    /// Set when a budget expires. The abandoned call still holds the serialized
+    /// chain, so every later decode on that chain would queue behind a provider
+    /// that may never return.
+    private var isChainWedged = false
+    private var chainGeneration: UInt64 = 0
+
+    /// Waits for one operation behind the serialized chain.
+    ///
+    /// Pass `timeoutNanoseconds` to bound that wait. It covers the queue wait as
+    /// well as the decode, because a queued operation waits on the one before it.
+    /// On expiry the operation is cancelled (best effort) and
+    /// `TranscriptionExecutorError.timedOut` is thrown.
+    ///
+    /// The chain is deliberately left intact on expiry, so a later operation still
+    /// queues rather than overlapping a provider that may still be busy: two
+    /// decodes sharing one incremental provider would index the next window against
+    /// samples the wedged call already accepted. Once the chain is known wedged,
+    /// a bounded caller is refused immediately instead of spending its own budget
+    /// on a queue that cannot drain; an unbounded caller keeps waiting, because
+    /// that is what an unbounded wait promises.
+    func run<T>(
+        benchmarkSessionID: Int? = nil,
+        timeoutNanoseconds: UInt64? = nil,
+        _ operation: @escaping () async throws -> T
+    ) async throws -> T {
         logTranscriptionExecutorPhase("entered", sessionID: benchmarkSessionID)
+        if timeoutNanoseconds != nil, self.isChainWedged {
+            logTranscriptionExecutorPhase("skipped_wedged_chain", sessionID: benchmarkSessionID)
+            DebugLogger.shared.warning(
+                "TranscriptionExecutor refused a transcription: the chain was already "
+                    + "wedged by a call that used its whole budget.",
+                source: "TranscriptionExecutor"
+            )
+            throw TranscriptionExecutorError.chainAlreadyWedged
+        }
         let previous = self.lastTask
+        let generation = self.chainGeneration
         let operationID = UUID()
         let task = Task<T, Error> {
             logTranscriptionExecutorPhase("task_started", sessionID: benchmarkSessionID)
@@ -29,16 +85,62 @@ actor TranscriptionExecutor {
         self.operationCancellations[operationID] = { task.cancel() }
         self.lastTask = Task { _ = try? await task.value }
         defer { self.operationCancellations.removeValue(forKey: operationID) }
+
+        guard let timeoutNanoseconds else {
+            return try await task.value
+        }
+        // Race the wait against the budget. Neither racer is joined, so a budget
+        // that expires can actually end the wait even though the abandoned call
+        // never returns (see `BoundedWait`).
+        let didComplete = await BoundedWait.completedWithin(
+            Duration.nanoseconds(Int(timeoutNanoseconds))
+        ) {
+            _ = try? await task.value
+        }
+        guard didComplete else {
+            if generation == self.chainGeneration { self.isChainWedged = true }
+            task.cancel()
+            DebugLogger.shared.warning(
+                "TranscriptionExecutor gave up waiting after \(timeoutNanoseconds / 1_000_000) ms; "
+                    + "abandoning the pending transcription",
+                source: "TranscriptionExecutor"
+            )
+            throw TranscriptionExecutorError.timedOut
+        }
         return try await task.value
     }
 
-    func cancelAndAwaitPending() async {
+    /// Bounds the wait on a pending operation. If `operation()` is stuck on a
+    /// non-cooperative call (e.g. a wedged FluidAudio/CoreML invocation),
+    /// cancellation alone won't unblock it, so this gives up waiting after
+    /// `timeout` rather than parking the caller forever. The orphaned task is
+    /// detached from `lastTask`; it may keep running in the background.
+    /// Returns false on timeout: the caller must retire its provider instance
+    /// before using the newly cleared executor chain.
+    @discardableResult
+    func cancelAndAwaitPending(timeout: Duration = .seconds(5)) async -> Bool {
+        var didDrain = true
         for cancel in self.operationCancellations.values {
             cancel()
         }
-        _ = await self.lastTask?.result
+        if let lastTask {
+            let didFinish = await BoundedWait.completedWithin(timeout) {
+                _ = await lastTask.result
+            }
+            didDrain = didFinish
+            if didFinish == false {
+                DebugLogger.shared.error(
+                    "TranscriptionExecutor.cancelAndAwaitPending timed out after \(timeout); " +
+                        "abandoning wedged task",
+                    source: "TranscriptionExecutor"
+                )
+            }
+        }
         self.lastTask = nil
         self.operationCancellations.removeAll()
+        self.isChainWedged = false
+        self.chainGeneration &+= 1
+        return didDrain
     }
 }
 

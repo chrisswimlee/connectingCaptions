@@ -9,6 +9,21 @@ import XCTest
 
 @MainActor
 final class LiveTranslationClauseTests: XCTestCase {
+    func testThaiWrapKeepsDictionaryWordsTogetherWhenTheyFit() {
+        let font = NSFont.systemFont(ofSize: 40)
+        let word = "สวัสดี"
+        let width = max(TheaterBilingualWrap.minimumWrapWidth, ceil((word as NSString).size(withAttributes: [.font: font]).width) + 8)
+        let lines = TheaterBilingualWrap.visualLines(String(repeating: word, count: 4), font: font, width: width)
+        XCTAssertEqual(lines, Array(repeating: word, count: 4))
+    }
+
+    func testThaiWrapPreservesMixedScriptsAndToneMarksAtNarrowWidths() {
+        let text = "สวัสดีครับ Apple ภาษาไทย ครั๊บ"
+        let lines = TheaterBilingualWrap.visualLines(text, font: NSFont.systemFont(ofSize: 64), width: 100)
+        XCTAssertEqual(lines.joined().filter { !$0.isWhitespace }, text.filter { !$0.isWhitespace })
+        XCTAssertFalse(lines.contains { $0.unicodeScalars.first.map { CharacterSet.nonBaseCharacters.contains($0) } == true })
+    }
+
     func testEnglishSplitsOnPunctuationAndKeepsOpenTail() {
         let split = TranslationClauseSegmenter.split(
             "Today we trained the model. Then we applied it to",
@@ -1684,26 +1699,6 @@ final class LiveTranslationClauseTests: XCTestCase {
         XCTAssertEqual(next?.rest, "")
     }
 
-    func testPolishRejectsAPriorSourceSentence() {
-        XCTAssertNil(
-            LLMTranslationEngine.acceptedPolished(
-                "Today we trained the model. Then we applied it.",
-                draft: "Then we applied it.",
-                target: TranslationLanguageCatalog.english,
-                priorSource: ["Today we trained the model."]
-            )
-        )
-        XCTAssertEqual(
-            LLMTranslationEngine.acceptedPolished(
-                "Then we applied it.",
-                draft: "Then we applied it.",
-                target: TranslationLanguageCatalog.english,
-                priorSource: ["Today we trained the model."]
-            ),
-            "Then we applied it."
-        )
-    }
-
     func testConfirmRunsOnStopAndPause() {
         XCTAssertFalse(LiveTranslationConfirm.shouldReDecode(isFinal: false))
         XCTAssertFalse(LiveTranslationConfirm.shouldReDecode(isFinal: false, isPause: false))
@@ -2611,8 +2606,9 @@ final class TheaterTalkSimulationTests: XCTestCase {
 @MainActor
 final class TheaterLongTalkTests: XCTestCase {
     func testLongTalkPrintsEverySentenceOnceWithoutSlowingDown() async {
-        // 600 sentences through real settle and end-of-utterance timers take
-        // about 75 s on an M-series Mac and longer on a hosted runner.
+        // Each sentence waits out the real lone-sentence settle (~0.22 s), so
+        // 300 sentences take about a minute here and must fit CI's 300 s cap.
+        // That is still 6× the board and 25× the peel window.
         self.executionTimeAllowance = 300
         let settings = SettingsStore.shared
         let originalSource = settings.translationSourceLanguageID
@@ -2631,7 +2627,7 @@ final class TheaterLongTalkTests: XCTestCase {
 
         let topics = ["the model", "the dataset", "attention", "the encoder", "our results", "the baseline"]
         let verbs = ["improves", "changes", "explains", "limits", "shapes", "drives"]
-        let sentenceCount = 600
+        let sentenceCount = 300
         var transcript = ""
         var printed: [String] = []
         var firstBatch: TimeInterval = 0
@@ -2699,8 +2695,8 @@ final class TheaterBoardAdmissionTests: XCTestCase {
         let cases: [(TheaterBoardAdmission.Phase, TheaterBoardAdmission.Context, String, TheaterBoardAdmission.Decision)] = [
             (.propose, self.context(), "", .skip(.empty)),
             (.publish, self.context(), "", .skip(.empty)),
-            (.propose, self.context(), "thanks for watching", .skip(.junk)),
-            (.publish, self.context(), "thanks for watching", .skip(.junk)),
+            (.propose, TheaterBoardAdmission.Context(audioContainsSpeech: false), "thanks for watching", .skip(.junk)),
+            (.publish, TheaterBoardAdmission.Context(audioContainsSpeech: false), "thanks for watching", .skip(.junk)),
             (.propose, self.context(), "It.", .skip(.tooThin)),
             (.publish, self.context(), "It.", .skip(.tooThin)),
             (.propose, self.context(inFlight: [sentence]), sentence, .skip(.inFlight)),

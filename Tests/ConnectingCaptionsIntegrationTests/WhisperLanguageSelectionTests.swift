@@ -273,7 +273,11 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         let originalCohere = settings.selectedCohereLanguage
         let originalNemotron = settings.selectedNemotronLanguage
         let originalAlsoHear = settings.theaterAlsoHearOtherLanguages
+        let originalLegacy = AppleSpeechLiveCapability.legacyLanguagePrefixes
+        // This Mac's offline Apple Speech packs must not decide the result.
+        AppleSpeechLiveCapability.setLegacyLanguagePrefixesForTesting(["en", "ja"])
         defer {
+            AppleSpeechLiveCapability.setLegacyLanguagePrefixesForTesting(originalLegacy)
             settings.selectedSpeechModel = originalModel
             settings.translationSourceLanguageID = originalSource
             settings.selectedWhisperLanguageCode = originalWhisper
@@ -327,7 +331,9 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         XCTAssertNil(SpokenLanguageResolver.voiceEngineMismatchMessage(settings: settings))
         XCTAssertEqual(
             SpokenLanguageResolver.stageEngineSummary(settings: settings),
-            "Hearing English with Whisper Large."
+            SettingsStore.SpeechModel.whisperLarge.isInstalled
+                ? "Hearing English with Whisper Large."
+                : "Download English for Whisper Large in Voice Engine before Listen."
         )
     }
 

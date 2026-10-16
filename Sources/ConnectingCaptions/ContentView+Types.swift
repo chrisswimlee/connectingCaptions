@@ -163,21 +163,21 @@ enum ShortcutRecordingTarget: Hashable {
     var title: String {
         switch self {
         case .primaryDictation:
-            return "Primary Dictation Shortcut"
+            return AppLanguage.text("Primary Dictation Shortcut")
         case .secondaryDictation:
-            return "Secondary Dictation Shortcut"
+            return AppLanguage.text("Secondary Dictation Shortcut")
         case .cancel:
-            return "Cancel Recording"
+            return AppLanguage.text("Cancel Recording")
         case .pasteLast:
-            return "Paste Last Transcription"
+            return AppLanguage.text("Paste Last Transcription")
         case .translateInsert:
-            return "Translate into App"
+            return AppLanguage.text("Translate into App")
         case .captionListen:
-            return "Theater Listen"
+            return AppLanguage.text("Theater Listen")
         case .dictationPrompt:
-            return "Prompt Shortcut"
+            return AppLanguage.text("Prompt Shortcut")
         case .newPrompt:
-            return "New Prompt Shortcut"
+            return AppLanguage.text("New Prompt Shortcut")
         }
     }
 

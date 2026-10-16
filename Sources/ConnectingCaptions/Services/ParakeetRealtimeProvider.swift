@@ -129,6 +129,14 @@ final class ParakeetRealtimeProvider: TranscriptionProvider {
     }
 
     var streamingPreviewMode: StreamingPreviewMode { .incrementalDelta }
+    var acceptedStreamingSampleCount: Int? { self.streamedSampleCount }
+
+    func resetStreamingSession() async {
+        if let engine = self.engine { await engine.reset() }
+        self.streamedSampleCount = 0
+        self.lastReportedEndOfUtterance = false
+    }
+
 
     func transcribe(_ samples: [Float]) async throws -> ASRTranscriptionResult {
         try await self.transcribeFinal(samples)

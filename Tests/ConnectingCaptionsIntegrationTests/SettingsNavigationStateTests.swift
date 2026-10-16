@@ -4,6 +4,14 @@ import XCTest
 
 @MainActor
 final class SettingsNavigationStateTests: XCTestCase {
+    func testAdvancedAndPlaybackSearchFollowTheOrganizedControls() {
+        XCTAssertTrue(SettingsSearchIndex.results(for: "caption animation").contains { $0.target == .theaterAdvanced })
+        XCTAssertTrue(SettingsSearchIndex.results(for: "save transcript").contains { $0.target == .theaterAdvanced })
+        XCTAssertTrue(SettingsSearchIndex.results(for: "speak captions").contains { $0.target == .theaterPlayback })
+        XCTAssertEqual(SettingsSearchTarget.theaterAdvanced.section, .translation)
+        XCTAssertEqual(SettingsSearchTarget.theaterPlayback.section, .translation)
+    }
+
     func testPresentAndDismissRestoresPreviousAppDestination() {
         var state = SettingsNavigationState()
 
@@ -110,7 +118,7 @@ final class SettingsNavigationStateTests: XCTestCase {
         XCTAssertTrue(SettingsSearchIndex.results(for: "pace cue").contains { $0.target == .theaterAppearance })
         XCTAssertTrue(SettingsSearchIndex.results(for: "Keep History").contains { $0.section == .dataAndDiagnostics })
         XCTAssertTrue(SettingsSearchIndex.results(for: "setup wizard").isEmpty)
-        XCTAssertTrue(SettingsSearchIndex.results(for: "either way").isEmpty)
+        XCTAssertTrue(SettingsSearchIndex.results(for: "either way").contains { $0.target == .theaterAdvanced })
         XCTAssertTrue(SettingsSearchIndex.results(for: "experimental").isEmpty)
         XCTAssertTrue(SettingsSearchIndex.results(for: "Copy to Clipboard").isEmpty)
         XCTAssertTrue(SettingsSearchIndex.results(for: "Spoken Send").isEmpty)

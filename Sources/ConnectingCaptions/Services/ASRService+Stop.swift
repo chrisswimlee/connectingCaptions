@@ -167,7 +167,17 @@ extension ASRService {
 
         // NOW it's safe to access the buffer - all pending tasks have completed
         let logicalSampleCount = self.audioBuffer.count
-        var pcm = self.audioBuffer.getRetained()
+        let finalProvider = self.transcriptionProvider
+        var pcm: [Float]
+        if !useDictionaryTrainingPath, finalProvider.streamingPreviewMode == .incrementalDelta {
+            let start = max(finalProvider.acceptedStreamingSampleCount ?? 0, self.audioBuffer.logicalStart)
+            pcm = self.audioBuffer.getRange(startingAt: start, count: max(0, logicalSampleCount - start))
+        } else {
+            pcm = self.audioBuffer.getRetained()
+        }
+        let finalCaptureTimeline = self.audioBuffer.timingSnapshot
+        let finalSourceStart = logicalSampleCount - pcm.count
+        var finalRemovedSilence: PauseIntervalAudio.Prepared?
         self.audioBuffer.clear()
         let hasRecognizedStreamingPreview = !self.partialTranscription
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -180,7 +190,7 @@ extension ASRService {
         self.benchmarkLog("stop_audio_drained samples=\(pcm.count) logicalSamples=\(logicalSampleCount) audioMs=\(Int((Double(logicalSampleCount) / 16_000.0 * 1000).rounded()))")
 
         // Drop recordings with no audio at all — nothing to transcribe.
-        guard !pcm.isEmpty else {
+        guard logicalSampleCount > 0 else {
             self.abortStreamingWavWriter()
             DebugLogger.shared.debug(
                 "stop(): no audio captured, skipping transcription",
@@ -266,16 +276,15 @@ extension ASRService {
                 }
             } else {
                 pcm = prepared.samples
+                finalRemovedSilence = prepared
             }
         }
 
-        // Pad sub-1s buffers with trailing silence so short utterances (e.g.
-        // "yes", "stop") still transcribe. whisper.cpp asserts on buffers
-        // shorter than 1s; every other provider handles silence padding
-        // without issue, so we pad unconditionally rather than branching per
-        // provider.
+        // Windowed decoders need a minimum buffer for short utterances.
+        // Incremental tails may be empty when the preview consumed all PCM;
+        // padding them would invent new samples beyond the accepted cursor.
         let minSamples = 16_000
-        if pcm.count < minSamples {
+        if pcm.count < minSamples, finalProvider.streamingPreviewMode == .trailingWindow {
             let originalCount = pcm.count
             pcm.append(contentsOf: repeatElement(0.0, count: minSamples - pcm.count))
             DebugLogger.shared.debug(
@@ -334,7 +343,9 @@ extension ASRService {
             var result: ASRTranscriptionResult
             let finalSource: String
             if useDictionaryTrainingPath {
-                result = try await self.transcriptionExecutor.run { [provider] in
+                result = try await self.transcriptionExecutor.run(
+                    timeoutNanoseconds: Self.finalDecodeTimeoutNanoseconds
+                ) { [provider] in
                     self.publishStoppedState(for: stoppingSessionID)
                     return try await provider.transcribeDictionaryTraining(pcm)
                 }
@@ -360,13 +371,35 @@ extension ASRService {
                     }
                 }
                 defer { delayedFinalStatusTask.cancel() }
-                result = try await self.transcriptionExecutor.run(benchmarkSessionID: self.benchmarkSessionID) { [provider] in
-                    let executionStartedAt = ProcessInfo.processInfo.systemUptime
-                    DebugLogger.shared.info("ASR_BENCH t=\(executionStartedAt) final_executor_begin", source: "ASRBenchmark")
-                    defer {
-                        DebugLogger.shared.info("ASR_BENCH t=\(ProcessInfo.processInfo.systemUptime) final_executor_end", source: "ASRBenchmark")
+                // A final decode that uses this whole budget is a provider that
+                // is not coming back, not a merely slow one. The `catch` below
+                // reports `.failed` and paints nothing, which is the honest
+                // answer: handing the accumulated preview back instead would
+                // paint an entire listen as one caption.
+                do {
+                    result = try await self.transcriptionExecutor.run(
+                        benchmarkSessionID: self.benchmarkSessionID,
+                        timeoutNanoseconds: Self.finalDecodeTimeoutNanoseconds
+                    ) { [provider] in
+                        let executionStartedAt = ProcessInfo.processInfo.systemUptime
+                        DebugLogger.shared.info("ASR_BENCH t=\(executionStartedAt) final_executor_begin", source: "ASRBenchmark")
+                        defer {
+                            DebugLogger.shared.info("ASR_BENCH t=\(ProcessInfo.processInfo.systemUptime) final_executor_end", source: "ASRBenchmark")
+                        }
+                        return try await provider.transcribeStoppedAudio(pcm, totalSampleCount: logicalSampleCount)
                     }
-                    return try await provider.transcribeFinalDelta(pcm, totalSampleCount: logicalSampleCount)
+                } catch TranscriptionExecutorError.chainAlreadyWedged {
+                    // This decode never got to run: an earlier streaming tick
+                    // wedged the chain before the final decode even started.
+                    // That is a weaker signal than this call spending its own
+                    // budget, and the whole listen was already confirmed live
+                    // via streaming — discarding it would lose real transcribed
+                    // speech for no benefit, so fall back to the live preview.
+                    DebugLogger.shared.warning(
+                        "Final decode refused: transcription chain was already wedged; falling back to the live preview",
+                        source: "ASRService"
+                    )
+                    result = ASRTranscriptionResult(text: self.partialTranscription)
                 }
                 delayedFinalStatusTask.cancel()
                 self.publishStoppedState(for: stoppingSessionID)
@@ -374,6 +407,13 @@ extension ASRService {
                 finalSource = "full"
             }
             let finalElapsedMs = self.elapsedMilliseconds(since: finalStartedAt)
+            if theaterListen {
+                self.speechCapturePolicy?.noteTimedSegments(finalCaptureTimeline.map(
+                    result.timedSegments,
+                    sourceStart: finalSourceStart,
+                    removedSilence: finalRemovedSilence
+                ))
+            }
             if !useDictionaryTrainingPath {
                 self.lastFinalTranscriptionDurationMs = finalElapsedMs
                 if provider.streamingPreviewMode == .trailingWindow {
@@ -433,7 +473,7 @@ extension ASRService {
             if !useDictionaryTrainingPath {
                 self.recordWordBoostHitIfAny(transcribedText: outputText)
             }
-            DebugLogger.shared.debug("After post-processing: '\(outputText)'", source: "ASRService")
+            DebugLogger.shared.debug("Post-processing complete characters: \(outputText.count)", source: "ASRService")
             self.benchmarkLog("stop_end result=success totalMs=\(self.elapsedMilliseconds(since: stopStartedAt)) recordingAgeMs=\(self.elapsedMilliseconds(since: self.benchmarkRecordingStartedAt)) cleanedChars=\(outputText.count)")
             if !useDictionaryTrainingPath {
                 self.finishStreamingWavWriter(model: SettingsStore.shared.selectedSpeechModel.rawValue)
@@ -1428,6 +1468,7 @@ extension ASRService {
                     return
                 }
                 if readiness == .ready {
+                    self.silentPCMRecoveryWatchdog.rearm()
                     AppServices.shared.microphonePreferenceCoordinator.confirmActiveSelection(
                         uid: self.audioStartAttemptInputUID,
                         name: self.audioStartAttemptInputName
@@ -1491,17 +1532,14 @@ extension ASRService {
                 reason: "active_route_recovery_failed"
             )
             DebugLogger.shared.error("Audio route recovery failed: \(error)", source: "ASRService")
-            AppServices.shared.microphonePreferenceCoordinator.markActiveSelectionUnavailable()
+            AppServices.shared.microphonePreferenceCoordinator.markActiveSelectionUnavailable(
+                suggestingManualRestart: true
+            )
 
             // Avoid asking stopWithoutTranscription() to await the recovery task
             // that is currently executing this catch block.
             self.audioRouteRecoveryTask = nil
             await self.stopWithoutTranscription()
-            NotificationCenter.default.post(
-                name: NSNotification.Name("ASRServiceDeviceDisconnected"),
-                object: nil,
-                userInfo: ["errorMessage": "Recording stopped because the audio device changed."]
-            )
         }
     }
 

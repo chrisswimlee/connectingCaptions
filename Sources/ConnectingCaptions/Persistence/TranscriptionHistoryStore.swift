@@ -28,6 +28,9 @@ struct CaptionHistoryPair: Codable, Equatable, Sendable {
     let translated: String
     let wasPolished: Bool
     let committedAt: Date?
+    var speechTiming: CaptionSpeechTiming?
+    var sourceLanguageID: String?
+    var targetLanguageID: String?
 
     init(source: String, translated: String, wasPolished: Bool, committedAt: Date? = nil) {
         self.source = source
@@ -42,6 +45,9 @@ struct CaptionHistoryPair: Codable, Equatable, Sendable {
         self.translated = try container.decode(String.self, forKey: .translated)
         self.wasPolished = try container.decodeIfPresent(Bool.self, forKey: .wasPolished) ?? false
         self.committedAt = try container.decodeIfPresent(Date.self, forKey: .committedAt)
+        self.speechTiming = try container.decodeIfPresent(CaptionSpeechTiming.self, forKey: .speechTiming)
+        self.sourceLanguageID = try container.decodeIfPresent(String.self, forKey: .sourceLanguageID)
+        self.targetLanguageID = try container.decodeIfPresent(String.self, forKey: .targetLanguageID)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -50,10 +56,13 @@ struct CaptionHistoryPair: Codable, Equatable, Sendable {
         try container.encode(self.translated, forKey: .translated)
         try container.encode(self.wasPolished, forKey: .wasPolished)
         try container.encodeIfPresent(self.committedAt, forKey: .committedAt)
+        try container.encodeIfPresent(self.speechTiming, forKey: .speechTiming)
+        try container.encodeIfPresent(self.sourceLanguageID, forKey: .sourceLanguageID)
+        try container.encodeIfPresent(self.targetLanguageID, forKey: .targetLanguageID)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case source, translated, wasPolished, committedAt
+        case source, translated, wasPolished, committedAt, speechTiming, sourceLanguageID, targetLanguageID
     }
 }
 
@@ -270,6 +279,9 @@ final class TranscriptionHistoryStore: ObservableObject {
     private var summaryRecords: [HistorySummaryRecord] = []
     private var latestFullEntry: TranscriptionHistoryEntry?
     private var unsavedUpserts: [UUID: TranscriptionHistoryEntry] = [:]
+    private var unsavedDeletes: Set<UUID> = []
+    private var unsavedReplacement = false
+    private var persistenceRevision: UInt64 = 0
     private var searchTask: Task<Void, Never>?
     private var activeSearchQuery = ""
     /// Last completed snapshot while a coalesced background refresh is pending.
@@ -501,7 +513,7 @@ final class TranscriptionHistoryStore: ObservableObject {
     }
 
     func makeBackupPayload() async throws -> [TranscriptionHistoryEntry] {
-        try await self.writer.load()
+        self.mergePending(into: try await self.writer.load())
     }
 
     func restore(from payload: [TranscriptionHistoryEntry]) {
@@ -569,19 +581,44 @@ final class TranscriptionHistoryStore: ObservableObject {
     }
 
     @discardableResult
-    func pruneAudioToBudget() -> Int {
-        // An incomplete startup snapshot must never classify older recordings as orphaned.
+    func pruneAudioToBudget() async throws -> Int {
         guard self.hasLoaded else { return 0 }
         self.invalidateAutomaticAudioBudgetMeasurement()
-        let budgetBytes = SettingsStore.shared.audioHistoryBudgetBytes
-        let currentBytes = DictationAudioHistoryStore.shared.audioUsageBytes()
-        return self.pruneAudioToBudget(currentBytes: currentBytes, budgetBytes: budgetBytes, audioEntries: nil)
+        return try await self.measureAndPruneAudio()
+    }
+
+    private func measureAndPruneAudio() async throws -> Int {
+        while true {
+            let gate = AudioBudgetMeasurementGate(
+                revision: self.audioBudgetRevision,
+                budgetBytes: SettingsStore.shared.audioHistoryBudgetBytes
+            )
+            let currentBytes = await Task.detached(priority: .utility) {
+                DictationAudioHistoryStore.shared.audioUsageBytes()
+            }.value
+            // A failed query must never turn real recordings into orphan candidates.
+            let loaded = try await self.writer.loadEntriesWithAudio()
+            guard gate.accepts(
+                currentRevision: self.audioBudgetRevision,
+                currentBudgetBytes: SettingsStore.shared.audioHistoryBudgetBytes
+            ) else { continue }
+            var byID = self.unsavedReplacement ? [:] : Dictionary(
+                loaded.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }
+            )
+            for id in self.unsavedDeletes { byID.removeValue(forKey: id) }
+            for (id, entry) in self.unsavedUpserts { byID[id] = entry }
+            return self.pruneAudioToBudget(
+                currentBytes: currentBytes,
+                budgetBytes: gate.budgetBytes,
+                audioEntries: Array(byID.values)
+            )
+        }
     }
 
     private func pruneAudioToBudget(
         currentBytes initialCurrentBytes: Int64,
         budgetBytes: Int64,
-        audioEntries: [TranscriptionHistoryEntry]?
+        audioEntries: [TranscriptionHistoryEntry]
     ) -> Int {
         guard budgetBytes > 0 else {
             return self.deleteAllSavedAudio()
@@ -590,7 +627,7 @@ final class TranscriptionHistoryStore: ObservableObject {
         var currentBytes = initialCurrentBytes
         guard currentBytes > budgetBytes else { return 0 }
 
-        var candidates = (audioEntries ?? self.entries)
+        var candidates = audioEntries
             .filter { $0.audio != nil }
             .sorted { $0.timestamp < $1.timestamp }
         let referencedFileNames = Set(
@@ -639,29 +676,11 @@ final class TranscriptionHistoryStore: ObservableObject {
 
         self.automaticAudioBudgetTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            while true {
-                let gate = AudioBudgetMeasurementGate(
-                    revision: self.audioBudgetRevision,
-                    budgetBytes: SettingsStore.shared.audioHistoryBudgetBytes
-                )
-                let currentBytes = await Task.detached(priority: .utility) {
-                    DictationAudioHistoryStore.shared.audioUsageBytes()
-                }.value
-                let audioEntries = (try? await self.writer.loadEntriesWithAudio()) ?? []
-                guard gate.accepts(
-                    currentRevision: self.audioBudgetRevision,
-                    currentBudgetBytes: SettingsStore.shared.audioHistoryBudgetBytes
-                ) else {
-                    continue
-                }
-
-                _ = self.pruneAudioToBudget(
-                    currentBytes: currentBytes,
-                    budgetBytes: gate.budgetBytes,
-                    audioEntries: audioEntries
-                )
-                self.automaticAudioBudgetTask = nil
-                return
+            defer { self.automaticAudioBudgetTask = nil }
+            do {
+                _ = try await self.measureAndPruneAudio()
+            } catch {
+                self.persistenceError = "Saved audio could not be pruned. \(error.localizedDescription)"
             }
         }
     }
@@ -717,38 +736,48 @@ final class TranscriptionHistoryStore: ObservableObject {
             return
         }
         if replacing {
-            self.unsavedUpserts = Dictionary(upserts.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
-        } else {
-            for id in deletes {
-                self.unsavedUpserts.removeValue(forKey: id)
-            }
-            for entry in upserts {
-                self.unsavedUpserts[entry.id] = entry
-            }
+            self.unsavedUpserts.removeAll()
+            self.unsavedDeletes.removeAll()
+            self.unsavedReplacement = true
         }
-        self.writer.write(
-            upserts: upserts,
-            deletes: deletes,
-            replacing: replacing,
-            retention: SettingsStore.shared.historyRetentionPolicy
-        ) { error in
-            Task { @MainActor in
-                if let error {
-                    self.persistenceError = "History could not be saved. Keep \(ConnectingCaptionsProduct.displayName) open and retry. \(error.localizedDescription)"
-                    return
-                }
-                for entry in upserts {
-                    if self.unsavedUpserts[entry.id] == entry {
-                        self.unsavedUpserts.removeValue(forKey: entry.id)
-                    }
-                }
-                self.persistenceError = nil
-            }
+        for id in deletes {
+            self.unsavedUpserts.removeValue(forKey: id)
+            self.unsavedDeletes.insert(id)
         }
+        for entry in upserts {
+            self.unsavedDeletes.remove(entry.id)
+            self.unsavedUpserts[entry.id] = entry
+        }
+        self.writePendingMutations()
         DebugLogger.shared.info(
             "HISTORY_BENCH enqueueMs=\((ProcessInfo.processInfo.systemUptime - startedAt) * 1000) upserts=\(upserts.count) deletes=\(deletes.count)",
             source: "TranscriptionHistoryStore"
         )
+    }
+
+    /// Every attempt carries all unacknowledged intent, including failed deletes
+    /// and replacements. An older completion cannot acknowledge a newer edit.
+    private func writePendingMutations() {
+        self.persistenceRevision &+= 1
+        let revision = self.persistenceRevision
+        self.writer.write(
+            upserts: Array(self.unsavedUpserts.values),
+            deletes: Array(self.unsavedDeletes),
+            replacing: self.unsavedReplacement,
+            retention: SettingsStore.shared.historyRetentionPolicy
+        ) { error in
+            Task { @MainActor in
+                guard revision == self.persistenceRevision else { return }
+                if let error {
+                    self.persistenceError = "History could not be saved. Keep \(ConnectingCaptionsProduct.displayName) open and retry. \(error.localizedDescription)"
+                    return
+                }
+                self.unsavedUpserts.removeAll()
+                self.unsavedDeletes.removeAll()
+                self.unsavedReplacement = false
+                self.persistenceError = nil
+            }
+        }
     }
 
     func retryPersistence() {
@@ -757,19 +786,7 @@ final class TranscriptionHistoryStore: ObservableObject {
             self.loadEntries()
             return
         }
-        let unsaved = Array(self.unsavedUpserts.values)
-        self.writer.write(upserts: unsaved, replacing: false) { error in
-            Task { @MainActor in
-                if let error {
-                    self.persistenceError = "History could not be saved. \(error.localizedDescription)"
-                    return
-                }
-                for entry in unsaved {
-                    self.unsavedUpserts.removeValue(forKey: entry.id)
-                }
-                self.persistenceError = nil
-            }
-        }
+        self.writePendingMutations()
     }
 
     func waitUntilLoaded() async throws {
@@ -857,25 +874,25 @@ final class TranscriptionHistoryStore: ObservableObject {
     }
 
     private func mergePending(into loaded: [TranscriptionHistoryEntry]) -> [TranscriptionHistoryEntry] {
-        if self.pendingReplacement {
-            return Array(self.pendingUpserts.values).sorted { $0.timestamp > $1.timestamp }
-        }
-        var merged = loaded.filter { !self.pendingDeletes.contains($0.id) && self.pendingUpserts[$0.id] == nil }
-        merged.append(contentsOf: self.pendingUpserts.values)
+        let upserts = self.pendingUpserts.merging(self.unsavedUpserts) { _, latest in latest }
+        let deletes = self.pendingDeletes.union(self.unsavedDeletes)
+        let replacing = self.pendingReplacement || self.unsavedReplacement
+        var merged = replacing ? [] : loaded.filter { !deletes.contains($0.id) && upserts[$0.id] == nil }
+        merged.append(contentsOf: upserts.values)
         return merged.sorted { $0.timestamp > $1.timestamp }
     }
 
     private func mergePendingSummaries(into loaded: [HistorySummaryRecord]) -> [HistorySummaryRecord] {
-        if self.pendingReplacement {
-            return Array(self.pendingUpserts.values).map { HistoryTextMetrics.summaryRecord(for: $0) }
-        }
-        var merged = loaded.filter { !self.pendingDeletes.contains($0.id) && self.pendingUpserts[$0.id] == nil }
-        merged.append(contentsOf: self.pendingUpserts.values.map { HistoryTextMetrics.summaryRecord(for: $0) })
+        let upserts = self.pendingUpserts.merging(self.unsavedUpserts) { _, latest in latest }
+        let deletes = self.pendingDeletes.union(self.unsavedDeletes)
+        let replacing = self.pendingReplacement || self.unsavedReplacement
+        var merged = replacing ? [] : loaded.filter { !deletes.contains($0.id) && upserts[$0.id] == nil }
+        merged.append(contentsOf: upserts.values.map { HistoryTextMetrics.summaryRecord(for: $0) })
         return merged.sorted { $0.timestamp > $1.timestamp }
     }
 
     func entriesWithSavedAudio() async throws -> [TranscriptionHistoryEntry] {
-        try await self.writer.loadEntriesWithAudio()
+        self.mergePending(into: try await self.writer.loadEntriesWithAudio()).filter { $0.audio != nil }
     }
 }
 

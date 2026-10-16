@@ -38,6 +38,10 @@ enum TheaterBoardAdmission {
         var requiresTrackedIdentity: Bool = false
         /// Insert Stop may type one trailing fragment the clause cutter refused.
         var allowTrailingFragment: Bool = false
+        var audioContainsSpeech: Bool? = nil
+        /// Reserved by the recognition-occurrence queue, never inferred from
+        /// matching text alone. Still requires a valid, tracked translation.
+        var hasNewRecognizedOccurrence: Bool = false
     }
 
     static func decide(
@@ -48,7 +52,7 @@ enum TheaterBoardAdmission {
     ) -> Decision {
         let cleaned = source.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleaned.isEmpty { return .skip(.empty) }
-        if CaptionJunkGate.shouldDrop(cleaned) { return .skip(.junk) }
+        if CaptionJunkGate.shouldDrop(cleaned, audioContainsSpeech: context.audioContainsSpeech) { return .skip(.junk) }
         if !context.allowTrailingFragment,
            TranslationClauseSegmenter.isTooThinToCommit(cleaned, languageID: languageID)
         {
@@ -61,6 +65,15 @@ enum TheaterBoardAdmission {
         }
         if inFlight.contains(where: { TranslationClauseSegmenter.isSameClause($0, cleaned) }) {
             return .skip(.inFlight)
+        }
+
+        if context.hasNewRecognizedOccurrence {
+            let key = TranslationClauseSegmenter.clauseIdentity(cleaned)
+            if phase == .publish, context.requiresTrackedIdentity,
+               !context.commitIdentities.contains(key) {
+                return .skip(.untracked)
+            }
+            return .admit
         }
 
         if context.peelSources.dropLast().contains(where: {
@@ -97,8 +110,8 @@ enum TheaterBoardAdmission {
             return .skip(.repeatsPrintedEnding)
         }
         // Lines older than the peel window are not in `peelSources`. A full
-        // sentence heard again word for word is a replay of the talk, not new speech.
-        // A shorter copy of a sentence already printed is the same replay.
+        // sentence without evidence of a new occurrence is a recognition replay.
+        // Explicit repeated occurrences take the reserved path above.
         if phase == .propose,
            Self.alreadyPrinted(cleaned, rows: context.peelSources, identities: context.commitIdentities)
         {

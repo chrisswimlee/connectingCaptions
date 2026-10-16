@@ -227,3 +227,6 @@ dist/
 
 # /brag launch-video output
 brag-output*/
+
+# Local release evidence can include transcripts and diagnostic logs.
+release-evidence/

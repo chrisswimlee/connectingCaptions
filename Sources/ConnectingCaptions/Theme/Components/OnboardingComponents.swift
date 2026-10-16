@@ -40,7 +40,7 @@ struct FluidOnboardingLandingHero<Actions: View>: View {
             }
 
             VStack(spacing: 4) {
-                Text(self.title)
+                AppText(self.title)
                     .font(.system(size: 40, weight: .regular))
                     .foregroundStyle(self.theme.palette.primaryText)
                     .multilineTextAlignment(.center)
@@ -370,11 +370,11 @@ private struct FluidOnboardingAppIconMark: View {
 private struct FluidOnboardingCaptionPlate: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("오늘 모델을 학습했습니다")
+            AppText("오늘 모델을 학습했습니다")
                 .font(.system(size: 15, weight: .regular))
                 .foregroundStyle(Color.primary)
                 .lineLimit(1)
-            Text("Today we trained the model.")
+            AppText("Today we trained the model.")
                 .font(.system(size: 12, weight: .regular))
                 .foregroundStyle(Color.secondary)
                 .lineLimit(1)

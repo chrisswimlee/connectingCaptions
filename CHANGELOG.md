@@ -4,17 +4,51 @@ All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
 
-- Named commercial license prices are public: $60 per Mac per year (five Macs minimum), written SLA +$90 per Mac per year, MDM pkg $1,500 once. The zip stays free.
-- Either way is on Home and Theater chrome. The toggle stays off until Whisper Small is downloaded in Voice Engine settings; turning it on then switches to Whisper so both languages of the pair are heard. Turning it off returns Voice Engine to Apple Speech. English ↔ Korean is the clearest script pair. Parakeet and the other Whisper sizes stay off the list.
-- An open clause in the task bar is dimmer and shows a trailing ellipsis. A full board eases to the next line. Talk notes can read a PowerPoint deck. Save transcript, off until you turn it on, writes Markdown and VTT when Listen stops.
-- A pause no longer prints words that were never said.
-- A continuation that starts with and, but, or so stays on the current line. A shorter copy of a sentence already on the board does not print again.
-- A "Because…" sentence that already has its main clause no longer swallows the next sentence. A name after a joined period keeps its capital. One noisy microphone packet no longer counts as speech.
-- Voice Engine is Apple Speech Analyzer when this Mac has it, otherwise Apple Speech. Translation Engine is Apple Translation.
-- Voice Engine offers the two Apple Speech versions, plus Whisper Small as the Either way add-on. Language packs is the Setup list for Apple Translation downloads.
-- First run is Welcome, languages, microphone, then Listen. Setup is Voice Engine and Language packs. Setup Wizard, Custom Dictionary, and Experimental stay off the advertised lists. Getting Started treats Apple Speech as ready. The Home license card appears only when a key is on.
-- The language pack downloads on Try Theater. Getting Started explains Listen and only asks for a microphone, a missing pack, or optional typing. Settings leaves dictation shortcuts, clipboard, streaks, and AI enhancement notices off the advertised lists. Search does not open those leftovers. After the first caption, Home no longer says to press Listen.
-- Japanese no longer cuts at 何か / そうだ, a short から, or です when ので still follows. Those leftovers stay on the same line.
+## [1.6.16] — 2026-10-16
+
+### Theater and setup
+
+- Voice Engine opens with its heading below the toolbar instead of scrolling the title behind it.
+- First run guides you through languages, the microphone, and Listen. Setup groups Voice Engine and Language packs; missing permissions, models, or packs appear beside Listen.
+- Theater shows the selected input and a microphone meter. Capture supports built-in, wired, USB, line-in, Bluetooth HFP, and routed virtual loopback inputs.
+- Caption appearance, original text, and advanced controls have clearer groups and labels. Language and mode changes explain when they stop Listen; outdated language checks no longer replace the current result.
+- Apple Speech Analyzer is the default where available, with on-device Apple Speech on older systems. Apple Translation handles translation. Removed the unused MLX / LM Studio caption rewrite path.
+- Voice Engine lists supported and ready languages per model, including per-Mac offline Apple Speech checks. Unsupported language choices and translation packs stay hidden.
+- Either way appears only with Whisper Small installed and translation ready in both directions. Turning it off keeps the selected engine.
+- Language menus and the selected pair share readiness indicators. Missing speech assets, translation packs, and permissions stay distinct; unknown availability requires another check. Speak captions explains missing voices or disconnected outputs before it can be enabled.
+- App interface translation supports all 19 setup languages, independently of caption languages. Translations are generated on-device and cached locally; Settings → General includes language and retry controls. Interface translation pauses during Listen.
+- Overlay has an explicit text-area lock. Unlock to move or resize it, then lock to save the area and prevent accidental changes. Keeping Tools visible does not unlock the area.
+
+### Captions and transcripts
+
+- Caption fades survive routine view updates, and corrections do not fade an already-visible line out again. Word printing uses dictionary word boundaries, including Thai and Japanese, and prints the final word in full. Wrapped whitespace preserves reveal progress; delayed animation ticks catch up to elapsed time. Changing print style or enabling Reduce Motion finishes the current line without replaying it.
+- Translation cleanup from a stopped Listen cannot cancel work queued by a new Listen.
+- Finished recognition updates that arrive just after a pause keep their sentence timer instead of waiting for the older open-clause timer. Live pause confirmation has a shorter deadline; Stop retains the full confirmation budget.
+- A sentence said twice in one talk no longer holds the last caption until you speak again, and the last words still print once the room stays quiet.
+- Fixed pause hallucinations, repeated shorter captions, and premature sentence breaks in English and Japanese. Continuations stay on the current line, and a noisy microphone packet no longer counts as speech.
+- Thai captions wrap at dictionary word boundaries when a word fits. Unfinished clauses appear dimmed with an ellipsis; a full board eases to the next line.
+- Apple Speech timestamps survive silence removal, history, and SRT/VTT export. Older or unmatched captions retain estimated timing.
+- Talk notes can import PowerPoint decks. Optional Save transcript writes Markdown and VTT when Listen stops.
+- History search selects a visible result. Deleting a transcript asks before removing its saved audio. A damaged pronunciation dictionary is preserved as a `.corrupt` file before replacement.
+- Fixed literal punctuation commands such as “version 1 literal dot 2” and “a literal plus b”.
+- Engine startup, retained-audio recognition, and shutdown waits now expire when a provider stalls.
+- Repeated sentences represented as separate recognition occurrences retain separate caption and history rows, including when translation is slow. Timed recognizers also distinguish later utterances after the recognition window advances. Replaying the same result does not add another row; Clear and discarded speech stay cleared.
+- Spoken outros and quoted phrases remain captions. Text-pattern rejection requires silence evidence. Successful translations can preserve names, numbers, and acronyms unchanged.
+- Microphone downsampling uses a stateful low-pass filter before conversion to 16 kHz, reducing out-of-band audio that would otherwise alias into the speech band.
+
+### Updates, delivery, and diagnostic privacy
+
+- Updates and rollback stage the replacement before moving the installed app. The original bundles remain recoverable until relaunch succeeds, and rollback pruning preserves the selected candidate.
+- Listen, then type retains the target app captured at Listen start. If that app has closed or its process identity changed, the text remains available to copy.
+- Speech, prompt traces, and streaming provider diagnostics record lengths and error identities instead of transcript or response text. Settings includes Clear Diagnostic Logs for current, rotated, and legacy logs that may contain speech from older builds.
+
+### Quality and release validation
+
+- Theater exports a JSONL quality-review worksheet for human references. Scoring separates recognition from translation and counts missed captions. Both scorers preserve Thai vowels and tone marks consistently.
+- Local release validation saves automated results and includes a Release build. Recorded-talk quality, hardware, accessibility, installer, and demo checks remain pending until reviewed.
+- Local validation also repairs the packaged Whisper framework, signs the local build ad-hoc, and requires strict verification of the assembled app bundle.
+- Release builds honor the configured signing identity. Publishing requires notes for the exact tagged version.
+- Named commercial license prices are public: $60 per Mac per year, five Macs minimum; written SLA +$90 per Mac per year; MDM package $1,500 once. The app stays free for everyone, including work use.
 
 ## [1.6.15] — 2026-09-29
 

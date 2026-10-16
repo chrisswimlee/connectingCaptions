@@ -187,18 +187,21 @@ final class SimpleUpdater {
             throw SimpleUpdateError.rollbackUnavailable
         }
 
-        self.createRollbackBackup(beforeRollback: true)
+        self.createRollbackBackup(beforeRollback: true, protecting: rollbackBundleURL)
 
         do {
             try self.performSwapAndRelaunch(
                 installedAppURL: Bundle.main.bundleURL,
-                downloadedAppURL: rollbackBundleURL
+                downloadedAppURL: rollbackBundleURL,
+                isRollback: true
             )
             DebugLogger.shared.info(
                 "SimpleUpdater: Rolled back to \(rollbackBundleURL.lastPathComponent)",
                 source: "SimpleUpdater"
             )
             shouldKeepOperationActive = true
+        } catch let error as AppBundleReplacement.RecoveryRequired {
+            throw error
         } catch {
             throw SimpleUpdateError.rollbackRestoreFailed
         }
@@ -744,7 +747,7 @@ final class SimpleUpdater {
             .replacingOccurrences(of: " ", with: "_")
     }
 
-    private func createRollbackBackup(beforeRollback: Bool) {
+    private func createRollbackBackup(beforeRollback: Bool, protecting: URL? = nil) {
         let currentAppVersion = self.currentAppVersion
         let appURL = Bundle.main.bundleURL
         let backupRoot = self.rollbackRootDirectory()
@@ -772,7 +775,7 @@ final class SimpleUpdater {
                 [.modificationDate: Date()],
                 ofItemAtPath: backupURL.path
             )
-            self.pruneRollbackBackups()
+            self.pruneRollbackBackups(protecting: protecting)
             DebugLogger.shared.info(
                 "SimpleUpdater: Created rollback backup at \(backupURL.path)",
                 source: "SimpleUpdater"
@@ -785,11 +788,11 @@ final class SimpleUpdater {
         }
     }
 
-    private func pruneRollbackBackups() {
+    private func pruneRollbackBackups(protecting: URL? = nil) {
         let backups = self.availableRollbackBackups()
         guard backups.count > self.maxRollbackBackups else { return }
 
-        for oldBackup in backups.dropFirst(self.maxRollbackBackups) {
+        for oldBackup in Self.rollbackBackupsToRemove(backups, limit: self.maxRollbackBackups, protecting: protecting) {
             do {
                 try self.fileManager.removeItem(at: oldBackup)
             } catch {
@@ -799,6 +802,10 @@ final class SimpleUpdater {
                 )
             }
         }
+    }
+
+    nonisolated static func rollbackBackupsToRemove(_ newestFirst: [URL], limit: Int, protecting: URL?) -> [URL] {
+        newestFirst.dropFirst(max(0, limit)).filter { $0.standardizedFileURL != protecting?.standardizedFileURL }
     }
 
     static func sortedRollbackBackups(
@@ -1000,7 +1007,33 @@ final class SimpleUpdater {
         }
     }
 
-    private func performSwapAndRelaunch(installedAppURL: URL, downloadedAppURL: URL) throws {
+    nonisolated static func installationDestination(
+        installedAppURL: URL,
+        downloadedAppURL: URL,
+        isRollback: Bool
+    ) -> URL {
+        isRollback ? installedAppURL : installedAppURL.deletingLastPathComponent()
+            .appendingPathComponent(downloadedAppURL.lastPathComponent)
+    }
+
+    private func restoreFailedReplacement(_ replacement: AppBundleReplacement.Transaction) {
+        do {
+            try replacement.rollback()
+        } catch {
+            DebugLogger.shared.error(error.localizedDescription, source: "SimpleUpdater")
+            let alert = NSAlert()
+            alert.messageText = AppLanguage.text("Update recovery needed")
+            alert.informativeText = error.localizedDescription
+            alert.alertStyle = .critical
+            alert.runModal()
+        }
+    }
+
+    private func performSwapAndRelaunch(
+        installedAppURL: URL,
+        downloadedAppURL: URL,
+        isRollback: Bool = false
+    ) throws {
         // Handle app name changes: if the downloaded app has a different name,
         // we need to replace the old app and use the new name
         let installedAppName = installedAppURL.lastPathComponent
@@ -1008,36 +1041,12 @@ final class SimpleUpdater {
 
         DebugLogger.shared.info("SimpleUpdater: Installing app - Current: \(installedAppName), New: \(downloadedAppName)", source: "SimpleUpdater")
 
-        let finalAppURL: URL
-        if installedAppName != downloadedAppName {
-            // App name changed - use the new name
-            finalAppURL = installedAppURL.deletingLastPathComponent().appendingPathComponent(downloadedAppName)
-            DebugLogger.shared.info("SimpleUpdater: App name changed, installing to: \(finalAppURL.path)", source: "SimpleUpdater")
-
-            // Safety check: ensure we don't overwrite an existing app with the new name
-            if FileManager.default.fileExists(atPath: finalAppURL.path) {
-                DebugLogger.shared.info("SimpleUpdater: Removing existing app at new location: \(finalAppURL.path)", source: "SimpleUpdater")
-                try FileManager.default.removeItem(at: finalAppURL)
-            }
-
-            // Remove old app if it exists
-            if FileManager.default.fileExists(atPath: installedAppURL.path) {
-                DebugLogger.shared.info("SimpleUpdater: Removing old app: \(installedAppURL.path)", source: "SimpleUpdater")
-                try FileManager.default.removeItem(at: installedAppURL)
-            }
-
-            // Move new app to Applications with new name
-            try FileManager.default.moveItem(at: downloadedAppURL, to: finalAppURL)
-            DebugLogger.shared.info("SimpleUpdater: Successfully installed new app at: \(finalAppURL.path)", source: "SimpleUpdater")
-        } else {
-            // Same name - normal replacement
-            DebugLogger.shared.info("SimpleUpdater: Same app name, performing normal replacement", source: "SimpleUpdater")
-            if FileManager.default.fileExists(atPath: installedAppURL.path) {
-                try FileManager.default.removeItem(at: installedAppURL)
-            }
-            try FileManager.default.moveItem(at: downloadedAppURL, to: installedAppURL)
-            finalAppURL = installedAppURL
-        }
+        let finalAppURL = Self.installationDestination(
+            installedAppURL: installedAppURL, downloadedAppURL: downloadedAppURL, isRollback: isRollback
+        )
+        let replacement = try AppBundleReplacement.begin(
+            installed: installedAppURL, candidate: downloadedAppURL, destination: finalAppURL
+        )
 
         // Use modern NSWorkspace API for more reliable app launching
         DispatchQueue.main.async {
@@ -1046,6 +1055,7 @@ final class SimpleUpdater {
             // Verify the app exists before trying to launch
             guard FileManager.default.fileExists(atPath: finalAppURL.path) else {
                 DebugLogger.shared.error("SimpleUpdater: ERROR - App not found at expected location: \(finalAppURL.path)", source: "SimpleUpdater")
+                self.restoreFailedReplacement(replacement)
                 self.resetUpdateOperation()
                 // Don't terminate if we can't find the new app
                 return
@@ -1059,12 +1069,14 @@ final class SimpleUpdater {
                     DebugLogger.shared.error("SimpleUpdater: Failed to relaunch app: \(error)", source: "SimpleUpdater")
                     DebugLogger.shared.error("SimpleUpdater: App location: \(finalAppURL.path)", source: "SimpleUpdater")
                     Task { @MainActor in
+                        self.restoreFailedReplacement(replacement)
                         self.resetUpdateOperation()
                     }
                     // Don't terminate if relaunch failed - let user manually restart
                     return
                 }
 
+                replacement.commit()
                 DebugLogger.shared.info("SimpleUpdater: Relaunched app, leaving this copy", source: "SimpleUpdater")
                 // Quit goes through terminateLater and does not finish while this panel is up.
                 // The new copy closes this process. Exit so the download panel cannot stay.

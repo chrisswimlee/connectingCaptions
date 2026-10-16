@@ -256,6 +256,7 @@ struct MicrophoneChangeNotice: Hashable {
     let previousName: String?
     let currentName: String?
     let presentation: MicrophoneChangePresentation
+    var suggestsManualRestart: Bool = false
 }
 
 @MainActor
@@ -441,7 +442,7 @@ private struct MicrophoneChangeOverlayView: View {
                     .foregroundStyle(.white.opacity(0.78))
                     .frame(width: 24, height: 24)
 
-                Text(self.title)
+                AppText(self.title)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white.opacity(0.72))
 
@@ -457,8 +458,8 @@ private struct MicrophoneChangeOverlayView: View {
                 .buttonStyle(.plain)
                 .contentShape(Circle())
                 .onHover { self.isCloseHovered = $0 }
-                .help("Dismiss")
-                .accessibilityLabel("Dismiss microphone change")
+                .help(AppLanguage.text("Dismiss"))
+                .accessibilityLabel(AppLanguage.text("Dismiss microphone change"))
             }
 
             Text(self.detailText)
@@ -476,15 +477,15 @@ private struct MicrophoneChangeOverlayView: View {
 
                 Spacer(minLength: 8)
 
-                Button("Do not show again", action: self.onDisable)
+                AppButton("Do not show again", action: self.onDisable)
                     .buttonStyle(TransientOverlaySettingsButtonStyle(isHovered: self.isDisableHovered))
                     .onHover { self.isDisableHovered = $0 }
-                    .help("Turn off microphone change alerts")
+                    .help(AppLanguage.text("Turn off microphone change alerts"))
 
-                Button("Settings", action: self.onSettings)
+                AppButton("Settings", action: self.onSettings)
                     .buttonStyle(TransientOverlaySettingsButtonStyle(isHovered: self.isSettingsHovered))
                     .onHover { self.isSettingsHovered = $0 }
-                    .help("Open microphone settings")
+                    .help(AppLanguage.text("Open microphone settings"))
             }
         }
         .padding(.horizontal, 14)
@@ -522,13 +523,16 @@ private struct MicrophoneChangeOverlayView: View {
 
     private var title: String {
         if self.notice.presentation == .startupSelection {
-            return "Microphone selected"
+            return AppLanguage.text("Microphone selected")
         }
         return self.notice.currentName == nil ? "Microphone unavailable" : "Microphone changed"
     }
 
     private var explanation: String {
         if self.notice.currentName == nil {
+            if self.notice.suggestsManualRestart {
+                return "Choose an available microphone in Settings, then start again."
+            }
             return "Choose an available microphone in Settings."
         }
         if self.notice.presentation == .startupSelection {
@@ -670,18 +674,18 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
 
     private var choiceContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            self.header(title: "Correction noticed", allowsBack: false)
+            self.header(title: AppLanguage.text("Correction noticed"), allowsBack: false)
 
             self.correctionPair
 
-            Text("Save only this correction, or teach \(ConnectingCaptionsProduct.displayName) other pronunciations.")
+            AppText("Save only this correction, or teach {0} other pronunciations.", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                 .font(.system(size: 11))
                 .foregroundStyle(.white.opacity(0.58))
                 .lineLimit(1)
 
             HStack(spacing: 8) {
                 CorrectionOverlayActionButton(
-                    title: "Train by Voice",
+                    title: AppLanguage.text("Train by Voice"),
                     systemImage: "mic.fill",
                     style: .secondary,
                     accent: self.accent,
@@ -689,7 +693,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
                 )
 
                 CorrectionOverlayActionButton(
-                    title: "Add This Correction",
+                    title: AppLanguage.text("Add This Correction"),
                     systemImage: "plus",
                     style: .accent,
                     accent: self.accent,
@@ -706,7 +710,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
         Menu {
             Button("Ignore This Correction", systemImage: "eye.slash", action: self.onIgnore)
 
-            Menu("Suggest After") {
+            Menu(AppLanguage.text("Suggest After")) {
                 ForEach(SettingsStore.AutomaticDictionarySuggestionFrequency.allCases) { frequency in
                     Button {
                         self.onFrequencyChange(frequency)
@@ -715,7 +719,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
                         if self.settings.automaticDictionarySuggestionFrequency == frequency {
                             Label(frequency.displayName, systemImage: "checkmark")
                         } else {
-                            Text(frequency.displayName)
+                            AppText(frequency.displayName)
                         }
                     }
                 }
@@ -723,7 +727,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
 
             Divider()
 
-            Button("Turn Off Auto-Learn", role: .destructive, action: self.onDisableSuggestions)
+            AppButton("Turn Off Auto-Learn", role: .destructive, action: self.onDisableSuggestions)
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 12, weight: .semibold))
@@ -734,22 +738,22 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help("More correction options")
+        .help(AppLanguage.text("More correction options"))
     }
 
     private var trainingContent: some View {
         VStack(alignment: .leading, spacing: 10) {
-            self.header(title: "Train by Voice", allowsBack: true)
+            self.header(title: AppLanguage.text("Train by Voice"), allowsBack: true)
 
             self.correctionPair
 
             VStack(alignment: .leading, spacing: 9) {
-                Text("Teach \(ConnectingCaptionsProduct.displayName) your pronunciation")
+                AppText("Teach {0} your pronunciation", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.94))
 
                 if self.session.isReady {
-                    Label("\(ConnectingCaptionsProduct.displayName) got it right 3 times in a row.", systemImage: "checkmark.circle.fill")
+                    AppLabel(AppLanguage.format("{0} got it right 3 times in a row.", String(describing: ConnectingCaptionsProduct.displayName)), systemImage: "checkmark.circle.fill")
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(self.accent)
                 } else {
@@ -807,7 +811,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
             }
 
             CorrectionOverlayActionButton(
-                title: "Add Replacement",
+                title: AppLanguage.text("Add Replacement"),
                 systemImage: self.session.isReady ? "sparkles" : "plus",
                 style: .accent,
                 accent: self.accent,
@@ -832,7 +836,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
 
     private func trainingInstruction(number: Int, text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 7) {
-            Text("\(number)")
+            AppText("{0}", arguments: [String(describing: number)])
                 .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                 .foregroundStyle(self.accent)
                 .frame(width: 14)
@@ -859,7 +863,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
                 Text(self.session.successTitle)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
-                Text("“\(self.session.candidate.heardText)” will become “\(self.session.candidate.correctedText)”.")
+                AppText("“{0}” will become “{1}”.", arguments: [String(describing: self.session.candidate.heardText), String(describing: self.session.candidate.correctedText)])
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.6))
                     .lineLimit(1)
@@ -884,7 +888,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
                 .buttonStyle(.plain)
                 .disabled(self.session.capturePhase != .idle)
                 .opacity(self.session.capturePhase == .idle ? 1 : 0.35)
-                .help("Back")
+                .help(AppLanguage.text("Back"))
             } else {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 11, weight: .semibold))
@@ -892,7 +896,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
                     .frame(width: 24, height: 24)
             }
 
-            Text(title)
+            AppText(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.72))
 
@@ -911,7 +915,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
             .buttonStyle(.plain)
             .contentShape(Circle())
             .onHover { self.isDismissHovered = $0 }
-            .help("Dismiss")
+            .help(AppLanguage.text("Dismiss"))
         }
     }
 
@@ -936,7 +940,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
     private var finalOutputRow: some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Final output")
+                AppText("Final output")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.white.opacity(0.46))
                 Text(self.session.finalOutputText)
@@ -948,7 +952,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
             Spacer(minLength: 8)
 
             if self.session.isReady {
-                Label("Ready", systemImage: "checkmark.circle.fill")
+                AppLabel("Ready", systemImage: "checkmark.circle.fill")
                     .font(.system(size: 10.5, weight: .semibold))
                     .foregroundStyle(self.accent)
             }
@@ -960,7 +964,7 @@ private struct AutomaticDictionaryCorrectionOverlayView: View {
 
     private var capturedVariantsRow: some View {
         HStack(spacing: 6) {
-            Text("Captured")
+            AppText("Captured")
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundStyle(.white.opacity(0.46))
 
@@ -1023,7 +1027,7 @@ private struct CorrectionOverlayReadinessRing: View {
                 .rotationEffect(.degrees(-90))
 
             VStack(spacing: 0) {
-                Text("\(self.progress)/\(self.total)")
+                AppText("{0}/{1}", arguments: [String(describing: self.progress), String(describing: self.total)])
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundStyle(self.isReady ? self.accent : .white.opacity(0.92))
                     .monospacedDigit()
@@ -1037,7 +1041,7 @@ private struct CorrectionOverlayReadinessRing: View {
         .shadow(color: self.isReady ? self.accent.opacity(0.22) : .clear, radius: 9)
         .animation(.easeOut(duration: 0.24), value: self.progress)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Training progress")
+        .accessibilityLabel(AppLanguage.text("Training progress"))
         .accessibilityValue("\(self.progress) of \(self.total) correct")
     }
 }
@@ -1201,6 +1205,6 @@ private struct CorrectionOverlayVariantChip: View {
         .buttonStyle(.plain)
         .frame(maxWidth: 112)
         .onHover { self.isHovered = $0 }
-        .help("Remove \(self.variant)")
+        .help(AppLanguage.format("Remove {0}", String(describing: self.variant)))
     }
 }

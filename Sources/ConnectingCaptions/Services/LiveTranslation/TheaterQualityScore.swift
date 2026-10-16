@@ -108,10 +108,9 @@ enum TheaterQualityScore {
 
     static func scoreLine(reference: String, hypothesis: String, languageID: String) -> LineScore {
         let error: Double
-        switch TranslationClauseSegmenter.languageCode(from: languageID) {
-        case "ko", "th", "ja", "zh":
+        if Self.compactScripts.contains(TranslationClauseSegmenter.languageCode(from: languageID)) {
             error = self.characterErrorRate(reference: reference, hypothesis: hypothesis)
-        default:
+        } else {
             error = self.wordErrorRate(reference: reference, hypothesis: hypothesis)
         }
         return LineScore(
@@ -158,10 +157,15 @@ enum TheaterQualityScore {
     }
 
     static func characterErrorRate(reference: String, hypothesis: String) -> Double {
-        let ref = Array(Self.foldedLetters(reference))
-        let hyp = Array(Self.foldedLetters(hypothesis))
-        return self.errorRate(reference: ref, hypothesis: hyp)
+        self.errorRate(
+            reference: Self.compactUnits(reference),
+            hypothesis: Self.compactUnits(hypothesis)
+        )
     }
+
+    /// Scripts scored by character rather than word. `scripts/score-theater-talk.py`
+    /// keeps the same list as `COMPACT`; change one and you have to change both.
+    static let compactScripts: Set<String> = ["ko", "th", "ja", "zh"]
 
     static func isStageAcceptable(
         reference: String,
@@ -169,10 +173,9 @@ enum TheaterQualityScore {
         languageID: String
     ) -> Bool {
         let error: Double
-        switch TranslationClauseSegmenter.languageCode(from: languageID) {
-        case "ko", "th", "ja", "zh":
+        if Self.compactScripts.contains(TranslationClauseSegmenter.languageCode(from: languageID)) {
             error = self.characterErrorRate(reference: reference, hypothesis: hypothesis)
-        default:
+        } else {
             error = self.wordErrorRate(reference: reference, hypothesis: hypothesis)
         }
         return error <= Self.stageAcceptableError
@@ -193,8 +196,32 @@ enum TheaterQualityScore {
             .filter { !$0.isEmpty }
     }
 
-    private static func foldedLetters(_ text: String) -> String {
-        text.lowercased().filter { $0.isLetter || $0.isNumber }
+    /// General categories that carry a letter's identity: letters, numbers, and the
+    /// combining marks Thai stacks on top of a base consonant.
+    ///
+    /// This used to be `Array(text).filter { $0.isLetter || $0.isNumber }`. Two things
+    /// were wrong with that. `Array(text)` walks *grapheme clusters*, and
+    /// `Character.isLetter` is only true when every scalar in the cluster is a letter,
+    /// so a base consonant carrying a vowel sign failed the test and *both* vanished.
+    /// `ครับ` and `ครัّบ` are different sentences; both folded to `ครบ` and
+    /// scored 0.0. And reading by cluster while *counting* by code point — which is
+    /// what `scripts/score-theater-talk.py` does — let the runtime scorer and the
+    /// offline scorer disagree about the same Thai line.
+    ///
+    /// Iterating scalars and keeping the mark categories fixes both. No NFD
+    /// decomposition: Thai marks are already separate scalars, and decomposing would
+    /// also split every Korean syllable into three jamo, which changes a number that
+    /// was not wrong. Keep this in step with the Python twin.
+    private static let compareCategories: Set<Unicode.GeneralCategory> = [
+        .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,
+        .decimalNumber, .letterNumber, .otherNumber,
+        .nonspacingMark, .spacingMark, .enclosingMark,
+    ]
+
+    /// Units for a compact-script line: one entry per Unicode scalar, marks kept.
+    private static func compactUnits(_ text: String) -> [Unicode.Scalar] {
+        Array(text.lowercased().unicodeScalars)
+            .filter { Self.compareCategories.contains($0.properties.generalCategory) }
     }
 
     private static func editDistance<T: Equatable>(_ left: [T], _ right: [T]) -> Int {

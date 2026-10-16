@@ -10,7 +10,7 @@ This repo is Theater captions and dictation insert for the setup languages: ever
 | Theater Listen start/stop, partial bus, History, connectingCaptions identity | Yes | No |
 | Dictation insert of **this Listen** into another app | Yes | Only if the typing engine itself is wrong |
 | Voice Engine picker for the setup languages | Yes | No |
-| ASR decode, microphone graph, Parakeet / Whisper / Nemotron internals | Ask first | Usually [FluidVoice](https://github.com/altic-dev/FluidVoice) |
+| ASR decode, input-device capture graph (mic, USB/line-in, Bluetooth, virtual loopback), Parakeet / Whisper / Nemotron internals | Ask first | Usually [FluidVoice](https://github.com/altic-dev/FluidVoice) |
 | Command Mode, rewrite, file transcription, local HTTP API, PostHog | No — those were removed | FluidVoice if they still exist there |
 
 Ready starter tickets live in [.github/GOOD_FIRST_ISSUES.md](.github/GOOD_FIRST_ISSUES.md). `scripts/enable-github-gates.sh` files them with `good first issue` when the repo is public.
@@ -46,11 +46,29 @@ Launch `DerivedData/Build/Products/Debug/Connecting Captions Debug.app`. Keep us
 
 4. Allow the microphone. Pick **Voice** for the language you speak or **Translate** for captions. Press **Listen** and speak one sentence. A language pack downloads only when I speak and Show as differ. Theater Listen does not ask for Screen Recording.
 
-5. Format, lint, and test. `./scripts/format-and-lint.sh` is required before you open a PR (SwiftFormat, SwiftLint strict, and the PR-policy unit tests when those tools are installed). CI runs the same chain in this order: `scripts/test-omitted-tests.sh` (wiring guard), SwiftLint strict, then the harnesses and the test command:
+5. Format, lint, and test. `./scripts/format-and-lint.sh` is required before you open a PR (SwiftFormat, SwiftLint strict, and the PR-policy unit tests when those tools are installed). CI enforces this chain on every push and PR that touches `Sources/**`, `Tests/**`, `scripts/**`, the Xcode project, or a `Package.resolved` file:
+
+   1. `scripts/test-omitted-tests.sh` — test-wiring guard. Fails when a `Tests/` file compiles in no target or harness; also fails on a committed `DEVELOPMENT_TEAM` in `project.pbxproj`.
+   2. `scripts/check-team-id.sh` — team-ID guard (run with `bash`; it needs `pipefail`). Same team-ID rule as a standalone step: none in `project.pbxproj`, and `xcconfig/Local.xcconfig` stays untracked.
+   3. `scripts/test-ui-copy.sh` — marketing-copy and VoiceOver-trap guard.
+   4. `scripts/test-quality-score.sh` — quality-scorer guard. `TheaterQualityScore.swift` and `scripts/score-theater-talk.py` are two implementations of one WER/CER rule; this fails when they stop counting the same units, and starts scoring `docs/samples/reference.jsonl` the day one is checked in.
+   5. `python3 scripts/update-interface-catalog.py --check` and the Python tooling regressions (`python3 -m unittest discover -s scripts -p 'test_*.py'`).
+   6. SwiftLint strict (`swiftlint:0.65.1` in docker).
+   7. The two `Tests/run_*.sh` harnesses (`swiftc`; Command Line Tools is enough).
+   8. `xcodebuild test` on macos-15, minus `ConnectingCaptionsUITests` and the flaky Tiny Whisper E2E.
+
+   A separate, docs-only gate runs on PRs that touch `docs/**` or a top-level `*.md` file (so a docs-only PR doesn't skip CI entirely): `scripts/test-docs-copy.sh` checks for banned marketing copy and broken relative links in markdown.
+
+   The same chain locally (the guards need nothing but `sh`, `bash`, `git`, and `grep`):
 
 ```bash
 ./scripts/format-and-lint.sh
 sh scripts/test-omitted-tests.sh
+bash scripts/check-team-id.sh
+sh scripts/test-ui-copy.sh
+sh scripts/test-quality-score.sh
+python3 scripts/update-interface-catalog.py --check
+python3 -m unittest discover -s scripts -p 'test_*.py'
 sh Tests/run_paste_key_cache_tests.sh
 sh Tests/run_history_persistence_tests.sh
 xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions \
@@ -84,15 +102,24 @@ xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions
   CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM=
 ```
 
+## Dependencies, pins, and second Macs
+
+Every machine that builds this app — both dev Macs and hosted CI — resolves packages from `origin`, never from each other. Two rules keep that chain honest:
+
+- A second dev Mac (or any new machine) clones **from GitHub**, never from a copy of another Mac, and never copies a hand-picked `Package.resolved` with it. Both `Package.resolved` files are tracked, so a fresh clone from `origin` resolves exactly the pins this repo already reviewed.
+- `scripts/check-pin-health.sh` — run locally and weekly by `Dependency Pin Health` (`.github/workflows/dependency-health.yml`) — proves every pinned revision in the checked-in `Package.resolved` files is still fetchable from its remote. Hosted CI re-resolves packages on every relevant push, and a `Package.resolved` edit is itself a `build.yml` relevant path. When Pin Health goes red, that is pin drift, not test flakiness.
+
+Never re-pin quietly. `project.pbxproj` pins two forks by **revision**, not by branch (`kind = revision`, no `branch` key): `altic-dev/FluidAudio` at `3fd63887…` and `altic-dev/DynamicNotchKit` at `708f31da…`. Neither fork publishes tags, so "just pin to a tag" does not exist here, and a revision pin is frozen — it will not drift when the fork's branch moves, which is exactly why `scripts/check-pin-health.sh` has to prove those revisions are still fetchable. Changing either SHA means new runtime code, so it is a behavior change and needs its own PR with a change description; never re-pin quietly inside a release PR — that is where release gets blocked.
+
 ## Where to edit
 
 Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) before changing Theater or the speech engine.
 
 | Area | Path | Role |
 | --- | --- | --- |
-| Live translation | `Sources/ConnectingCaptions/Services/LiveTranslation/` | Clause split, Apple Translation, Theater archive, latency HUD, optional MLX |
+| Live translation | `Sources/ConnectingCaptions/Services/LiveTranslation/` | Clause split, Apple Translation, Theater archive, latency HUD |
 | Theater UI | `Sources/ConnectingCaptions/UI/LiveTranslation/` | Home, Theater window, presenter chrome |
-| Speech engine | `ASRService.swift` plus `ASRService+*.swift` | Microphone audio → transcript. Reads `SpeechCapturePolicy`. Keep this as the engine, not the product. |
+| Speech engine | `ASRService.swift` plus `ASRService+*.swift` | Captured audio → transcript, from any selected input device (mic, USB/line-in, Bluetooth, virtual loopback). Reads `SpeechCapturePolicy`. Keep this as the engine, not the product. |
 | Theater Listen | `ContentView+TheaterListen.swift`, `TheaterSpeechSession.swift` | Caption and insert start/stop. Do not start Theater as dictation. |
 | Dictation insert | `TypingService`, `GlobalHotkeyManager`, `QuickTranslateInsert` | Listen, then type uses the app captured at start and shows that line on a bar. Type the board uses the frontmost field. |
 | Overlay | `BottomOverlayView`, `NotchOverlayManager` | Insert chip only |

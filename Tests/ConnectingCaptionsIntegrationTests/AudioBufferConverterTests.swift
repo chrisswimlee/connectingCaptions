@@ -102,3 +102,62 @@ final class AudioBufferConverterTests: XCTestCase {
         }
     }
 }
+
+
+final class SpeechResamplingTests: XCTestCase {
+    private func pipeline() -> AudioCapturePipeline {
+        AudioCapturePipeline(audioBuffer: ThreadSafeAudioBuffer(), onAcceptedSamples: { _ in },
+                             onFirstAudio: { _, _, _, _, _, _, _ in }, onLevel: { _ in },
+                             onSpeechEnergy: { _, _ in }, onCaptureHealth: { _, _, _, _, _, _ in })
+    }
+
+    private func tone(frequency: Double, rate: Double, count: Int) -> [Float] {
+        (0..<count).map { Float(sin(2 * Double.pi * frequency * Double($0) / rate)) }
+    }
+
+    private func rms(_ samples: ArraySlice<Float>) -> Float {
+        sqrt(samples.reduce(0) { $0 + $1 * $1 } / Float(samples.count))
+    }
+
+    func test48kConversionRejects12kAliasAndPreservesSpeechBand() {
+        let high = self.pipeline().resampleTo16kLocked(self.tone(frequency: 12_000, rate: 48_000, count: 48_000), sourceSampleRate: 48_000)
+        let speech = self.pipeline().resampleTo16kLocked(self.tone(frequency: 1_000, rate: 48_000, count: 48_000), sourceSampleRate: 48_000)
+        XCTAssertEqual(high.count, 16_000)
+        XCTAssertLessThan(self.rms(high.dropFirst(100)), 0.001)
+        XCTAssertEqual(self.rms(speech.dropFirst(100)), Float(1 / sqrt(2.0)), accuracy: 0.01)
+    }
+
+    func testPacketBoundariesPreservePhaseAndFilterHistoryAt44100() {
+        let input = self.tone(frequency: 1_000, rate: 44_100, count: 44_100)
+        let whole = self.pipeline().resampleTo16kLocked(input, sourceSampleRate: 44_100)
+        let streaming = self.pipeline()
+        var packets: [Float] = []
+        for start in stride(from: 0, to: input.count, by: 137) {
+            packets += streaming.resampleTo16kLocked(Array(input[start..<min(input.count, start + 137)]), sourceSampleRate: 44_100)
+        }
+        XCTAssertEqual(packets.count, whole.count)
+        XCTAssertEqual(packets.count, 16_000)
+        for (actual, expected) in zip(packets, whole) { XCTAssertEqual(actual, expected, accuracy: 0.00001) }
+    }
+
+    func testCommonHardwareRatesRejectAudioAboveOutputNyquist() {
+        for rate in [44_100.0, 48_000.0, 96_000.0] {
+            let output = self.pipeline().resampleTo16kLocked(
+                self.tone(frequency: 8_500, rate: rate, count: Int(rate)), sourceSampleRate: rate
+            )
+            XCTAssertEqual(output.count, 16_000)
+            XCTAssertLessThan(self.rms(output.dropFirst(100)), 0.005, "rate=\(rate)")
+        }
+    }
+
+    func testRateChangeClearsFilterHistoryAnd16kRemainsUnchanged() {
+        let stream = self.pipeline()
+        _ = stream.resampleTo16kLocked(Array(repeating: 1, count: 4_800), sourceSampleRate: 48_000)
+        let silence = stream.resampleTo16kLocked(Array(repeating: 0, count: 4_410), sourceSampleRate: 44_100)
+        XCTAssertTrue(silence.allSatisfy { $0 == 0 })
+        let native: [Float] = [0.1, -0.2, 0.3]
+        XCTAssertEqual(stream.resampleTo16kLocked(native, sourceSampleRate: 16_000), native)
+        XCTAssertTrue(stream.resampleTo16kLocked(native, sourceSampleRate: .nan).isEmpty)
+        XCTAssertTrue(stream.resampleTo16kLocked(native, sourceSampleRate: 0).isEmpty)
+    }
+}

@@ -1,0 +1,21 @@
+{"id": "en-identical", "languageID": "en", "reference": "Today we trained the model.", "hypothesis": "Today we trained the model.", "expected": 0.0}
+{"id": "en-one-substitution", "languageID": "en", "reference": "today we trained", "hypothesis": "today we measured", "expected": 0.333333}
+{"id": "en-punctuation-and-case", "languageID": "en", "reference": "Hello, World!", "hypothesis": "hello world", "expected": 0.0}
+{"id": "en-empty-reference", "languageID": "en", "reference": "", "hypothesis": "anything at all", "expected": 1.0}
+{"id": "en-all-insertions", "languageID": "en", "reference": "the cat sat", "hypothesis": "the cat sat on the warm flat mat", "expected": 1.666667}
+{"id": "en-word-order-kept", "languageID": "en", "reference": "the quarter starts at noon", "hypothesis": "the quarter start at noon", "expected": 0.2}
+{"id": "ko-identical", "languageID": "ko", "reference": "오늘 모델을 학습했습니다", "hypothesis": "오늘 모델을 학습했습니다", "expected": 0.0}
+{"id": "ko-spaces-stripped-equal", "languageID": "ko", "reference": "오늘 모델을 학습했습니다", "hypothesis": "오늘모델을학습했습니다", "expected": 0.0}
+{"id": "ko-fully-different", "languageID": "ko", "reference": "오늘 모델을 학습했습니다", "hypothesis": "완전히 다른 문장입니다", "expected": 0.818182}
+{"id": "ko-particles-differ", "languageID": "ko", "reference": "모델이 학습되었습니다", "hypothesis": "모델을 학습했습니다", "expected": 0.3}
+{"id": "ko-syllables-not-split", "languageID": "ko", "reference": "안녕", "hypothesis": "안녕하세요", "expected": 1.5}
+{"id": "ja-identical", "languageID": "ja", "reference": "今日はモデルを学習しました", "hypothesis": "今日はモデルを学習しました", "expected": 0.0}
+{"id": "ja-copula-differs", "languageID": "ja", "reference": "今日はモデルでした", "hypothesis": "今日はモデルです", "expected": 0.222222}
+{"id": "ja-fully-different", "languageID": "ja", "reference": "今日はモデルを学習しました", "hypothesis": "明日は雨かもしれません", "expected": 0.769231}
+{"id": "ja-long-vowel-dropped", "languageID": "ja", "reference": "パターン", "hypothesis": "パタン", "expected": 0.25}
+{"id": "th-identical", "languageID": "th", "reference": "วันนี้เราฝึกโมเดลครับ", "hypothesis": "วันนี้เราฝึกโมเดลครับ", "expected": 0.0}
+{"id": "th-marks-differ", "languageID": "th", "reference": "ครับ", "hypothesis": "ครั๊บ", "expected": 0.25}
+{"id": "th-tone-mark-dropped", "languageID": "th", "reference": "วันนี้เราฝึกโมเดลครับ", "hypothesis": "วันนนี้เราฝึกโมเดลครับ", "expected": 0.047619}
+{"id": "zh-identical", "languageID": "zh", "reference": "今天我们训练了模型", "hypothesis": "今天我们训练了模型", "expected": 0.0}
+{"id": "zh-one-char-differs", "languageID": "zh", "reference": "今天我们训练了模型", "hypothesis": "今天我们训练模型", "expected": 0.111111}
+{"id": "en-ko-cross-script", "languageID": "ko", "reference": "Today we trained the model.", "hypothesis": "오늘 모델을 학습했습니다", "expected": 1.0}

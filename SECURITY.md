@@ -34,9 +34,9 @@ Out of scope:
 
 ## Notes for this build
 
-The app is **unsandboxed**. Theater and dictation need the microphone. Insert-into-another-app needs Accessibility. Global hotkeys and user-downloaded voice / MLX weights also need to run outside the App Sandbox. Hardened Runtime stays on.
+The app is **unsandboxed**. Theater and dictation need the microphone — that is, the Microphone (audio-input) permission, which covers every capture source: built-in mic, wired/USB/line-in gear, Bluetooth (HFP) headsets, and virtual loopback devices such as BlackHole when audio is routed into them. Insert-into-another-app needs Accessibility. Global hotkeys and user-downloaded voice weights also need to run outside the App Sandbox. Hardened Runtime stays on.
 
-`com.apple.security.cs.disable-library-validation` is still set because Xcode’s XCFramework copy of `CTranscribe.framework` (TranscribeCpp / Whisper) can fail to load after its versioned layout is flattened. MLX and Python run in a separate process and are not the reason. A Theater-only build that drops Whisper can remove the key. See [docs/SIGNING.md](docs/SIGNING.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`com.apple.security.cs.disable-library-validation` is still set because Xcode’s XCFramework copy of `CTranscribe.framework` (TranscribeCpp / Whisper) can fail to load after its versioned layout is flattened. Nothing else here needs an exemption: the app no longer ships a Python runtime or a local model server, and the Whisper runtime is linked, not launched as a privileged helper. A Theater-only build that drops Whisper can remove the key. See [docs/SIGNING.md](docs/SIGNING.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 Automatic updates only install a zip that:
 
@@ -47,3 +47,15 @@ Automatic updates only install a zip that:
 - is signed with a usable Developer ID team, not ad-hoc or `not set`
 
 GitHub Release jobs fail closed when Developer ID or notarization credentials are missing. This tree does not ship a local HTTP API or analytics. Live Theater does not send telemetry.
+
+Speech and prompt diagnostics use character counts and provider error identities.
+Older builds may have stored speech or provider response text in diagnostic logs,
+independently of the transcript-history preference. Settings → Debug Settings →
+**Clear Diagnostic Logs** removes this app's current, rotated, and legacy logs.
+Review any previously exported diagnostic files separately; clearing local logs
+does not remove copies you have shared.
+
+Update replacement retains the displaced app bundles until the replacement
+relaunches. If automatic recovery fails, the error identifies the recovery
+directory; retain its contents until the app has been recovered. Validate signed
+update and rollback in a disposable test account before distributing a release.

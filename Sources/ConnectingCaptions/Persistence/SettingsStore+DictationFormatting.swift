@@ -80,10 +80,10 @@ extension SettingsStore {
 
         var title: String {
             switch self {
-            case .newLine: return "New Line"
-            case .newParagraph: return "New Paragraph"
-            case .tab: return "Tab"
-            case .space: return "Space"
+            case .newLine: return AppLanguage.text("New Line")
+            case .newParagraph: return AppLanguage.text("New Paragraph")
+            case .tab: return AppLanguage.text("Tab")
+            case .space: return AppLanguage.text("Space")
             }
         }
 

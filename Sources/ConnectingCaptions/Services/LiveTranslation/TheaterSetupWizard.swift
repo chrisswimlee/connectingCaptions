@@ -14,26 +14,26 @@ enum TheaterSetupWizard {
 
         var title: String {
             switch self {
-            case .welcome: return "Welcome"
-            case .languages: return "Languages"
-            case .captions: return "Captions"
-            case .audience: return "Audience"
-            case .ready: return "Ready"
+            case .welcome: return AppLanguage.text("Welcome")
+            case .languages: return AppLanguage.text("Languages")
+            case .captions: return AppLanguage.text("Captions")
+            case .audience: return AppLanguage.text("Audience")
+            case .ready: return AppLanguage.text("Ready")
             }
         }
 
         var subtitle: String {
             switch self {
             case .welcome:
-                return "A preview of the caption the room sees."
+                return AppLanguage.text("A preview of the caption the room sees.")
             case .languages:
-                return "App language is the language this app uses. I speak is what you say. Show as is the caption."
+                return AppLanguage.text("App language is the language this app uses. I speak is what you say. Show as is the caption.")
             case .captions:
-                return "Choose whether the original language sits under each sentence."
+                return AppLanguage.text("Choose whether the original language sits under each sentence.")
             case .audience:
-                return "Who sees the caption in a screenshot or a call."
+                return AppLanguage.text("Who sees the caption in a screenshot or a call.")
             case .ready:
-                return "Finish here, or open Theater and press Listen."
+                return AppLanguage.text("Finish here, or open Theater and press Listen.")
             }
         }
 

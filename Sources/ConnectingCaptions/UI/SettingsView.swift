@@ -130,22 +130,22 @@ struct SettingsView: View {
         let profiles = self.settings.promptProfiles(for: .dictate)
         let privateAIAvailable = PrivateAIProviderPromptFormat.isAvailable(settings: self.settings)
         HStack {
-            Text("AI Prompt")
+            AppText("AI Prompt")
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(self.settingsSecondaryText)
                 .padding(.leading, 30)
             Spacer()
             Picker("", selection: self.dictationPromptSelectionBinding(for: slot)) {
                 Section("ON-DEVICE") {
-                    Text("Fast — No cleanup").tag("__OFF__")
+                    AppText("Fast — No cleanup").tag("__OFF__")
                     if PrivateFeatures.privateAIProvider {
-                        Text("Cleanup — Fluid-1")
+                        AppText("Cleanup — Fluid-1")
                             .tag(PrivateAIProviderPromptFormat.promptSelectionID)
                             .disabled(!privateAIAvailable)
                     }
                 }
                 Section("EXTERNAL") {
-                    Text("Cleanup").tag("__DEFAULT__")
+                    AppText("Cleanup").tag("__DEFAULT__")
                     ForEach(profiles) { profile in
                         Text(profile.name.isEmpty ? "Untitled" : profile.name)
                             .tag(profile.id)
@@ -204,13 +204,15 @@ struct SettingsView: View {
                 // Startup Card
                 ThemedCard(style: .standard) {
                     VStack(alignment: .leading, spacing: 14) {
-                        FluidSectionHeader(title: "Startup", systemImage: "power")
+                        FluidSectionHeader(title: AppLanguage.text("Startup"), systemImage: "power")
 
                         VStack(spacing: 16) {
+                            AppInterfaceLanguageSettings()
+                            Divider().opacity(0.2)
                             // Launch at startup
                             self.settingsToggleRow(
-                                title: "Launch at startup",
-                                description: "Automatically start \(ConnectingCaptionsProduct.displayName) when you log in",
+                                title: AppLanguage.text("Launch at startup"),
+                                description: AppLanguage.format("Automatically start {0} when you log in", String(describing: ConnectingCaptionsProduct.displayName)),
                                 footnote: self.settings.launchAtStartupStatusMessage,
                                 errorMessage: self.settings.launchAtStartupErrorMessage,
                                 isOn: self.launchAtStartupBinding
@@ -220,8 +222,8 @@ struct SettingsView: View {
 
                             // Show window when launched at login
                             self.settingsToggleRow(
-                                title: "Show window when launched at login",
-                                description: "When off, \(ConnectingCaptionsProduct.displayName) starts silently in the menu bar at login. Opening the app yourself always shows the window.",
+                                title: AppLanguage.text("Show window when launched at login"),
+                                description: AppLanguage.format("When off, {0} starts silently in the menu bar at login. Opening the app yourself always shows the window.", String(describing: ConnectingCaptionsProduct.displayName)),
                                 isOn: Binding(
                                     get: { SettingsStore.shared.showMainWindowAtLoginLaunch },
                                     set: { SettingsStore.shared.showMainWindowAtLoginLaunch = $0 }
@@ -232,45 +234,63 @@ struct SettingsView: View {
 
                             // Hide from Dock & App Switcher
                             self.settingsToggleRow(
-                                title: "Hide from Dock & App Switcher",
-                                description: "Keep \(ConnectingCaptionsProduct.displayName) in the menu bar only (hides Dock icon and Cmd+Tab entry)",
-                                footnote: "Note: May require app restart to take effect.",
+                                title: AppLanguage.text("Hide from Dock & App Switcher"),
+                                description: AppLanguage.format("Keep {0} in the menu bar only (hides Dock icon and Cmd+Tab entry)", String(describing: ConnectingCaptionsProduct.displayName)),
+                                footnote: AppLanguage.text("Note: May require app restart to take effect."),
                                 isOn: Binding(
                                     get: { SettingsStore.shared.hideFromDockAndAppSwitcher },
                                     set: { SettingsStore.shared.hideFromDockAndAppSwitcher = $0 }
                                 )
                             )
                             .settingsSearchTarget(.dockVisibility)
-                            Divider().opacity(0.2)
+                        }
+                    }
+                    .padding(16)
+                }
+                .shownInSettingsSection(.general, selectedSection: self.selectedSection)
 
-                            // Accent Color
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(alignment: .center) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Accent Color")
-                                            .font(self.theme.typography.bodyStrong)
-                                            .foregroundStyle(self.settingsTitleText)
-                                        Text(TheaterSetupWizard.accentDetail)
-                                            .font(self.theme.typography.bodySmall)
-                                            .foregroundStyle(self.settingsSecondaryText)
-                                    }
+                // Appearance Card
+                ThemedCard(style: .standard) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        FluidSectionHeader(title: AppLanguage.text("Appearance"), systemImage: "paintpalette.fill")
 
-                                    Spacer()
-
-                                    AccentColorSwatches(accessibilityIdentifier: "settings.accentColor")
+                        // Accent Color
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .center) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    AppText("Accent Color")
+                                        .font(self.theme.typography.bodyStrong)
+                                        .foregroundStyle(self.settingsTitleText)
+                                    Text(TheaterSetupWizard.accentDetail)
+                                        .font(self.theme.typography.bodySmall)
+                                        .foregroundStyle(self.settingsSecondaryText)
                                 }
-                            }
-                            .settingsSearchTarget(.accentColor)
-                            Divider().opacity(0.2)
 
+                                Spacer()
+
+                                AccentColorSwatches(accessibilityIdentifier: "settings.accentColor")
+                            }
+                        }
+                        .settingsSearchTarget(.accentColor)
+                    }
+                    .padding(16)
+                }
+                .shownInSettingsSection(.general, selectedSection: self.selectedSection)
+
+                // Updates Card
+                ThemedCard(style: .standard) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        FluidSectionHeader(title: AppLanguage.text("Updates"), systemImage: "arrow.triangle.2.circlepath")
+
+                        VStack(alignment: .leading, spacing: 16) {
                             // Automatic Updates
                             VStack(alignment: .leading, spacing: 6) {
                                 HStack(alignment: .center) {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("Automatic Updates")
+                                        AppText("Automatic Updates")
                                             .font(self.theme.typography.bodyStrong)
                                             .foregroundStyle(self.settingsTitleText)
-                                        Text("Off unless you turn it on. Hourly GitHub checks when enabled.")
+                                        AppText("Off unless you turn it on. Hourly GitHub checks when enabled.")
                                             .font(self.theme.typography.bodySmall)
                                             .foregroundStyle(self.settingsSecondaryText)
                                     }
@@ -288,10 +308,10 @@ struct SettingsView: View {
 
                                 HStack(alignment: .center) {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("Beta Releases")
+                                        AppText("Beta Releases")
                                             .font(self.theme.typography.bodyStrong)
                                             .foregroundStyle(self.settingsTitleText)
-                                        Text("Opt in to preview builds that may be unstable")
+                                        AppText("Opt in to preview builds that may be unstable")
                                             .font(self.theme.typography.bodySmall)
                                             .foregroundStyle(self.settingsSecondaryText)
                                     }
@@ -308,23 +328,23 @@ struct SettingsView: View {
                                 }
 
                                 if SettingsStore.shared.betaReleasesEnabled {
-                                    Text("Beta opt-in enabled. Update checks include both stable and beta builds.")
+                                    AppText("Beta opt-in enabled. Update checks include both stable and beta builds.")
                                         .font(.caption)
                                         .foregroundStyle(self.theme.palette.warning)
                                 }
 
                                 if let lastCheck = SettingsStore.shared.lastUpdateCheckDate {
-                                    Text("Last checked: \(lastCheck.formatted(date: .abbreviated, time: .shortened))")
+                                    AppText("Last checked: {0}", arguments: [String(describing: lastCheck.formatted(date: .abbreviated, time: .shortened))])
                                         .font(self.theme.typography.bodySmall)
                                         .foregroundStyle(self.settingsSecondaryText)
                                 }
 
-                                Text("Current version: \(self.currentAppVersion)")
+                                AppText("Current version: {0}", arguments: [String(describing: self.currentAppVersion)])
                                     .font(self.theme.typography.bodySmall)
                                     .foregroundStyle(self.settingsSecondaryText)
 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("A product of \(ConnectingCaptionsProduct.publisherName)")
+                                    AppText("A product of {0}", arguments: [String(describing: ConnectingCaptionsProduct.publisherName)])
                                         .font(self.theme.typography.bodySmall)
                                         .foregroundStyle(self.settingsSecondaryText)
                                     HStack(spacing: 12) {
@@ -343,7 +363,7 @@ struct SettingsView: View {
 
                             // Update Buttons
                             HStack(spacing: 10) {
-                                Button("Check for Updates") {
+                                AppButton("Check for Updates") {
                                     Task { @MainActor in
                                         do {
                                             let includePrerelease = SettingsStore.shared.betaReleasesEnabled
@@ -379,7 +399,7 @@ struct SettingsView: View {
                                 .tint(self.theme.palette.accent)
                                 .controlSize(.regular)
 
-                                Button("Release Notes") {
+                                AppButton("Release Notes") {
                                     if let url = ConnectingCaptionsProduct.releasesURL {
                                         NSWorkspace.shared.open(url)
                                     }
@@ -442,7 +462,7 @@ struct SettingsView: View {
                                 .disabled(self.rollbackVersion.isEmpty || self.isRollingBack)
                                 .opacity(self.isRollingBack ? 0.7 : 1.0)
 
-                                Button("Get Previous Builds") {
+                                AppButton("Get Previous Builds") {
                                     self.openPreviousBuildPicker()
                                 }
                                 .buttonStyle(.bordered)
@@ -451,11 +471,11 @@ struct SettingsView: View {
                             .padding(.top, 12)
 
                             if self.rollbackVersion.isEmpty {
-                                Text("No rollback backup found.")
+                                AppText("No rollback backup found.")
                                     .font(self.theme.typography.bodySmall)
                                     .foregroundStyle(self.settingsSecondaryText)
                             } else {
-                                Text("Rollback target: \(self.rollbackVersion)")
+                                AppText("Rollback target: {0}", arguments: [String(describing: self.rollbackVersion)])
                                     .font(self.theme.typography.bodySmall)
                                     .foregroundStyle(self.settingsSecondaryText)
                             }
@@ -473,7 +493,7 @@ struct SettingsView: View {
                     // Only surface microphone permission when the user needs to act.
                     ThemedCard(style: .standard) {
                         VStack(alignment: .leading, spacing: 14) {
-                            FluidSectionHeader(title: "Microphone Permission", systemImage: "mic.fill")
+                            FluidSectionHeader(title: AppLanguage.text("Microphone Permission"), systemImage: "mic.fill")
 
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack(spacing: 10) {
@@ -490,7 +510,7 @@ struct SettingsView: View {
                                         .font(self.theme.typography.bodyStrong)
                                         .foregroundStyle(self.theme.palette.warning)
 
-                                        Text("Microphone access is required for voice recording")
+                                        AppText("Microphone access is required for voice recording")
                                             .font(self.theme.typography.bodySmall)
                                             .foregroundStyle(self.settingsSecondaryText)
                                     }
@@ -500,7 +520,7 @@ struct SettingsView: View {
                                         Button {
                                             self.asr.requestMicAccess()
                                         } label: {
-                                            Label("Grant Access", systemImage: "mic.fill")
+                                            AppLabel("Grant Access", systemImage: "mic.fill")
                                         }
                                         .buttonStyle(.borderedProminent)
                                         .tint(self.theme.palette.accent)
@@ -509,7 +529,7 @@ struct SettingsView: View {
                                         Button {
                                             self.asr.openSystemSettingsForMic()
                                         } label: {
-                                            Label("Open Settings", systemImage: "gear")
+                                            AppLabel("Open Settings", systemImage: "gear")
                                         }
                                         .buttonStyle(.bordered)
                                         .controlSize(.regular)
@@ -517,7 +537,7 @@ struct SettingsView: View {
                                 }
 
                                 self.instructionsBox(
-                                    title: "How to enable microphone access:",
+                                    title: AppLanguage.text("How to enable microphone access:"),
                                     steps: self.asr.micStatus == .notDetermined
                                         ? ["Click **Grant Access** above", "Choose **Allow** in the system dialog"]
                                         : [
@@ -538,13 +558,13 @@ struct SettingsView: View {
                 ThemedCard(style: .standard) {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack(spacing: 8) {
-                            FluidSectionHeader(title: "Global Hotkey", systemImage: "keyboard")
+                            FluidSectionHeader(title: AppLanguage.text("Global Hotkey"), systemImage: "keyboard")
 
                             Spacer()
 
                             if self.accessibilityEnabled {
                                 if self.isRecordingAnyShortcut {
-                                    Text("Recording…")
+                                    AppText("Recording…")
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(.orange)
                                 } else if self.hotkeyManagerInitialized {
@@ -552,12 +572,12 @@ struct SettingsView: View {
                                         Image(systemName: "checkmark.circle.fill")
                                             .foregroundStyle(Color.fluidGreen)
                                             .font(.caption)
-                                        Text("Active")
+                                        AppText("Active")
                                             .font(.caption.weight(.semibold))
                                             .foregroundStyle(self.settingsSecondaryText)
                                     }
                                 } else {
-                                    Text("Initializing…")
+                                    AppText("Initializing…")
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(self.settingsSecondaryText)
                                 }
@@ -571,7 +591,7 @@ struct SettingsView: View {
                                     HStack(spacing: 8) {
                                         Image(systemName: "hand.point.up.left.fill")
                                             .foregroundStyle(.orange)
-                                        Text("Press your new hotkey combination now…")
+                                        AppText("Press your new hotkey combination now…")
                                             .font(.caption)
                                             .foregroundStyle(.orange)
                                     }
@@ -580,7 +600,7 @@ struct SettingsView: View {
                                         ProgressView()
                                             .controlSize(.small)
                                             .fixedSize()
-                                        Text("Hotkey initializing…")
+                                        AppText("Hotkey initializing…")
                                             .font(.caption)
                                             .foregroundStyle(self.settingsSecondaryText)
                                     }
@@ -589,11 +609,11 @@ struct SettingsView: View {
                                 // MARK: - Shortcuts Section
 
                                 VStack(alignment: .leading, spacing: 8) {
-                                    Text("Shortcuts")
+                                    AppText("Shortcuts")
                                         .font(self.theme.typography.bodySmallStrong)
                                         .foregroundStyle(self.settingsTitleText)
 
-                                    Text("Dictation starts from a shortcut. Theater Listen is on the Theater page.")
+                                    AppText("Dictation starts from a shortcut. Theater Listen is on the Theater page.")
                                         .font(.caption)
                                         .foregroundStyle(self.settingsTertiaryText)
 
@@ -608,8 +628,8 @@ struct SettingsView: View {
                                         content: .init(
                                             icon: "xmark.circle.fill",
                                             iconColor: .secondary,
-                                            title: "Cancel Recording",
-                                            description: "Cancel the current recording or dismiss the active recording overlay"
+                                            title: AppLanguage.text("Cancel Recording"),
+                                            description: AppLanguage.text("Cancel the current recording or dismiss the active recording overlay")
                                         ),
                                         shortcut: self.cancelRecordingShortcut,
                                         isRecording: self.isRecording(.cancel),
@@ -628,8 +648,8 @@ struct SettingsView: View {
                                         content: .init(
                                             icon: "arrow.down.doc",
                                             iconColor: .secondary,
-                                            title: "Paste Last Transcription",
-                                            description: "Re-insert your most recent transcription without using the clipboard"
+                                            title: AppLanguage.text("Paste Last Transcription"),
+                                            description: AppLanguage.text("Re-insert your most recent transcription without using the clipboard")
                                         ),
                                         shortcut: self.pasteLastTranscriptionShortcut,
                                         isRecording: self.isRecording(.pasteLast),
@@ -674,17 +694,17 @@ struct SettingsView: View {
                                         HStack(spacing: 6) {
                                             Image(systemName: "exclamationmark.triangle.fill")
                                                 .foregroundStyle(self.theme.palette.warning)
-                                            Text("Accessibility is only for typing into other apps")
+                                            AppText("Accessibility is only for typing into other apps")
                                                 .font(self.theme.typography.bodyStrong)
                                                 .foregroundStyle(self.theme.palette.warning)
                                         }
-                                        Text("Theater captions do not need this. Enable it to type a translation or dictation into another app.")
+                                        AppText("Theater captions do not need this. Enable it to type a translation or dictation into another app.")
                                             .font(self.theme.typography.bodySmall)
                                             .foregroundStyle(self.settingsSecondaryText)
                                     }
                                     Spacer()
 
-                                    Button("Open Accessibility Settings") {
+                                    AppButton("Open Accessibility Settings") {
                                         self.openAccessibilitySettings()
                                     }
                                     .buttonStyle(.borderedProminent)
@@ -693,7 +713,7 @@ struct SettingsView: View {
                                 }
 
                                 self.instructionsBox(
-                                    title: "Follow these steps to enable Accessibility:",
+                                    title: AppLanguage.text("Follow these steps to enable Accessibility:"),
                                     steps: [
                                         "Click **Open Accessibility Settings** above",
                                         "In the Accessibility window, click the **+ button**",
@@ -704,13 +724,13 @@ struct SettingsView: View {
                                 )
 
                                 HStack(spacing: 10) {
-                                    Button("Reveal in Finder") {
+                                    AppButton("Reveal in Finder") {
                                         self.revealAppInFinder()
                                     }
                                     .buttonStyle(.bordered)
                                     .controlSize(.small)
 
-                                    Button("Open Applications") {
+                                    AppButton("Open Applications") {
                                         self.openApplicationsFolder()
                                     }
                                     .buttonStyle(.bordered)
@@ -724,8 +744,8 @@ struct SettingsView: View {
 
                                 VStack(spacing: 12) {
                                     self.optionToggleRow(
-                                        title: "Start listening with a keyboard shortcut",
-                                        description: "Dictation. Types what you said. Does not translate.",
+                                        title: AppLanguage.text("Start listening with a keyboard shortcut"),
+                                        description: AppLanguage.text("Dictation. Types what you said. Does not translate."),
                                         isOn: Binding(
                                             get: { SettingsStore.shared.listeningHotkeyEnabled },
                                             set: { newValue in
@@ -740,7 +760,7 @@ struct SettingsView: View {
                                     if SettingsStore.shared.listeningHotkeyEnabled {
                                         HStack(alignment: .center) {
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text("Shortcut behavior")
+                                                AppText("Shortcut behavior")
                                                     .font(self.theme.typography.bodyStrong)
                                                     .foregroundStyle(self.settingsTitleText)
                                                 Text(self.hotkeyMode.description)
@@ -752,7 +772,7 @@ struct SettingsView: View {
 
                                             Picker("", selection: self.$hotkeyMode) {
                                                 ForEach(HotkeyActivationMode.allCases) { mode in
-                                                    Text(mode.displayName).tag(mode)
+                                                    AppText(mode.displayName).tag(mode)
                                                 }
                                             }
                                             .pickerStyle(.menu)
@@ -766,8 +786,8 @@ struct SettingsView: View {
                                     }
 
                                     self.optionToggleRow(
-                                        title: "Copy to Clipboard",
-                                        description: "Automatically copy transcribed text to clipboard as a backup.",
+                                        title: AppLanguage.text("Copy to Clipboard"),
+                                        description: AppLanguage.text("Automatically copy transcribed text to clipboard as a backup."),
                                         isOn: self.$copyToClipboard
                                     )
                                     .onChange(of: self.copyToClipboard) { _, newValue in
@@ -778,7 +798,7 @@ struct SettingsView: View {
 
                                     HStack(alignment: .center) {
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text("Text Insertion Mode")
+                                            AppText("Text Insertion Mode")
                                                 .font(self.theme.typography.bodyStrong)
                                                 .foregroundStyle(self.settingsTitleText)
                                             Text(SettingsStore.shared.textInsertionMode.description)
@@ -793,7 +813,7 @@ struct SettingsView: View {
                                             set: { SettingsStore.shared.textInsertionMode = $0 }
                                         )) {
                                             ForEach(SettingsStore.TextInsertionMode.allCases) { mode in
-                                                Text(mode.displayName).tag(mode)
+                                                AppText(mode.displayName).tag(mode)
                                             }
                                         }
                                         .pickerStyle(.menu)
@@ -807,8 +827,8 @@ struct SettingsView: View {
                                     Divider().opacity(0.2)
 
                                     self.optionToggleRow(
-                                        title: "Weekends Don't Break Streak",
-                                        description: "Skip Saturday and Sunday when calculating usage streaks. Perfect for weekday-only users.",
+                                        title: AppLanguage.text("Weekends Don't Break Streak"),
+                                        description: AppLanguage.text("Skip Saturday and Sunday when calculating usage streaks. Perfect for weekday-only users."),
                                         isOn: Binding(
                                             get: { SettingsStore.shared.weekendsDontBreakStreak },
                                             set: { SettingsStore.shared.weekendsDontBreakStreak = $0 }
@@ -818,8 +838,8 @@ struct SettingsView: View {
                                     Divider().opacity(0.2)
 
                                     self.optionToggleRow(
-                                        title: "Skip Silent Recordings",
-                                        description: "Avoid transcription when a recording up to four seconds contains only clear silence. Disabled by default to preserve quiet speech.",
+                                        title: AppLanguage.text("Skip Silent Recordings"),
+                                        description: AppLanguage.text("Avoid transcription when a recording up to four seconds contains only clear silence. Disabled by default to preserve quiet speech."),
                                         isOn: Binding(
                                             get: { SettingsStore.shared.skipSilentRecordingsEnabled },
                                             set: { SettingsStore.shared.skipSilentRecordingsEnabled = $0 }
@@ -839,12 +859,12 @@ struct SettingsView: View {
 
                 ThemedCard(style: .standard) {
                     VStack(alignment: .leading, spacing: 14) {
-                        FluidSectionHeader(title: "Text Formatting", systemImage: "textformat")
+                        FluidSectionHeader(title: AppLanguage.text("Text Formatting"), systemImage: "textformat")
 
                         VStack(spacing: 16) {
                             self.settingsToggleRow(
-                                title: "Lowercase First Letter",
-                                description: "Start each transcription with a lowercase letter.",
+                                title: AppLanguage.text("Lowercase First Letter"),
+                                description: AppLanguage.text("Start each transcription with a lowercase letter."),
                                 isOn: Binding(
                                     get: { self.settings.gaavLowercaseFirstLetterEnabled },
                                     set: { self.settings.gaavLowercaseFirstLetterEnabled = $0 }
@@ -853,8 +873,8 @@ struct SettingsView: View {
                             Divider().opacity(0.2)
 
                             self.settingsToggleRow(
-                                title: "Remove Trailing Period",
-                                description: "Drop a final period from transcriptions.",
+                                title: AppLanguage.text("Remove Trailing Period"),
+                                description: AppLanguage.text("Drop a final period from transcriptions."),
                                 isOn: Binding(
                                     get: { self.settings.gaavRemoveTrailingPeriodEnabled },
                                     set: { self.settings.gaavRemoveTrailingPeriodEnabled = $0 }
@@ -863,8 +883,8 @@ struct SettingsView: View {
                             Divider().opacity(0.2)
 
                             self.settingsToggleRow(
-                                title: "Slash Commands & @ Formatting",
-                                description: "Convert spoken slash commands and supported @ mentions into symbols.",
+                                title: AppLanguage.text("Slash Commands & @ Formatting"),
+                                description: AppLanguage.text("Convert spoken slash commands and supported @ mentions into symbols."),
                                 isOn: Binding(
                                     get: { self.settings.literalDictationFormattingEnabled },
                                     set: { self.settings.literalDictationFormattingEnabled = $0 }
@@ -873,8 +893,8 @@ struct SettingsView: View {
                             Divider().opacity(0.2)
 
                             self.settingsToggleRow(
-                                title: "Space Between Dictations",
-                                description: "Add spacing when consecutive dictations are joined.",
+                                title: AppLanguage.text("Space Between Dictations"),
+                                description: AppLanguage.text("Add spacing when consecutive dictations are joined."),
                                 isOn: Binding(
                                     get: { self.settings.continuousDictationSpacingEnabled },
                                     set: { self.settings.continuousDictationSpacingEnabled = $0 }
@@ -883,8 +903,8 @@ struct SettingsView: View {
                             Divider().opacity(0.2)
 
                             self.settingsToggleRow(
-                                title: "Smart Capitalization",
-                                description: "Use text before the cursor to choose uppercase or lowercase.",
+                                title: AppLanguage.text("Smart Capitalization"),
+                                description: AppLanguage.text("Use text before the cursor to choose uppercase or lowercase."),
                                 isOn: Binding(
                                     get: { self.settings.contextAwareCapitalizationEnabled },
                                     set: { self.settings.contextAwareCapitalizationEnabled = $0 }
@@ -902,8 +922,8 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         VStack(alignment: .leading, spacing: 12) {
                             self.optionToggleRow(
-                                title: "Microphone Changes",
-                                description: "Show an alert when \(ConnectingCaptionsProduct.displayName) changes or loses its microphone.",
+                                title: AppLanguage.text("Microphone Changes"),
+                                description: AppLanguage.format("Show an alert when {0} changes or loses its microphone.", String(describing: ConnectingCaptionsProduct.displayName)),
                                 isOn: Binding(
                                     get: { self.settings.showMicrophoneChangeAlerts },
                                     set: { enabled in
@@ -925,7 +945,7 @@ struct SettingsView: View {
                 ThemedCard(style: .standard) {
                     VStack(alignment: .leading, spacing: 14) {
                         HStack {
-                            FluidSectionHeader(title: "Audio Devices", systemImage: "mic")
+                            FluidSectionHeader(title: AppLanguage.text("Audio Devices"), systemImage: "mic")
 
                             Spacer()
 
@@ -936,7 +956,7 @@ struct SettingsView: View {
                                 self.cachedDefaultInputUID = defaultInput?.uid ?? ""
                                 self.cachedDefaultOutputName = AudioDevice.getDefaultOutputDevice()?.name ?? ""
                             } label: {
-                                Label("Refresh", systemImage: "arrow.clockwise")
+                                AppLabel("Refresh", systemImage: "arrow.clockwise")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -960,14 +980,14 @@ struct SettingsView: View {
                                 }
 
                             HStack {
-                                Text("Output Device")
+                                AppText("Output Device")
                                     .font(self.theme.typography.bodyStrong)
                                     .foregroundStyle(self.settingsTitleText)
                                 Spacer()
                                 Picker("", selection: self.$selectedOutputUID) {
                                     // Handle empty state gracefully
                                     if self.outputDevices.isEmpty {
-                                        Text("Loading...").tag("")
+                                        AppText("Loading...").tag("")
                                     } else {
                                         ForEach(self.outputDevices, id: \.uid) { dev in
                                             // Add "(System Default)" tag using cached name to avoid CoreAudio calls during layout
@@ -1028,24 +1048,24 @@ struct SettingsView: View {
                 // Overlay Settings Card
                 ThemedCard(style: .standard) {
                     VStack(alignment: .leading, spacing: 14) {
-                        FluidSectionHeader(title: "Recording Overlay", systemImage: "rectangle.on.rectangle")
-                        Text("This is the dictation recording chip. It is not Theater.")
+                        FluidSectionHeader(title: AppLanguage.text("Recording Overlay"), systemImage: "rectangle.on.rectangle")
+                        AppText("This is the dictation recording chip. It is not Theater.")
                             .font(self.theme.typography.bodySmall)
                             .foregroundStyle(self.settingsSecondaryText)
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Sensitivity")
+                                    AppText("Sensitivity")
                                         .font(self.theme.typography.bodyStrong)
                                         .foregroundStyle(self.settingsTitleText)
-                                    Text("Control how sensitive the audio visualizer is to sound input")
+                                    AppText("Control how sensitive the audio visualizer is to sound input")
                                         .font(self.theme.typography.bodySmall)
                                         .foregroundStyle(self.settingsSecondaryText)
                                 }
 
                                 Spacer()
 
-                                Button("Reset") {
+                                AppButton("Reset") {
                                     self.visualizerNoiseThreshold = 0.4
                                     SettingsStore.shared.visualizerNoiseThreshold = self.visualizerNoiseThreshold
                                 }
@@ -1055,7 +1075,7 @@ struct SettingsView: View {
                             .settingsSearchTarget(.overlaySensitivity)
 
                             HStack(spacing: 10) {
-                                Text("More")
+                                AppText("More")
                                     .font(.caption)
                                     .foregroundStyle(self.settingsSecondaryText)
                                     .frame(width: 36, alignment: .trailing)
@@ -1063,7 +1083,7 @@ struct SettingsView: View {
                                 Slider(value: self.$visualizerNoiseThreshold, in: 0.01...0.8, step: 0.01)
                                     .controlSize(.regular)
 
-                                Text("Less")
+                                AppText("Less")
                                     .font(.caption)
                                     .foregroundStyle(self.settingsSecondaryText)
                                     .frame(width: 36, alignment: .leading)
@@ -1079,10 +1099,10 @@ struct SettingsView: View {
                             // Overlay Position
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Overlay Position")
+                                    AppText("Overlay Position")
                                         .font(self.theme.typography.bodyStrong)
                                         .foregroundStyle(self.settingsTitleText)
-                                    Text("Where the recording indicator appears on screen")
+                                    AppText("Where the recording indicator appears on screen")
                                         .font(self.theme.typography.bodySmall)
                                         .foregroundStyle(self.settingsSecondaryText)
                                 }
@@ -1091,7 +1111,7 @@ struct SettingsView: View {
 
                                 Picker("", selection: self.$settings.overlayPosition) {
                                     ForEach(SettingsStore.OverlayPosition.allCases, id: \.self) { position in
-                                        Text(position.displayName).tag(position)
+                                        AppText(position.displayName).tag(position)
                                     }
                                 }
                                 .pickerStyle(.menu)
@@ -1104,23 +1124,23 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack(alignment: .top) {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("Transcription Preview Length")
+                                        AppText("Transcription Preview Length")
                                             .font(self.theme.typography.bodyStrong)
                                             .foregroundStyle(self.settingsTitleText)
-                                        Text("How many recent characters appear in the notch/pill preview")
+                                        AppText("How many recent characters appear in the notch/pill preview")
                                             .font(self.theme.typography.bodySmall)
                                             .foregroundStyle(self.settingsSecondaryText)
                                     }
 
                                     Spacer()
 
-                                    Text("\(self.settings.transcriptionPreviewCharLimit) chars")
+                                    AppText("{0} chars", arguments: [String(describing: self.settings.transcriptionPreviewCharLimit)])
                                         .font(.caption.monospaced())
                                         .foregroundStyle(self.settingsSecondaryText)
                                 }
 
                                 HStack(spacing: 10) {
-                                    Text("Less")
+                                    AppText("Less")
                                         .font(.caption)
                                         .foregroundStyle(self.settingsSecondaryText)
                                         .frame(width: 36, alignment: .trailing)
@@ -1135,7 +1155,7 @@ struct SettingsView: View {
                                     )
                                     .controlSize(.regular)
 
-                                    Text("More")
+                                    AppText("More")
                                         .font(.caption)
                                         .foregroundStyle(self.settingsSecondaryText)
                                         .frame(width: 36, alignment: .leading)
@@ -1164,7 +1184,7 @@ struct SettingsView: View {
                                 if self.settings.overlayPosition == .bottom {
                                     Picker("", selection: self.$settings.overlaySize) {
                                         ForEach(SettingsStore.OverlaySize.allCases, id: \.self) { size in
-                                            Text(size.displayName).tag(size)
+                                            AppText(size.displayName).tag(size)
                                         }
                                     }
                                     .pickerStyle(.menu)
@@ -1172,7 +1192,7 @@ struct SettingsView: View {
                                 } else {
                                     Picker("", selection: self.$settings.notchPresentationMode) {
                                         ForEach(SettingsStore.NotchPresentationMode.allCases, id: \.self) { mode in
-                                            Text(mode.displayName).tag(mode)
+                                            AppText(mode.displayName).tag(mode)
                                         }
                                     }
                                     .pickerStyle(.menu)
@@ -1183,10 +1203,10 @@ struct SettingsView: View {
 
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Live Preview")
+                                    AppText("Live Preview")
                                         .font(self.theme.typography.bodyStrong)
                                         .foregroundStyle(self.settingsTitleText)
-                                    Text("Show transcription text in the overlay while you speak")
+                                    AppText("Show transcription text in the overlay while you speak")
                                         .font(self.theme.typography.bodySmall)
                                         .foregroundStyle(self.settingsSecondaryText)
                                 }
@@ -1208,10 +1228,10 @@ struct SettingsView: View {
                                 // Bottom Offset
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("Bottom Offset")
+                                        AppText("Bottom Offset")
                                             .font(self.theme.typography.bodyStrong)
                                             .foregroundStyle(self.settingsTitleText)
-                                        Text("Distance from bottom of screen")
+                                        AppText("Distance from bottom of screen")
                                             .font(self.theme.typography.bodySmall)
                                             .foregroundStyle(self.settingsSecondaryText)
                                     }
@@ -1223,7 +1243,7 @@ struct SettingsView: View {
                                             .frame(width: 110)
                                             .controlSize(.small)
 
-                                        Text("\(Int(self.settings.overlayBottomOffset)) px")
+                                        AppText("{0} px", arguments: [String(describing: Int(self.settings.overlayBottomOffset))])
                                             .font(.caption.monospaced())
                                             .foregroundStyle(self.settingsSecondaryText)
                                             .frame(width: 54, alignment: .trailing)
@@ -1234,7 +1254,7 @@ struct SettingsView: View {
                             }
 
                             if self.asr.isRunning {
-                                Text("Settings are disabled during active recording")
+                                AppText("Settings are disabled during active recording")
                                     .font(.caption)
                                     .foregroundStyle(self.settingsSecondaryText)
                                     .italic()
@@ -1262,12 +1282,12 @@ struct SettingsView: View {
                 // Debug Settings Card
                 ThemedCard(style: .standard) {
                     VStack(alignment: .leading, spacing: 14) {
-                        FluidSectionHeader(title: "Debug Settings", systemImage: "ladybug.fill")
+                        FluidSectionHeader(title: AppLanguage.text("Debug Settings"), systemImage: "ladybug.fill")
 
                         VStack(alignment: .leading, spacing: 8) {
                             self.settingsToggleRow(
-                                title: "Show Debug Logs in App",
-                                description: "File logs are always collected for diagnostics.",
+                                title: AppLanguage.text("Show Debug Logs in App"),
+                                description: AppLanguage.text("File logs are always collected for diagnostics."),
                                 isOn: Binding(
                                     get: { SettingsStore.shared.enableDebugLogs },
                                     set: { SettingsStore.shared.enableDebugLogs = $0 }
@@ -1284,15 +1304,17 @@ struct SettingsView: View {
                                     DebugLogger.shared.info("Log file not found at \(url.path)", source: "SettingsView")
                                 }
                             } label: {
-                                Label("Reveal Log File", systemImage: "doc.richtext")
+                                AppLabel("Reveal Log File", systemImage: "doc.richtext")
                             }
                             .buttonStyle(.bordered)
                             .controlSize(.regular)
 
-                            Text("The debug log contains detailed information about app operations and can help with troubleshooting.")
+                            DiagnosticLogClearButton()
+
+                            AppText("The debug log contains detailed information about app operations and can help with troubleshooting.")
                                 .font(self.theme.typography.bodySmall)
                                 .foregroundStyle(self.settingsSecondaryText)
-                            Text("Crash diagnostics are written to Library/Logs/connectingCaptions/connectingCaptions.log by default.")
+                            AppText("Crash diagnostics are written to Library/Logs/connectingCaptions/connectingCaptions.log by default.")
                                 .font(self.theme.typography.bodySmall)
                                 .foregroundStyle(self.settingsSecondaryText)
                         }
@@ -1305,8 +1327,8 @@ struct SettingsView: View {
                 ThemedCard(style: .standard) {
                     VStack(alignment: .leading, spacing: 14) {
                         self.settingsToggleRow(
-                            title: "Show Performance in History",
-                            description: "Display transcription time and optional cleanup time.",
+                            title: AppLanguage.text("Show Performance in History"),
+                            description: AppLanguage.text("Display transcription time and optional cleanup time."),
                             isOn: Binding(
                                 get: { SettingsStore.shared.showHistoryPerformanceMetrics },
                                 set: { SettingsStore.shared.showHistoryPerformanceMetrics = $0 }
@@ -1318,15 +1340,15 @@ struct SettingsView: View {
 
                         HStack(alignment: .center) {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Run Onboarding Again")
+                                AppText("Run Onboarding Again")
                                     .font(self.theme.typography.bodyStrong)
                                     .foregroundStyle(self.settingsTitleText)
-                                Text("Replay the first-run Theater setup. Your models and settings stay.")
+                                AppText("Replay the first-run Theater setup. Your models and settings stay.")
                                     .font(self.theme.typography.bodySmall)
                                     .foregroundStyle(self.settingsSecondaryText)
                             }
                             Spacer()
-                            Button("Run Onboarding") {
+                            AppButton("Run Onboarding") {
                                 self.settings.resetOnboardingProgress()
                             }
                             .buttonStyle(.bordered)
@@ -1377,12 +1399,12 @@ struct SettingsView: View {
             try data.write(to: url, options: .atomic)
 
             self.presentInfoAlert(
-                title: "Backup Exported",
-                message: "Saved your \(ConnectingCaptionsProduct.displayName) backup to:\n\(url.path)"
+                title: AppLanguage.text("Backup Exported"),
+                message: AppLanguage.format("Saved your {0} backup to:\n{1}", String(describing: ConnectingCaptionsProduct.displayName), String(describing: url.path))
             )
         } catch {
             self.presentErrorAlert(
-                title: "Backup Export Failed",
+                title: AppLanguage.text("Backup Export Failed"),
                 message: error.localizedDescription
             )
         }
@@ -1427,12 +1449,12 @@ struct SettingsView: View {
             self.syncLocalSettingsAfterBackupRestore()
 
             self.presentInfoAlert(
-                title: "Backup Imported",
-                message: "Your settings, prompt profiles, and stats were restored successfully."
+                title: AppLanguage.text("Backup Imported"),
+                message: AppLanguage.text("Your settings, prompt profiles, and stats were restored successfully.")
             )
         } catch {
             self.presentErrorAlert(
-                title: "Backup Import Failed",
+                title: AppLanguage.text("Backup Import Failed"),
                 message: error.localizedDescription
             )
         }
@@ -1442,24 +1464,37 @@ struct SettingsView: View {
         self.refreshAudioHistoryUsage()
     }
 
+    /// Handing the audio walk to the background is the whole point of this
+    /// helper. Counting every saved `.wav` on the main actor stalls the settings
+    /// panel for as long as the walk takes, and four of the call sites below run
+    /// inside a click or a modal alert, where the stall is the whole interaction.
+    /// Nothing reads `audioHistoryUsageBytes` on the same turn, so a late but
+    /// non-blocking number is strictly better than an on-time frozen panel.
     func refreshAudioHistoryUsage() {
-        self.audioHistoryUsageBytes = DictationAudioHistoryStore.shared.audioUsageBytes()
-        self.audioHistoryBudgetText = Self.audioBudgetText(for: SettingsStore.shared.audioHistoryBudgetGB)
+        Task { await self.refreshAudioHistoryUsageInBackground() }
     }
 
-    func applyAudioHistoryBudget() {
+    func applyAudioHistoryBudget() async {
         let normalized = self.audioHistoryBudgetText
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: ",", with: ".")
         guard let value = Double(normalized), value > 0 else {
-            self.presentErrorAlert(title: "Invalid Budget", message: "Enter a positive number of GB.")
+            self.presentErrorAlert(title: AppLanguage.text("Invalid Budget"), message: AppLanguage.text("Enter a positive number of GB."))
             self.refreshAudioHistoryUsage()
             return
         }
 
         let newBudget = max(0.1, value)
         let newBudgetBytes = DictationAudioHistoryStore.bytes(forGigabytes: newBudget)
-        if self.audioHistoryUsageBytes > newBudgetBytes {
+        // Measure fresh usage rather than trusting `audioHistoryUsageBytes`, which is
+        // populated by a background scan and can still read its 0 default here — a
+        // stale/zero value would skip this confirmation while pruning still deletes
+        // real audio below.
+        let currentUsageBytes = await Task.detached(priority: .utility) {
+            DictationAudioHistoryStore.shared.audioUsageBytes()
+        }.value
+        self.audioHistoryUsageBytes = currentUsageBytes
+        if currentUsageBytes > newBudgetBytes {
             let confirm = NSAlert()
             confirm.messageText = "Prune saved audio?"
             confirm.informativeText = """
@@ -1475,10 +1510,15 @@ struct SettingsView: View {
         }
 
         SettingsStore.shared.audioHistoryBudgetGB = newBudget
-        let pruned = TranscriptionHistoryStore.shared.pruneAudioToBudget()
-        self.refreshAudioHistoryUsage()
-        if pruned > 0 {
-            self.presentInfoAlert(title: "Audio Pruned", message: "Deleted oldest saved audio from \(pruned) history entries.")
+        do {
+            let pruned = try await TranscriptionHistoryStore.shared.pruneAudioToBudget()
+            self.refreshAudioHistoryUsage()
+            if pruned > 0 {
+                self.presentInfoAlert(title: AppLanguage.text("Audio Pruned"), message: AppLanguage.format("Deleted oldest saved audio from {0} history entries.", String(describing: pruned)))
+            }
+        } catch {
+            self.refreshAudioHistoryUsage()
+            self.presentInfoAlert(title: AppLanguage.text("Audio Pruning Failed"), message: error.localizedDescription)
         }
     }
 
@@ -1493,7 +1533,7 @@ struct SettingsView: View {
 
         let removed = TranscriptionHistoryStore.shared.deleteAllSavedAudio()
         self.refreshAudioHistoryUsage()
-        self.presentInfoAlert(title: "Audio Deleted", message: "Removed audio from \(removed) history entries.")
+        self.presentInfoAlert(title: AppLanguage.text("Audio Deleted"), message: AppLanguage.format("Removed audio from {0} history entries.", String(describing: removed)))
     }
 
     func exportAudioZip() {
@@ -1512,13 +1552,13 @@ struct SettingsView: View {
                 panel.nameFieldStringValue = DictationAudioHistoryStore.shared.suggestedAudioExportFilename()
 
                 guard panel.runModal() == .OK, let url = panel.url else { return }
-                try DictationAudioHistoryStore.shared.exportAudioArchive(
+                try await DictationAudioHistoryStore.shared.exportAudioArchive(
                     entries: entries,
                     to: url
                 )
-                self.presentInfoAlert(title: "Audio Export Saved", message: "Saved your dictation audio export to:\n\(url.path)")
+                self.presentInfoAlert(title: AppLanguage.text("Audio Export Saved"), message: AppLanguage.format("Saved your dictation audio export to:\n{0}", String(describing: url.path)))
             } catch {
-                self.presentErrorAlert(title: "Audio Export Failed", message: error.localizedDescription)
+                self.presentErrorAlert(title: AppLanguage.text("Audio Export Failed"), message: error.localizedDescription)
             }
         }
     }

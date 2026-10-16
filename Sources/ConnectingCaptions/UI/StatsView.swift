@@ -73,7 +73,7 @@ struct StatsView: View {
                 // Greeting + streak badge
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Today")
+                        AppText("Today")
                             .font(.system(size: 28, weight: .bold, design: .rounded))
                             .foregroundStyle(.primary)
 
@@ -92,7 +92,7 @@ struct StatsView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "flame.fill")
                                 .font(.system(size: 11))
-                            Text("\(streak) day\(streak == 1 ? "" : "s")")
+                            AppText("{0} day{1}", arguments: [String(describing: streak), String(describing: streak == 1 ? "" : "s")])
                                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                         }
                         .foregroundStyle(self.theme.palette.warning)
@@ -149,7 +149,7 @@ struct StatsView: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
 
-                Text(label)
+                AppText(label)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -182,7 +182,7 @@ struct StatsView: View {
     // MARK: - Time Saved Card
 
     private var timeSavedCard: some View {
-        StatCard(title: "TIME SAVED", icon: "clock.fill") {
+        StatCard(title: AppLanguage.text("TIME SAVED"), icon: "clock.fill") {
             VStack(alignment: .leading, spacing: 8) {
                 Text(self.historyStore.formattedTimeSaved(typingWPM: self.settings.userTypingWPM))
                     .font(.system(size: 32, weight: .bold, design: .rounded))
@@ -193,7 +193,7 @@ struct StatsView: View {
                     self.showWPMEditor = true
                 } label: {
                     HStack(spacing: 4) {
-                        Text("Based on \(self.settings.userTypingWPM) WPM typing")
+                        AppText("Based on {0} WPM typing", arguments: [String(describing: self.settings.userTypingWPM)])
                             .font(.system(size: 11))
                         Image(systemName: "pencil")
                             .font(.system(size: 9))
@@ -210,31 +210,31 @@ struct StatsView: View {
 
     private var wpmEditorPopover: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Your Typing Speed")
+            AppText("Your Typing Speed")
                 .font(.system(size: 13, weight: .semibold))
 
             HStack {
-                TextField("WPM", text: self.$editingWPM)
+                TextField(AppLanguage.text("WPM"), text: self.$editingWPM)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 60)
                     .multilineTextAlignment(.center)
 
-                Text("words per minute")
+                AppText("words per minute")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
 
-            Text("Average typing: 40 WPM\nProfessional: 65-75 WPM")
+            AppText("Average typing: 40 WPM\nProfessional: 65-75 WPM")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
 
             HStack {
-                Button("Cancel") {
+                AppButton("Cancel") {
                     self.showWPMEditor = false
                 }
                 .fluidButton(.compact, size: .small)
 
-                Button("Save") {
+                AppButton("Save") {
                     if let wpm = Int(editingWPM), wpm > 0 {
                         self.settings.userTypingWPM = wpm
                     }
@@ -250,7 +250,7 @@ struct StatsView: View {
     // MARK: - Total Words Card
 
     private var totalWordsCard: some View {
-        StatCard(title: "TOTAL WORDS", icon: "text.word.spacing") {
+        StatCard(title: AppLanguage.text("TOTAL WORDS"), icon: "text.word.spacing") {
             VStack(alignment: .leading, spacing: 8) {
                 Text(self.formatNumber(self.historyStore.totalWords))
                     .font(.system(size: 32, weight: .bold, design: .rounded))
@@ -258,11 +258,11 @@ struct StatsView: View {
 
                 let today = self.historyStore.wordsToday
                 if today > 0 {
-                    Text("+\(self.formatNumber(today)) today")
+                    AppText("+{0} today", arguments: [String(describing: self.formatNumber(today))])
                         .font(.system(size: 11))
                         .foregroundStyle(self.theme.palette.success)
                 } else {
-                    Text(TheaterReadiness.openTheaterAndListen)
+                    AppText(TheaterReadiness.openTheaterAndListen)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -273,10 +273,10 @@ struct StatsView: View {
     // MARK: - Streak Card
 
     private var streakCard: some View {
-        StatCard(title: "CURRENT STREAK", icon: "flame.fill") {
+        StatCard(title: AppLanguage.text("CURRENT STREAK"), icon: "flame.fill") {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("\(self.historyStore.currentStreak)")
+                    AppText("{0}", arguments: [String(describing: self.historyStore.currentStreak)])
                         .font(.system(size: 32, weight: .bold, design: .rounded))
                         .foregroundStyle(self.historyStore.currentStreak > 0 ? self.theme.palette.warning : .primary)
 
@@ -285,7 +285,7 @@ struct StatsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text("Best: \(self.historyStore.bestStreak) days")
+                AppText("Best: {0} days", arguments: [String(describing: self.historyStore.bestStreak)])
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -295,13 +295,13 @@ struct StatsView: View {
     // MARK: - Transcriptions Card
 
     private var transcriptionsCard: some View {
-        StatCard(title: "SESSIONS", icon: "doc.text.fill") {
+        StatCard(title: AppLanguage.text("SESSIONS"), icon: "doc.text.fill") {
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(self.historyStore.totalEntryCount)")
+                AppText("{0}", arguments: [String(describing: self.historyStore.totalEntryCount)])
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundStyle(.primary)
 
-                Text("Avg: \(self.historyStore.averageWordsPerTranscription) words each")
+                AppText("Avg: {0} words each", arguments: [String(describing: self.historyStore.averageWordsPerTranscription)])
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -314,15 +314,15 @@ struct StatsView: View {
         ThemedCard(style: .standard, padding: 16, hoverEffect: false) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Label("ACTIVITY", systemImage: "chart.bar.fill")
+                    AppLabel("ACTIVITY", systemImage: "chart.bar.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
 
                     Spacer()
 
                     Picker("", selection: self.$chartDays) {
-                        Text("7 days").tag(7)
-                        Text("30 days").tag(30)
+                        AppText("7 days").tag(7)
+                        AppText("30 days").tag(30)
                     }
                     .pickerStyle(.segmented)
                     .frame(width: 140)
@@ -339,7 +339,7 @@ struct StatsView: View {
                             Image(systemName: "chart.bar")
                                 .font(.system(size: 24))
                                 .foregroundStyle(.tertiary)
-                            Text("No activity yet")
+                            AppText("No activity yet")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                         }
@@ -390,11 +390,11 @@ struct StatsView: View {
                         let totalPeriod = data.reduce(0) { $0 + $1.words }
                         let activeDays = data.filter { $0.words > 0 }.count
 
-                        Text("\(self.formatNumber(totalPeriod)) words")
+                        AppText("{0} words", arguments: [String(describing: self.formatNumber(totalPeriod))])
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.primary)
 
-                        Text("across \(activeDays) active days")
+                        AppText("across {0} active days", arguments: [String(describing: activeDays)])
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
 
@@ -412,7 +412,7 @@ struct StatsView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
 
-            Text("\(self.formatNumber(item.words)) \(item.words == 1 ? "word" : "words")")
+            AppText("{0} {1}", arguments: [String(describing: self.formatNumber(item.words)), String(describing: item.words == 1 ? "word" : "words")])
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
@@ -438,13 +438,13 @@ struct StatsView: View {
         ThemedCard(style: .standard, padding: 16, hoverEffect: false) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
-                    Label("MILESTONES", systemImage: "flag.fill")
+                    AppLabel("MILESTONES", systemImage: "flag.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
 
                     Spacer()
 
-                    Text("\(self.historyStore.totalMilestonesAchieved)/\(self.historyStore.totalMilestonesPossible)")
+                    AppText("{0}/{1}", arguments: [String(describing: self.historyStore.totalMilestonesAchieved), String(describing: self.historyStore.totalMilestonesPossible)])
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(self.theme.palette.accent)
                 }
@@ -452,19 +452,19 @@ struct StatsView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     // Word milestones
                     self.milestoneRow(
-                        title: "Words",
+                        title: AppLanguage.text("Words"),
                         milestones: self.historyStore.wordMilestones
                     )
 
                     // Transcription milestones
                     self.milestoneRow(
-                        title: "Sessions",
+                        title: AppLanguage.text("Sessions"),
                         milestones: self.historyStore.transcriptionMilestones
                     )
 
                     // Streak milestones
                     self.milestoneRow(
-                        title: "Streak",
+                        title: AppLanguage.text("Streak"),
                         milestones: self.historyStore.streakMilestones
                     )
                 }
@@ -474,7 +474,7 @@ struct StatsView: View {
 
     private func milestoneRow(title: String, milestones: [(target: Int, achieved: Bool, label: String)]) -> some View {
         HStack(spacing: 8) {
-            Text(title)
+            AppText(title)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 80, alignment: .leading)
@@ -506,7 +506,7 @@ struct StatsView: View {
     private var insightsCard: some View {
         ThemedCard(style: .standard, padding: 16, hoverEffect: false) {
             VStack(alignment: .leading, spacing: 12) {
-                Label("INSIGHTS", systemImage: "lightbulb.fill")
+                AppLabel("INSIGHTS", systemImage: "lightbulb.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
 
@@ -517,7 +517,7 @@ struct StatsView: View {
                     // Top Apps
                     self.insightItem(
                         icon: "app.fill",
-                        title: "Top Apps",
+                        title: AppLanguage.text("Top Apps"),
                         value: self.historyStore.topAppsFormatted(limit: 3).joined(separator: ", "),
                         fallback: "No data yet"
                     )
@@ -525,7 +525,7 @@ struct StatsView: View {
                     // AI Enhancement Rate
                     self.insightItem(
                         icon: "sparkles",
-                        title: "AI Enhanced",
+                        title: AppLanguage.text("AI Enhanced"),
                         value: "\(self.historyStore.aiEnhancementRate)%",
                         fallback: "0%"
                     )
@@ -533,7 +533,7 @@ struct StatsView: View {
                     // Peak Hours
                     self.insightItem(
                         icon: "clock.fill",
-                        title: "Peak Time",
+                        title: AppLanguage.text("Peak Time"),
                         value: self.historyStore.peakHourFormatted,
                         fallback: "N/A"
                     )
@@ -541,7 +541,7 @@ struct StatsView: View {
                     // Avg Length
                     self.insightItem(
                         icon: "ruler.fill",
-                        title: "Avg Length",
+                        title: AppLanguage.text("Avg Length"),
                         value: "\(self.historyStore.averageWordsPerTranscription) words",
                         fallback: "0 words"
                     )
@@ -558,7 +558,7 @@ struct StatsView: View {
                 .frame(width: 20)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                AppText(title)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
 
@@ -580,23 +580,23 @@ struct StatsView: View {
     private var recordsCard: some View {
         ThemedCard(style: .standard, padding: 16, hoverEffect: false) {
             VStack(alignment: .leading, spacing: 12) {
-                Label("PERSONAL RECORDS", systemImage: "trophy.fill")
+                AppLabel("PERSONAL RECORDS", systemImage: "trophy.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 12) {
                     self.recordItem(
-                        title: "Longest Session",
+                        title: AppLanguage.text("Longest Session"),
                         value: "\(self.historyStore.longestTranscriptionWords) words"
                     )
 
                     self.recordItem(
-                        title: "Most Words in a Day",
+                        title: AppLanguage.text("Most Words in a Day"),
                         value: "\(self.formatNumber(self.historyStore.mostWordsInDay)) words"
                     )
 
                     self.recordItem(
-                        title: "Most in a Day",
+                        title: AppLanguage.text("Most in a Day"),
                         value: "\(self.historyStore.mostTranscriptionsInDay) sessions"
                     )
                 }
@@ -606,7 +606,7 @@ struct StatsView: View {
 
     private func recordItem(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title)
+            AppText(title)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
 
@@ -635,7 +635,7 @@ struct StatsView: View {
             Button {
                 self.showResetConfirmation = true
             } label: {
-                Label("Reset All Stats", systemImage: "trash")
+                AppLabel("Reset All Stats", systemImage: "trash")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
@@ -646,13 +646,13 @@ struct StatsView: View {
             Spacer()
         }
         .padding(.top, 8)
-        .alert("Reset All Stats", isPresented: self.$showResetConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Reset Everything", role: .destructive) {
+        .alert(AppLanguage.text("Reset All Stats"), isPresented: self.$showResetConfirmation) {
+            AppButton("Cancel", role: .cancel) {}
+            AppButton("Reset Everything", role: .destructive) {
                 self.historyStore.clearAllHistory()
             }
         } message: {
-            Text("This will permanently delete all \(self.historyStore.totalEntryCount) sessions and reset all statistics. This action cannot be undone.")
+            AppText("This will permanently delete all {0} sessions and reset all statistics. This action cannot be undone.", arguments: [String(describing: self.historyStore.totalEntryCount)])
         }
     }
 

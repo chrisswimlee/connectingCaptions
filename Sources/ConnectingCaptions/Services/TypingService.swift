@@ -381,6 +381,7 @@ final class TypingService {
         postInsertionKey: SettingsStore.SpokenSendKey? = nil,
         requiredFocusTarget: CapturedFocusTarget? = nil,
         preferPaste: Bool = false,
+        requiredTargetBundleID: String? = nil,
         completion: (@MainActor (DeliveryOutcome) -> Void)? = nil
     ) {
         let requestedAt = ProcessInfo.processInfo.systemUptime
@@ -397,7 +398,6 @@ final class TypingService {
             "request chars=\(text.count) mode=\(mode.rawValue) autocompleteSteps=\(plan.steps.count) preferredPID=\(preferredTargetPID.map { String($0) } ?? "nil") textReadyAgeMs=\(textReadyAge.map { String($0) } ?? "nil")"
         )
         self.log("[TypingService] ENTRY: typeTextInstantly called with text length: \(text.count)")
-        self.log("[TypingService] Text preview: \"\(String(text.prefix(100)))\"")
 
         guard text.isEmpty == false || postInsertionKey != nil else {
             self.bench("request_return reason=empty_text")
@@ -494,7 +494,8 @@ final class TypingService {
                     let inserted = self.insertTextInstantly(
                         text,
                         preferredTargetPID: preferredTargetPID,
-                        preferPaste: preferPaste
+                        preferPaste: preferPaste,
+                        requiredTargetBundleID: requiredTargetBundleID
                     )
                     self.bench(
                         "insert_return elapsedMs=\(Self.elapsedMs(since: insertStartedAt)) totalMs=\(Self.elapsedMs(since: requestedAt))"
@@ -561,9 +562,26 @@ final class TypingService {
 
     // MARK: - Internal insertion pipeline
 
-    private func insertTextInstantly(_ text: String, preferredTargetPID: pid_t?, preferPaste: Bool = false) -> Bool {
+    private func insertTextInstantly(
+        _ text: String,
+        preferredTargetPID: pid_t?,
+        preferPaste: Bool = false,
+        requiredTargetBundleID: String? = nil
+    ) -> Bool {
         self.log("[TypingService] insertTextInstantly called with \(text.count) characters")
-        self.log("[TypingService] Attempting to type text: \"\(text.prefix(50))\(text.count > 50 ? "..." : "")\"")
+
+        if let requiredTargetBundleID {
+            let runningBundleID = preferredTargetPID.flatMap { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
+            guard let targetPID = TheaterInsertDelivery.capturedTargetPID(
+                recordedPID: preferredTargetPID, recordedBundleID: requiredTargetBundleID, runningBundleID: runningBundleID
+            ) else { return false }
+            // Captured-target delivery must never fall back to the current app or global events.
+            if preferPaste || self.textInsertionMode == .reliablePaste || InsertIMEGuard.shouldAvoidUnicodeInjection()
+                || self.isGhosttyApplication(pid: targetPID) {
+                return self.insertTextViaClipboardToPid(text, targetPID: targetPID)
+            }
+            return self.insertTextBulkInstant(text, targetPID: targetPID)
+        }
 
         if preferPaste || InsertIMEGuard.shouldAvoidUnicodeInjection() {
             self.log("[TypingService] Korean/Thai IME or caption language; forcing Reliable Paste")

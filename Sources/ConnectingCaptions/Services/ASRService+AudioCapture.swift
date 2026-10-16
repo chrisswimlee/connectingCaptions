@@ -42,6 +42,7 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
     var resampleSourceFrameCursor: Int64 = 0
     var resampleNextSourcePosition: Double = 0
     var resamplePreviousSample: Float?
+    var resampleAntiAliasFilter: SpeechAntiAliasFilter?
     var lastInputSampleEnd: Int64?
     var captureHealthSampleCount: Int = 0
     var captureHealthTotalSampleCount: Int = 0
@@ -319,7 +320,11 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
             self.audioBuffer.append(wall)
             self.needsResumeSilenceWall = false
         }
-        self.audioBuffer.append(mono16k)
+        self.audioBuffer.append(mono16k, hostTime: Self.hostTime(
+            inputHostTime,
+            advancedByFrames: acceptedRange.lowerBound,
+            sampleRate: sampleRate
+        ))
         self.onAcceptedSamples(mono16k)
         if shouldReportFirstAudio {
             let acceptedHostTime = Self.hostTime(
@@ -439,6 +444,7 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
         self.resampleSourceFrameCursor = 0
         self.resampleNextSourcePosition = 0
         self.resamplePreviousSample = nil
+        self.resampleAntiAliasFilter = nil
     }
 
     func resetCaptureHealthLocked() {
@@ -448,22 +454,26 @@ final nonisolated class AudioCapturePipeline: @unchecked Sendable {
         self.captureHealthPeak = 0
     }
 
-    /// Stateful linear resampling keeps fractional phase across small hardware
-    /// callbacks. Stateless per-packet conversion silently shortens 44.1 kHz
-    /// recordings and introduces a discontinuity at every device cycle.
+    /// Band-limited conversion retains filter history and fractional phase across
+    /// packets. Filtering before decimation prevents high frequencies from aliasing
+    /// into speech; preserving phase avoids shortening 44.1 kHz recordings.
     func resampleTo16kLocked(
         _ samples: [Float],
         sourceSampleRate: Double
     ) -> [Float] {
-        guard samples.isEmpty == false else { return [] }
+        guard !samples.isEmpty, sourceSampleRate.isFinite, sourceSampleRate > 0 else { return [] }
         if abs(self.resampleSourceRate - sourceSampleRate) > 0.5 {
             self.resetResamplerLocked()
             self.resampleSourceRate = sourceSampleRate
+            if sourceSampleRate > 16_000 {
+                self.resampleAntiAliasFilter = SpeechAntiAliasFilter(sourceSampleRate: sourceSampleRate)
+            }
         }
         if sourceSampleRate == 16_000.0 {
             return samples
         }
 
+        let samples = self.resampleAntiAliasFilter?.process(samples) ?? samples
         let chunkStart = Double(self.resampleSourceFrameCursor)
         let chunkEnd = chunkStart + Double(samples.count)
         let step = sourceSampleRate / 16_000.0

@@ -190,7 +190,6 @@ enum SpokenLanguageResolver {
     static func voiceEngineMismatchMessage(settings: SettingsStore = .shared) -> String? {
         let source = self.sourceLanguage(settings: settings)
         let spoken = self.heardLanguage(settings: settings)
-
         if source.id == TranslationLanguageCatalog.thai.id,
            self.shouldWarnThaiNemotron(settings: settings, spoken: spoken)
         {
@@ -203,7 +202,7 @@ enum SpokenLanguageResolver {
             if VoiceEngineLanguageCatalog.supports(settings.selectedSpeechModel, languageID: source.id) {
                 return nil
             }
-            return "\(settings.selectedSpeechModel.displayName) does not hear \(source.displayName). Switch Voice Engine to Apple Speech or Whisper."
+            return "\(settings.selectedSpeechModel.displayName) does not hear \(source.displayName). Choose a Voice Engine that lists this language as supported."
         }
 
         guard !self.voiceEngineSupportsSource(settings: settings) else { return nil }
@@ -243,10 +242,13 @@ enum SpokenLanguageResolver {
     }
 
     static func stageEngineSummary(settings: SettingsStore = .shared) -> String {
+        let source = self.sourceLanguage(settings: settings)
+        let selected = settings.selectedSpeechModel
         if let mismatch = self.voiceEngineMismatchMessage(settings: settings) {
             return mismatch
         }
-        let source = self.sourceLanguage(settings: settings)
+        let readiness = VoiceEngineLanguageReadiness.current(model: selected, languageID: source.id)
+        if readiness != .ready { return readiness.message(model: selected, language: source) }
         let model = settings.selectedSpeechModel.displayName
         return "Hearing \(source.displayName) with \(model)."
     }
@@ -405,16 +407,39 @@ enum SpokenLanguageResolver {
             && VoiceEngineLanguageCatalog.supports(model, languageID: target.id)
     }
 
+    /// Whether turning Either way on would actually hear both sides of this
+    /// pair, judged by what the add-on (Whisper Small) supports — not by
+    /// whichever Voice Engine happens to be selected right now. `applyDynamicPairing`
+    /// switches to the add-on the moment the toggle flips, so this is the check
+    /// that should gate whether the toggle is tappable in the first place.
+    static func dynamicPairingSupportsCurrentPair(settings: SettingsStore = .shared) -> Bool {
+        guard settings.theaterSessionMode == .translation else { return false }
+        let source = self.sourceLanguage(settings: settings)
+        let target = self.targetLanguage(settings: settings)
+        guard source.id != target.id else { return false }
+        let addOn = SettingsStore.SpeechModel.eitherWayAddOn
+        return VoiceEngineLanguageCatalog.supports(addOn, languageID: source.id)
+            && VoiceEngineLanguageCatalog.supports(addOn, languageID: target.id)
+    }
+
     static func isDynamicPairingEnabled(settings: SettingsStore = .shared) -> Bool {
         settings.theaterDynamicPairing && self.dynamicPairingAvailable(settings: settings)
     }
 
     /// Home and Theater chrome. Distinct Translate pair. Whisper Small is the
     /// add-on that actually hears both languages.
+    @MainActor
     static func showsEitherWayControl(settings: SettingsStore = .shared) -> Bool {
-        guard settings.theaterSessionMode == .translation else { return false }
-        guard !self.isSameLanguagePair(settings: settings) else { return false }
-        return SettingsStore.SpeechModel.availableModels.contains(SettingsStore.SpeechModel.eitherWayAddOn)
+        guard self.dynamicPairingSupportsCurrentPair(settings: settings) else { return false }
+        let source = self.sourceLanguage(settings: settings)
+        let target = self.targetLanguage(settings: settings)
+        let engine = AppleTranslationEngine.shared
+        let addOn = SettingsStore.SpeechModel.eitherWayAddOn
+        return EitherWayAvailability.isVisible(
+            speechReady: SettingsStore.SpeechModel.availableModels.contains(addOn) && addOn.isInstalled,
+            forward: engine.cachedPackAvailability(source: source, target: target),
+            reverse: engine.cachedPackAvailability(source: target, target: source)
+        )
     }
 
     /// I speak → Show as, unless Either way heard the Show-as language.
@@ -455,15 +480,15 @@ enum SpokenLanguageResolver {
         if source.id == target.id {
             return "Pick a Show as language that differs from I speak."
         }
+        if !self.dynamicPairingSupportsCurrentPair(settings: settings) {
+            return "Either way needs Whisper to hear both \(source.displayName) and \(target.displayName)."
+        }
         let addOn = SettingsStore.SpeechModel.eitherWayAddOn
         if !addOn.isInstalled {
-            return "Download Whisper Small (\(addOn.downloadSize)) in Voice Engine settings to turn this on. Apple Speech stays the default for one speaker."
+            return "Turn this on from Voice Engine. Apple Speech stays the default for one speaker."
         }
         if settings.selectedSpeechModel != addOn {
-            return "Uses Whisper Small so both languages of this pair are heard. Apple Speech stays the default for one speaker."
-        }
-        if !self.dynamicPairingAvailable(settings: settings) {
-            return "Either way needs Whisper to hear both \(source.displayName) and \(target.displayName)."
+            return "Uses Whisper Small to hear both languages. Turning Either way off keeps this Voice Engine selected."
         }
         if SpokenScriptDetector.pairSharesOneScript(source.id, target.id) {
             return "Speak either language. Whisper names which one. If it does not, captions stay \(source.displayName) → \(target.displayName)."
@@ -595,8 +620,6 @@ nonisolated enum LiveTranslationTiming {
     /// quiet for the 400 ms silence hold and the 400 ms end-of-utterance hold
     /// before this starts, so this is the extra wait the audience feels.
     static let openSettleNanoseconds: UInt64 = 1_200_000_000
-    /// A local sharpen that is slower than this loses. The Apple line prints.
-    static let firstPrintSharpenNanoseconds: UInt64 = 700_000_000
     /// Brief hold after end-of-utterance so the last ASR tick can land.
     static let eouHoldNanoseconds: UInt64 = 400_000_000
     /// Quiet gap after the last wording of a lone finished sentence. A revision
@@ -644,9 +667,6 @@ nonisolated enum LiveTranslationTiming {
     /// After this much silence, skip ASR ticks and start a new e2e measurement.
     static let silenceHoldNanoseconds: UInt64 = 400_000_000
     static let silenceHoldSeconds: TimeInterval = 0.4
-    static let polishPriorCaptionCount = 4
-    static let polishTemperature = 0.2
-    static let polishMaxTokens = 256
     /// A commit MT call must fail, not hang. Warmup runs before the first
     /// Listen, so the first caption uses the same mailbox timeout as the rest.
     /// A hung call must not hold later sentences.
@@ -666,11 +686,6 @@ nonisolated enum LiveTranslationTiming {
             return Self.commitMailboxTimeoutNanoseconds
         }
     }
-    /// Local first-print polish and Apple-failure MT must lose to Apple if slower than a clause.
-    static let commitTranslationTimeoutNanoseconds: UInt64 = 4_000_000_000
-    /// After this many local attempts, an 80% miss rate disables local MT for the listen.
-    static let localEchoFailMinimumAttempts = 5
-    static let localEchoFailRatio = 0.80
 
     static func completeSettleNanoseconds(languageID: String) -> UInt64 {
         switch TranslationClauseSegmenter.languageCode(from: languageID) {

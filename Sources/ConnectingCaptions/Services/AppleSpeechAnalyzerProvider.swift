@@ -211,7 +211,7 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
             locale: transcriptionLocale,
             transcriptionOptions: [],
             reportingOptions: [],
-            attributeOptions: []
+            attributeOptions: [.audioTimeRange]
         )
 
         // 2. Create input stream
@@ -244,21 +244,30 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
 
         // 6. Set up results collector FIRST (before starting analyzer - per Apple's pattern)
         var finalText = ""
+        var timedSegments: [ASRTimedSegment] = []
         let resultsTask = Task {
             DebugLogger.shared.debug("AppleSpeechAnalyzer: Results task started, waiting for results...", source: "AppleSpeechAnalyzerProvider")
             for try await case let result in freshTranscriber.results {
                 let text = String(result.text.characters)
-                DebugLogger.shared.debug("AppleSpeechAnalyzer: Got result - isFinal: \(result.isFinal), text: '\(text)'", source: "AppleSpeechAnalyzerProvider")
+                DebugLogger.shared.debug("AppleSpeechAnalyzer: Got result - isFinal: \(result.isFinal), characters: \(text.count)", source: "AppleSpeechAnalyzerProvider")
                 if result.isFinal {
                     // ACCUMULATE results (per Apple's pattern) - don't break!
                     if !finalText.isEmpty && !text.isEmpty {
                         finalText += " "
                     }
                     finalText += text
+                    for run in result.text.runs {
+                        guard let range = run.audioTimeRange else { continue }
+                        timedSegments.append(ASRTimedSegment(
+                            text: String(result.text[run.range].characters),
+                            start: range.start.seconds,
+                            end: CMTimeRangeGetEnd(range).seconds
+                        ))
+                    }
                 }
                 // Continue iterating until stream ends (after finalizeAndFinish)
             }
-            DebugLogger.shared.debug("AppleSpeechAnalyzer: Results iteration complete, accumulated: '\(finalText)'", source: "AppleSpeechAnalyzerProvider")
+            DebugLogger.shared.debug("AppleSpeechAnalyzer: Results iteration complete, characters: \(finalText.count)", source: "AppleSpeechAnalyzerProvider")
         }
 
         // 7. Start the analyzer (this kicks off processing)
@@ -277,18 +286,18 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
             try await analyzer.finalizeAndFinishThroughEndOfInput()
             DebugLogger.shared.debug("AppleSpeechAnalyzer: Analyzer finalized", source: "AppleSpeechAnalyzerProvider")
         } catch {
-            DebugLogger.shared.warning("Analyzer finalize error: \(error.localizedDescription)", source: "AppleSpeechAnalyzerProvider")
+            DebugLogger.shared.warning("Analyzer finalize error: \(DiagnosticMetadata.error(error))", source: "AppleSpeechAnalyzerProvider")
         }
 
         // 10. Now wait for results task to complete (it will finish once stream closes)
         do {
             try await resultsTask.value
         } catch {
-            DebugLogger.shared.warning("Speech recognition error: \(error.localizedDescription)", source: "AppleSpeechAnalyzerProvider")
+            DebugLogger.shared.warning("Speech recognition error: \(DiagnosticMetadata.error(error))", source: "AppleSpeechAnalyzerProvider")
         }
 
-        DebugLogger.shared.debug("AppleSpeechAnalyzer: Transcription complete - result: '\(finalText)'", source: "AppleSpeechAnalyzerProvider")
-        return ASRTranscriptionResult(text: finalText, confidence: 1.0)
+        DebugLogger.shared.debug("AppleSpeechAnalyzer: Transcription complete - characters: \(finalText.count)", source: "AppleSpeechAnalyzerProvider")
+        return ASRTranscriptionResult(text: finalText, confidence: 1.0, timedSegments: timedSegments)
     }
 
     // MARK: - Helpers

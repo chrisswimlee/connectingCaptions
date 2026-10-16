@@ -953,6 +953,51 @@ extension DictationE2ETests {
         }
     }
 
+    func testPronunciationStoreQuarantinesACorruptFileInsteadOfErasingIt() async throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PronunciationStore-\(UUID().uuidString).json")
+        let quarantineURL = fileURL.appendingPathExtension("corrupt")
+        defer {
+            try? FileManager.default.removeItem(at: fileURL)
+            try? FileManager.default.removeItem(at: quarantineURL)
+        }
+        let corruptBytes = Data("not valid json".utf8)
+        try corruptBytes.write(to: fileURL)
+
+        let store = PronunciationDictionaryStore(fileURL: fileURL)
+        let profiles = await store.allProfiles()
+        XCTAssertTrue(profiles.isEmpty)
+
+        // The corrupt file must not still be sitting at fileURL: the next write
+        // would otherwise persist an empty document over it and the original
+        // bytes would be gone for good.
+        XCTAssertFalse(FileManager.default.fileExists(atPath: fileURL.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: quarantineURL.path))
+        XCTAssertEqual(try Data(contentsOf: quarantineURL), corruptBytes)
+    }
+
+    func testPronunciationStoreReplaceAllQuarantinesACorruptFileBeforeWriting() async throws {
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PronunciationStore-\(UUID().uuidString).json")
+        let quarantineURL = fileURL.appendingPathExtension("corrupt")
+        defer {
+            try? FileManager.default.removeItem(at: fileURL)
+            try? FileManager.default.removeItem(at: quarantineURL)
+        }
+        let corruptBytes = Data("{not json".utf8)
+        try corruptBytes.write(to: fileURL)
+
+        // replaceAllProfiles is the first touch of this store. A restore that
+        // skips loadIfNeeded() would write straight over the corrupt bytes.
+        let store = PronunciationDictionaryStore(fileURL: fileURL)
+        try await store.replaceAllProfiles([])
+
+        XCTAssertEqual(try Data(contentsOf: quarantineURL), corruptBytes)
+        let profiles = await store.allProfiles()
+        XCTAssertTrue(profiles.isEmpty)
+        XCTAssertNotEqual(try Data(contentsOf: fileURL), corruptBytes)
+    }
+
     func testPronunciationProfileEditPolicyDiscardsProfileWhenMeaningChanges() {
         XCTAssertTrue(
             PronunciationProfileEditPolicy.shouldDiscardProfile(

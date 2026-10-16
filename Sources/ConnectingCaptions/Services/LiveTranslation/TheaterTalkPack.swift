@@ -3,7 +3,7 @@ import Foundation
 import PDFKit
 
 /// Local notes or a deck for this talk. Terms stay on the Mac and bias
-/// glossary lock plus the optional local LLM. This is not Screen Recording.
+/// glossary lock. This is not Screen Recording.
 nonisolated enum TheaterTalkPack {
     static let maxTerms = 200
     static let maxPromptTerms = 80

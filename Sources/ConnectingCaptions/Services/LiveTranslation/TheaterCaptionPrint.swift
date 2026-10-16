@@ -10,8 +10,8 @@ enum TheaterSpokenLineMode: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .off: return "Off"
-        case .afterPause: return "On the board"
+        case .off: return AppLanguage.text("Off")
+        case .afterPause: return AppLanguage.text("On the board")
         }
     }
 
@@ -61,10 +61,10 @@ enum TheaterLinePrint: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .atOnce: return "At once"
-        case .word: return "By word"
-        case .letter: return "By letter"
-        case .fade: return "Fade"
+        case .atOnce: return AppLanguage.text("At once")
+        case .word: return AppLanguage.text("By word")
+        case .letter: return AppLanguage.text("By letter")
+        case .fade: return AppLanguage.text("Fade")
         }
     }
 
@@ -98,10 +98,10 @@ enum TheaterPrintGap: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .tight: return "Tight"
-        case .close: return "Close"
-        case .open: return "Open"
-        case .wide: return "Wide"
+        case .tight: return AppLanguage.text("Tight")
+        case .close: return AppLanguage.text("Close")
+        case .open: return AppLanguage.text("Open")
+        case .wide: return AppLanguage.text("Wide")
         }
     }
 
@@ -211,6 +211,13 @@ enum TheaterWindowPlacement {
     }
     static let legacyDefaultSize = CGSize(width: 1100, height: 440)
 
+    static func canLockOverlayFrame(_ frame: CGRect, visible: CGRect) -> Bool {
+        [frame.minX, frame.minY, frame.width, frame.height, visible.width, visible.height].allSatisfy(\.isFinite)
+            && visible.width > 0 && visible.height > 0
+            && frame.width >= min(TheaterOverlayPolicy.overlayMinSize.width, visible.width)
+            && frame.height >= min(TheaterOverlayPolicy.overlayMinSize.height, visible.height)
+    }
+
     static func resolvedFrame(
         stored: CGRect?,
         visible: CGRect,
@@ -301,7 +308,7 @@ enum TheaterWindowPlacement {
                 needsPlacement: false
             )
         }
-        if let saved, !Self.needsOverlayPlacement(stored: saved, visible: visible) {
+        if let saved, Self.canLockOverlayFrame(saved, visible: visible) {
             return OverlayFrameDecision(
                 frame: Self.clamped(saved, to: visible),
                 needsPlacement: false

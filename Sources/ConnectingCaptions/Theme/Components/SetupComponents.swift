@@ -55,14 +55,14 @@ struct SetupStepView: View {
                             .foregroundStyle(self.statusColor)
                             .font(.caption.weight(.bold))
                     } else {
-                        Text("\(self.step)")
+                        AppText("{0}", arguments: [String(describing: self.step)])
                             .font(.caption.weight(.bold))
                             .foregroundStyle(self.statusColor)
                     }
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(self.title)
+                    AppText(self.title)
                         .font(.body.weight(.medium))
                         .foregroundStyle(.primary)
 
@@ -76,7 +76,7 @@ struct SetupStepView: View {
 
                 // Action button or status badge
                 if self.status == .completed {
-                    Label("Done", systemImage: "checkmark")
+                    AppLabel("Done", systemImage: "checkmark")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
@@ -141,13 +141,13 @@ struct InstructionStep: View {
                     .fill(self.theme.palette.accent.opacity(0.15))
                     .frame(width: 22, height: 22)
 
-                Text("\(self.number)")
+                AppText("{0}", arguments: [String(describing: self.number)])
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(self.theme.palette.accent)
             }
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(self.title)
+                AppText(self.title)
                     .font(.subheadline.weight(.medium))
 
                 Text(self.description)

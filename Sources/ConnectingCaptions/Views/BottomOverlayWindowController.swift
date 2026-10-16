@@ -1417,7 +1417,7 @@ private struct BottomOverlayModeMenuView: View {
             self.onDismissRequested()
         }) {
             HStack(alignment: .center, spacing: 8) {
-                Text(title)
+                AppText(title)
                     .font(.system(size: 15, weight: .semibold))
                 Spacer()
                 if !shortcut.isEmpty {
@@ -1563,9 +1563,9 @@ private struct BottomOverlayPromptMenuView: View {
             self.onDismissRequested()
         }) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Fast")
+                AppText("Fast")
                 Spacer(minLength: 12)
-                Text("No cleanup")
+                AppText("No cleanup")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.white.opacity(0.45))
                 if isSelected {
@@ -1602,7 +1602,7 @@ private struct BottomOverlayPromptMenuView: View {
             self.onDismissRequested()
         }) {
             HStack {
-                Text("Cleanup")
+                AppText("Cleanup")
                 Spacer()
                 if isSelected {
                     Image(systemName: "checkmark")
@@ -1632,9 +1632,9 @@ private struct BottomOverlayPromptMenuView: View {
             self.onDismissRequested()
         }) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Cleanup")
+                AppText("Cleanup")
                 Spacer(minLength: 12)
-                Text("Fluid-1")
+                AppText("Fluid-1")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.white.opacity(0.45))
                 if isSelected {
@@ -1698,7 +1698,7 @@ private struct BottomOverlayPromptMenuView: View {
 
         VStack(alignment: .leading, spacing: 0) {
             if self.promptMode.normalized == .dictate {
-                Text("ON-DEVICE")
+                AppText("ON-DEVICE")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.4))
                     .padding(.horizontal, 8)
@@ -1717,7 +1717,7 @@ private struct BottomOverlayPromptMenuView: View {
                     .padding(.vertical, 4)
             }
 
-            Text("EXTERNAL")
+            AppText("EXTERNAL")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.4))
                 .padding(.horizontal, 8)
@@ -1835,7 +1835,7 @@ private struct BottomOverlayActionsMenuView: View {
             self.onDismissRequested()
         }) {
             HStack(spacing: 8) {
-                Text(title)
+                AppText(title)
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
                 Image(systemName: icon)
@@ -1866,7 +1866,7 @@ private struct BottomOverlayActionsMenuView: View {
             self.onDismissRequested()
         }) {
             HStack(spacing: 8) {
-                Text(title)
+                AppText(title)
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
                 if !shortcut.isEmpty {
@@ -1891,7 +1891,7 @@ private struct BottomOverlayActionsMenuView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("MODE")
+            AppText("MODE")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.4))
                 .padding(.horizontal, 8)
@@ -1903,14 +1903,14 @@ private struct BottomOverlayActionsMenuView: View {
             Divider()
                 .padding(.vertical, 4)
 
-            Text("ACTIONS")
+            AppText("ACTIONS")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.4))
                 .padding(.horizontal, 8)
                 .padding(.bottom, 3)
 
             self.actionRow(
-                title: "Process Again",
+                title: AppLanguage.text("Process Again"),
                 icon: "arrow.clockwise",
                 rowID: "reprocess_last",
                 enabled: self.canReprocessLast
@@ -1919,7 +1919,7 @@ private struct BottomOverlayActionsMenuView: View {
             }
 
             self.actionRow(
-                title: "Copy Last",
+                title: AppLanguage.text("Copy Last"),
                 icon: "doc.on.doc",
                 rowID: "copy_last",
                 enabled: self.canCopyLast
@@ -1928,7 +1928,7 @@ private struct BottomOverlayActionsMenuView: View {
             }
 
             self.actionRow(
-                title: "Insert Last",
+                title: AppLanguage.text("Insert Last"),
                 icon: "arrow.down.doc",
                 rowID: "paste_last",
                 enabled: self.canPasteLast
@@ -1937,7 +1937,7 @@ private struct BottomOverlayActionsMenuView: View {
             }
 
             self.actionRow(
-                title: "Use Raw Text",
+                title: AppLanguage.text("Use Raw Text"),
                 icon: "arrow.uturn.backward",
                 rowID: "undo_ai_last",
                 enabled: self.canUndoLastAI

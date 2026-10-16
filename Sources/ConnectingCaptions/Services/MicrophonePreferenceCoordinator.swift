@@ -125,6 +125,9 @@ final class MicrophonePreferenceCoordinator: ObservableObject {
             migrationVersion == 1 &&
             enumeratedPreferredInput?.isBuiltIn != true &&
             Self.isLikelyBuiltInMicrophoneUID(self.settings.preferredInputDeviceUID) == false
+
+        // A nil or empty preferred UID fails this guard, so ambiguous state already
+        // falls through to the selection below rather than being kept as a manual pick.
         if preferredInput == nil,
            preserveDisconnectedManualSelection ||
            preserveDisconnectedVersionOneExternal ||
@@ -275,7 +278,7 @@ final class MicrophonePreferenceCoordinator: ObservableObject {
         }
     }
 
-    func markActiveSelectionUnavailable() {
+    func markActiveSelectionUnavailable(suggestingManualRestart: Bool = false) {
         guard self.hasConfirmedActiveSelection,
               self.lastConfirmedInputUID != nil
         else { return }
@@ -288,7 +291,8 @@ final class MicrophonePreferenceCoordinator: ObservableObject {
             MicrophoneChangeNotice(
                 previousName: previousName,
                 currentName: nil,
-                presentation: .activeChange
+                presentation: .activeChange,
+                suggestsManualRestart: suggestingManualRestart
             )
         )
     }
