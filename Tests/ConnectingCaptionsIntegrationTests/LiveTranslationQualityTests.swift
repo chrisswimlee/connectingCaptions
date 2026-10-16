@@ -302,7 +302,9 @@ final class LiveTranslationQualityTests: XCTestCase {
     /// The static catalog claims Analyzer supports Thai (it may, on some Macs/OS
     /// builds), but `supports` must defer to the live `SpeechTranscriber` reality
     /// once it's known, rather than trusting the static map unconditionally.
-    func testAnalyzerSupportDefersToLiveCapabilityOnceKnown() {
+    func testAnalyzerSupportDefersToLiveCapabilityOnceKnown() throws {
+        // Before macOS 26 Analyzer is not an available model, so it has no static routes.
+        guard #available(macOS 26.0, *) else { throw XCTSkip("Apple Speech Analyzer needs macOS 26.") }
         defer { AppleSpeechLiveCapability.setAnalyzerLanguagePrefixesForTesting(nil) }
 
         AppleSpeechLiveCapability.setAnalyzerLanguagePrefixesForTesting(nil)

@@ -56,7 +56,9 @@ final class TheaterListenPolicyTests: XCTestCase {
         )))
     }
 
-    func testVoiceEngineAdviceMatchesWhyTheEngineIsNotReady() {
+    func testVoiceEngineAdviceMatchesWhyTheEngineIsNotReady() throws {
+        // Before macOS 26 Analyzer is not an available model, so it has no static routes.
+        guard #available(macOS 26.0, *) else { throw XCTSkip("Apple Speech Analyzer needs macOS 26.") }
         let mismatch = TheaterReadyGate.voiceEngineAdvice(
             model: .appleSpeechAnalyzer,
             source: TranslationLanguageCatalog.english,

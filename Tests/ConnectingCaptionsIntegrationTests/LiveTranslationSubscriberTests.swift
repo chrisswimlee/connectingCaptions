@@ -138,12 +138,16 @@ final class CaptionPublicationDelayTests: XCTestCase {
         let first = timing.flush(onFinish: { finishCount += 1 }) {
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
+        // Held open by the test, not by a sleep a slow runner can outlast.
+        let (gate, release) = AsyncStream<Void>.makeStream()
         let replacement = timing.flush(onFinish: { finishCount += 1 }) {
-            try? await Task.sleep(nanoseconds: 80_000_000)
+            for await _ in gate { break }
         }
         await first.value
         XCTAssertTrue(timing.isFlushing)
         XCTAssertEqual(finishCount, 0)
+        release.yield()
+        release.finish()
         await replacement.value
         XCTAssertFalse(timing.isFlushing)
         XCTAssertEqual(finishCount, 1)

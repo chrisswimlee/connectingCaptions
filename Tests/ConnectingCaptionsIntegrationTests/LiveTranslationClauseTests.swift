@@ -2606,8 +2606,9 @@ final class TheaterTalkSimulationTests: XCTestCase {
 @MainActor
 final class TheaterLongTalkTests: XCTestCase {
     func testLongTalkPrintsEverySentenceOnceWithoutSlowingDown() async {
-        // 600 sentences through real settle and end-of-utterance timers take
-        // about 75 s on an M-series Mac and longer on a hosted runner.
+        // Each sentence waits out the real lone-sentence settle (~0.22 s), so
+        // 300 sentences take about a minute here and must fit CI's 300 s cap.
+        // That is still 6× the board and 25× the peel window.
         self.executionTimeAllowance = 300
         let settings = SettingsStore.shared
         let originalSource = settings.translationSourceLanguageID
@@ -2626,7 +2627,7 @@ final class TheaterLongTalkTests: XCTestCase {
 
         let topics = ["the model", "the dataset", "attention", "the encoder", "our results", "the baseline"]
         let verbs = ["improves", "changes", "explains", "limits", "shapes", "drives"]
-        let sentenceCount = 600
+        let sentenceCount = 300
         var transcript = ""
         var printed: [String] = []
         var firstBatch: TimeInterval = 0

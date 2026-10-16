@@ -295,7 +295,9 @@ final class VoiceEngineLanguageReadinessTests: XCTestCase {
         XCTAssertEqual(LanguageOptionStatus.resolve(speech: nil, translation: .unknown), .checking)
     }
 
-    func testUnknownAppleCapabilityIsOfferedAsCheckingNotConfirmed() {
+    func testUnknownAppleCapabilityIsOfferedAsCheckingNotConfirmed() throws {
+        // Before macOS 26 Analyzer is not an available model, so it has no static routes.
+        guard #available(macOS 26.0, *) else { throw XCTSkip("Apple Speech Analyzer needs macOS 26.") }
         let original = AppleSpeechLiveCapability.analyzerLanguagePrefixes
         defer { AppleSpeechLiveCapability.setAnalyzerLanguagePrefixesForTesting(original) }
         AppleSpeechLiveCapability.setAnalyzerLanguagePrefixesForTesting(nil)
