@@ -32,7 +32,7 @@ extension AIEnhancementSettingsView {
     // MARK: - Helper Functions
 
     func formLabel(_ title: String) -> some View {
-        Text(title)
+        AppText(title)
             .fontWeight(.medium)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
@@ -80,14 +80,14 @@ extension AIEnhancementSettingsView {
                 ? "Configure local models and API providers."
                 : "Choose how \(ConnectingCaptionsProduct.displayName) cleans up your dictation. This cleans dictation. Theater uses Custom Dictionary."
         ) {
-            Picker("AI section", selection: self.$selectedConfigurationSection) {
-                Text("Providers").tag(AIEnhancementConfigurationSection.providers)
-                Text("Cleanup Styles").tag(AIEnhancementConfigurationSection.advancedPrompts)
+            Picker(AppLanguage.text("AI section"), selection: self.$selectedConfigurationSection) {
+                AppText("Providers").tag(AIEnhancementConfigurationSection.providers)
+                AppText("Cleanup Styles").tag(AIEnhancementConfigurationSection.advancedPrompts)
             }
             .pickerStyle(.segmented)
             .frame(maxWidth: 280)
             .labelsHidden()
-            .accessibilityLabel("AI section")
+            .accessibilityLabel(AppLanguage.text("AI section"))
         }
     }
 
@@ -97,9 +97,9 @@ extension AIEnhancementSettingsView {
 
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Providers")
+                    AppText("Providers")
                         .font(.system(size: 14, weight: .semibold))
-                    Text("Configure local models and API providers.")
+                    AppText("Configure local models and API providers.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -110,7 +110,7 @@ extension AIEnhancementSettingsView {
                     HStack(spacing: 5) {
                         Image(systemName: self.viewModel.showHelp ? "questionmark.circle.fill" : "questionmark.circle")
                             .font(.system(size: 14))
-                        Text("Help")
+                        AppText("Help")
                             .font(.caption)
                             .fontWeight(.medium)
                     }
@@ -181,7 +181,7 @@ extension AIEnhancementSettingsView {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .font(.system(size: 16))
-            Text("API key required for AI enhancement to work")
+            AppText("API key required for AI enhancement to work")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.orange)
             Spacer()
@@ -199,7 +199,7 @@ extension AIEnhancementSettingsView {
                 Image(systemName: "lightbulb.fill")
                     .font(.system(size: 14))
                     .foregroundStyle(.yellow)
-                Text("Quick Start Guide")
+                AppText("Quick Start Guide")
                     .font(.system(size: 13, weight: .semibold))
             }
 
@@ -274,10 +274,10 @@ extension AIEnhancementSettingsView {
                 Image(systemName: "square.grid.2x2")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(self.theme.palette.secondaryText)
-                Text("All providers")
+                AppText("All providers")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(self.theme.palette.secondaryText)
-                Text("(\(count))")
+                AppText("({0})", arguments: [String(describing: count)])
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(self.theme.palette.tertiaryText)
             }
@@ -286,7 +286,7 @@ extension AIEnhancementSettingsView {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                TextField("Search providers", text: self.$providerSearchText)
+                TextField(AppLanguage.text("Search providers"), text: self.$providerSearchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
             }
@@ -308,7 +308,7 @@ extension AIEnhancementSettingsView {
                                 .id(item.id)
                         }
                         if filteredItems.isEmpty, !query.isEmpty {
-                            Text("No providers match \"\(query)\"")
+                            AppText("No providers match \"{0}\"", arguments: [String(describing: query)])
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .padding(.vertical, 12)
@@ -347,10 +347,10 @@ extension AIEnhancementSettingsView {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.fluidGreen)
-                Text("Verified providers")
+                AppText("Verified providers")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(self.theme.palette.secondaryText)
-                Text("(\(count))")
+                AppText("({0})", arguments: [String(describing: count)])
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(self.theme.palette.tertiaryText)
             }
@@ -361,10 +361,10 @@ extension AIEnhancementSettingsView {
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("No verified providers yet")
+                        AppText("No verified providers yet")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Text("Set up a provider below and verify its connection")
+                        AppText("Set up a provider below and verify its connection")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
@@ -581,7 +581,7 @@ extension AIEnhancementSettingsView {
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text("Model")
+                AppText("Model")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .frame(width: 50, alignment: .leading)
@@ -657,7 +657,7 @@ extension AIEnhancementSettingsView {
                     HStack(spacing: 6) {
                         Image(systemName: "info.circle")
                             .font(.caption)
-                        Text("Install the selected model to enable verification")
+                        AppText("Install the selected model to enable verification")
                             .font(.caption)
                     }
                     .foregroundStyle(.secondary)
@@ -700,7 +700,7 @@ extension AIEnhancementSettingsView {
 
     private func privateAIPrefixCacheRow(isBusy: Bool) -> some View {
         HStack(alignment: .center, spacing: 8) {
-            Text("Faster first result")
+            AppText("Faster first result")
                 .font(.caption)
                 .frame(width: 124, alignment: .leading)
 
@@ -709,8 +709,8 @@ extension AIEnhancementSettingsView {
                 .controlSize(.mini)
                 .labelsHidden()
                 .disabled(isBusy)
-                .help("Keeps Fluid-1 ready so your first dictation finishes sooner.")
-                .accessibilityLabel("Faster first result")
+                .help(AppLanguage.text("Keeps Fluid-1 ready so your first dictation finishes sooner."))
+                .accessibilityLabel(AppLanguage.text("Faster first result"))
 
             Spacer(minLength: 0)
         }
@@ -718,7 +718,7 @@ extension AIEnhancementSettingsView {
 
     private func privateAIBackendRow(isBusy: Bool) -> some View {
         HStack(alignment: .center, spacing: 8) {
-            Text("Backend")
+            AppText("Backend")
                 .font(.caption)
                 .frame(width: 124, alignment: .leading)
 
@@ -737,13 +737,13 @@ extension AIEnhancementSettingsView {
     private func privateAIBackendPicker(isBusy: Bool) -> some View {
         Picker("", selection: self.privateAIBackendBinding) {
             ForEach(self.privateAISelectableBackendPreferences) { preference in
-                Text(preference.displayName).tag(preference)
+                AppText(preference.displayName).tag(preference)
             }
         }
         .pickerStyle(.menu)
         .labelsHidden()
         .disabled(isBusy)
-        .help("Local Fluid-1 runtime. Default is MLX on Apple Silicon.")
+        .help(AppLanguage.text("Local Fluid-1 runtime. Default is MLX on Apple Silicon."))
     }
 
     private var privateAISelectableBackendPreferences: [SettingsStore.PrivateAIBackendPreference] {
@@ -763,7 +763,7 @@ extension AIEnhancementSettingsView {
 
     private func privateAIBoostRow(isBusy: Bool) -> some View {
         HStack(alignment: .center, spacing: 8) {
-            Text("Faster results")
+            AppText("Faster results")
                 .font(.caption)
                 .frame(width: 124, alignment: .leading)
 
@@ -772,10 +772,10 @@ extension AIEnhancementSettingsView {
                 .controlSize(.mini)
                 .labelsHidden()
                 .disabled(isBusy)
-                .help("Uses extra local acceleration so Fluid-1 finishes faster.")
-                .accessibilityLabel("Faster results")
+                .help(AppLanguage.text("Uses extra local acceleration so Fluid-1 finishes faster."))
+                .accessibilityLabel(AppLanguage.text("Faster results"))
 
-            Text("Finishes dictation up to 15% faster. Uses about 100 MB more memory.")
+            AppText("Finishes dictation up to 15% faster. Uses about 100 MB more memory.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
@@ -943,7 +943,7 @@ extension AIEnhancementSettingsView {
 
     private func downloadPrivateAIModel(_ model: PrivateAIRegisteredModel) {
         guard model.canDownload else {
-            self.privateAILoadState = .failed(modelID: model.id, message: "Download URL is not configured yet.")
+            self.privateAILoadState = .failed(modelID: model.id, message: AppLanguage.text("Download URL is not configured yet."))
             return
         }
 
@@ -1059,7 +1059,7 @@ extension AIEnhancementSettingsView {
                 guard self.privateAISelectedModelID == model.id else { return }
                 self.privateAILoadState = .failed(
                     modelID: model.id,
-                    message: "Update failed. The previous model is still active. \(Self.errorMessage(for: error))"
+                    message: AppLanguage.format("Update failed. The previous model is still active. {0}", String(describing: Self.errorMessage(for: error)))
                 )
             }
             self.refreshPrivateAIModelUpdateStatus(model)
@@ -1103,21 +1103,21 @@ extension AIEnhancementSettingsView {
     ) -> PrivateAIProviderModelStatus {
         if self.privateAILoadState.isDownloading(model.id) {
             return PrivateAIProviderModelStatus(
-                detail: "Downloading model.",
+                detail: AppLanguage.text("Downloading model."),
                 color: self.theme.palette.accent
             )
         }
 
         if self.privateAILoadState.isLoading(model.id) {
             return PrivateAIProviderModelStatus(
-                detail: "Loading...",
+                detail: AppLanguage.text("Loading..."),
                 color: self.theme.palette.accent
             )
         }
 
         if self.privateAILoadState.isLoaded(model.id) {
             return PrivateAIProviderModelStatus(
-                detail: "For dictation only.",
+                detail: AppLanguage.text("For dictation only."),
                 color: Color.fluidGreen
             )
         }
@@ -1131,21 +1131,21 @@ extension AIEnhancementSettingsView {
 
         if self.isPrivateAIModelVerified(model) {
             return PrivateAIProviderModelStatus(
-                detail: "For dictation only.",
+                detail: AppLanguage.text("For dictation only."),
                 color: Color.fluidGreen
             )
         }
 
         if PrivateAIIntegrationService.isModelInstalled(model) {
             return PrivateAIProviderModelStatus(
-                detail: "Ready to verify.",
+                detail: AppLanguage.text("Ready to verify."),
                 color: Color.fluidGreen
             )
         }
 
         if PrivateAIIntegrationService.isLocalRuntimeConfigured {
             return PrivateAIProviderModelStatus(
-                detail: "Local model configured.",
+                detail: AppLanguage.text("Local model configured."),
                 color: Color.fluidGreen
             )
         }
@@ -1155,13 +1155,13 @@ extension AIEnhancementSettingsView {
                 " (\(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file)))"
             } ?? ""
             return PrivateAIProviderModelStatus(
-                detail: "\(self.privateAIBackendShortName) model not downloaded\(size).",
+                detail: AppLanguage.format("{0} model not downloaded{1}.", String(describing: self.privateAIBackendShortName), String(describing: size)),
                 color: self.theme.palette.accent
             )
         }
 
         return PrivateAIProviderModelStatus(
-            detail: "Model unavailable.",
+            detail: AppLanguage.text("Model unavailable."),
             color: .orange
         )
     }
@@ -1194,7 +1194,7 @@ extension AIEnhancementSettingsView {
 
     private func loadPrivateAIModel(_ model: PrivateAIRegisteredModel) {
         guard PrivateAIIntegrationService.isModelInstalled(model) else {
-            self.privateAILoadState = .failed(modelID: model.id, message: "Model file is not installed.")
+            self.privateAILoadState = .failed(modelID: model.id, message: AppLanguage.text("Model file is not installed."))
             return
         }
 
@@ -1370,11 +1370,11 @@ extension AIEnhancementSettingsView {
                             Image(systemName: "textformat")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text("Provider Name")
+                            AppText("Provider Name")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
-                        TextField("Custom Provider", text: nameBinding)
+                        TextField(AppLanguage.text("Custom Provider"), text: nameBinding)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 13))
                     }
@@ -1384,7 +1384,7 @@ extension AIEnhancementSettingsView {
                             Image(systemName: "link")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text("Base URL")
+                            AppText("Base URL")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(.secondary)
                         }
@@ -1395,11 +1395,11 @@ extension AIEnhancementSettingsView {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("API Key")
+                    AppText("API Key")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                     HStack(alignment: .center, spacing: 8) {
-                        SecureField("Enter API key", text: apiKeyBinding)
+                        SecureField(AppLanguage.text("Enter API key"), text: apiKeyBinding)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 13))
                             .frame(maxWidth: 200)
@@ -1430,7 +1430,7 @@ extension AIEnhancementSettingsView {
                 }
 
                 HStack(spacing: 8) {
-                    Text("Model")
+                    AppText("Model")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.secondary)
                         .frame(width: 50, alignment: .leading)
@@ -1525,7 +1525,7 @@ extension AIEnhancementSettingsView {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "trash")
-                            Text("Delete Provider")
+                            AppText("Delete Provider")
                         }
                         .font(.caption)
                     }
@@ -1542,7 +1542,7 @@ extension AIEnhancementSettingsView {
                 .foregroundStyle(.red)
                 .padding(.top, 2)
 
-            Text(message)
+            AppText(message)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.red.opacity(0.9))
                 .lineLimit(lineLimit)
@@ -1578,10 +1578,10 @@ extension AIEnhancementSettingsView {
                 .frame(width: 40, height: 40)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Add Custom Provider")
+                    AppText("Add Custom Provider")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(self.theme.palette.primaryText)
-                    Text("OpenAI-compatible endpoint")
+                    AppText("OpenAI-compatible endpoint")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -1734,13 +1734,13 @@ extension AIEnhancementSettingsView {
                                 self.viewModel.startEditingProvider()
                             }
                         }) {
-                            Text("Edit")
+                            AppText("Edit")
                                 .font(.system(size: 12, weight: .semibold))
                                 .frame(width: actionColumnWidth, height: AISettingsLayout.providerRowControlHeight)
                         }
                         .buttonStyle(SquareIconButtonStyle())
                         .frame(width: actionColumnWidth, height: AISettingsLayout.providerRowControlHeight)
-                        .help("Edit provider")
+                        .help(AppLanguage.text("Edit provider"))
                     } else {
                         SearchableModelPicker(
                             models: models,
@@ -1774,13 +1774,13 @@ extension AIEnhancementSettingsView {
                                 self.viewModel.setEditingAPIKey(true, for: item.id)
                             }
                         }) {
-                            Text("Edit")
+                            AppText("Edit")
                                 .font(.system(size: 12, weight: .semibold))
                                 .frame(width: actionColumnWidth, height: AISettingsLayout.providerRowControlHeight)
                         }
                         .buttonStyle(SquareIconButtonStyle())
                         .frame(width: actionColumnWidth, height: AISettingsLayout.providerRowControlHeight)
-                        .help("Edit provider")
+                        .help(AppLanguage.text("Edit provider"))
                     }
                 }
                 .fixedSize(horizontal: true, vertical: false)
@@ -2011,7 +2011,7 @@ extension AIEnhancementSettingsView {
             foreground: hasEnabledConfig ? self.theme.palette.accent : nil,
             borderColor: hasEnabledConfig ? self.theme.palette.accent.opacity(0.6) : nil
         ))
-        .help("Configure reasoning parameters")
+        .help(AppLanguage.text("Configure reasoning parameters"))
     }
 
     var promptsStepContent: some View {
@@ -2020,7 +2020,7 @@ extension AIEnhancementSettingsView {
                 Image(systemName: "text.bubble.fill")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(self.theme.palette.accent)
-                Text("Styles")
+                AppText("Styles")
                     .font(.system(size: 14, weight: .semibold))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -2035,7 +2035,7 @@ extension AIEnhancementSettingsView {
                         .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
-                .help("About prompt profiles")
+                .help(AppLanguage.text("About prompt profiles"))
                 .popover(isPresented: self.$isPromptProfilesHelpPresented, arrowEdge: .top) {
                     self.promptProfilesHelpPopover
                 }
@@ -2064,7 +2064,7 @@ extension AIEnhancementSettingsView {
                 Image(systemName: "pencil.circle.fill")
                     .font(.system(size: 14))
                     .foregroundStyle(self.theme.palette.accent)
-                Text("Edit Provider")
+                AppText("Edit Provider")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
             }
@@ -2108,7 +2108,7 @@ extension AIEnhancementSettingsView {
                         Image(systemName: "info.circle.fill")
                             .font(.system(size: 10, weight: .semibold))
                             .padding(.top, 1)
-                        Text("\(self.privateAIContextCueText). Higher values help long transcripts but use more RAM.")
+                        AppText("{0}. Higher values help long transcripts but use more RAM.", arguments: [String(describing: self.privateAIContextCueText)])
                             .font(.caption2)
                             .lineLimit(2)
                     }
@@ -2131,7 +2131,7 @@ extension AIEnhancementSettingsView {
                     } label: {
                         HStack(spacing: 5) {
                             Image(systemName: "arrow.counterclockwise")
-                            Text("Reset Verification")
+                            AppText("Reset Verification")
                         }
                         .font(.caption)
                     }
@@ -2145,7 +2145,7 @@ extension AIEnhancementSettingsView {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "trash")
-                            Text("Delete Model")
+                            AppText("Delete Model")
                         }
                         .font(.caption)
                     }
@@ -2160,7 +2160,7 @@ extension AIEnhancementSettingsView {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark")
-                        Text("Done")
+                        AppText("Done")
                     }
                 }
                 .fluidButton(.glass, size: .compact)
@@ -2174,7 +2174,7 @@ extension AIEnhancementSettingsView {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
-            Text(title)
+            AppText(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -2194,11 +2194,11 @@ extension AIEnhancementSettingsView {
             .buttonStyle(.plain)
             .disabled(isBusy || self.settings.privateAIContextTokenLimit <= SettingsStore.privateAIContextTokenLimitRange.lowerBound)
 
-            Text("\(self.settings.privateAIContextTokenLimit.formatted())")
+            AppText("{0}", arguments: [String(describing: self.settings.privateAIContextTokenLimit.formatted())])
                 .font(.system(size: 13, weight: .semibold, design: .monospaced))
                 .frame(width: 74, height: AISettingsLayout.providerRowControlHeight)
 
-            Text("tokens")
+            AppText("tokens")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .frame(width: 48, height: AISettingsLayout.providerRowControlHeight, alignment: .leading)
@@ -2224,7 +2224,7 @@ extension AIEnhancementSettingsView {
                 .stroke(self.theme.palette.cardBorder.opacity(0.35), lineWidth: 0.8)
         )
         .fixedSize()
-        .help("How much raw dictation Fluid-1 can clean at once. Higher values help long transcripts but use more RAM and can slow first response.")
+        .help(AppLanguage.text("How much raw dictation Fluid-1 can clean at once. Higher values help long transcripts but use more RAM and can slow first response."))
     }
 
     private func decreasePrivateAIContextTokenLimit() {
@@ -2255,7 +2255,7 @@ extension AIEnhancementSettingsView {
                 Image(systemName: "pencil.circle.fill")
                     .font(.system(size: 14))
                     .foregroundStyle(self.theme.palette.accent)
-                Text("Edit Provider")
+                AppText("Edit Provider")
                     .font(.system(size: 14, weight: .semibold))
                 Spacer()
             }
@@ -2268,11 +2268,11 @@ extension AIEnhancementSettingsView {
                                 Image(systemName: "textformat")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("Name")
+                                AppText("Name")
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(.secondary)
                             }
-                            TextField("Provider name", text: self.$viewModel.editProviderName)
+                            TextField(AppLanguage.text("Provider name"), text: self.$viewModel.editProviderName)
                                 .textFieldStyle(.roundedBorder)
                                 .font(.system(size: 13))
                         }
@@ -2283,7 +2283,7 @@ extension AIEnhancementSettingsView {
                                 Image(systemName: "link")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("Base URL")
+                                AppText("Base URL")
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundStyle(.secondary)
                             }
@@ -2299,12 +2299,12 @@ extension AIEnhancementSettingsView {
                         Image(systemName: "key")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("API Key")
+                        AppText("API Key")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
                     HStack(alignment: .center, spacing: 8) {
-                        SecureField("Enter API key", text: apiKeyBinding)
+                        SecureField(AppLanguage.text("Enter API key"), text: apiKeyBinding)
                             .textFieldStyle(.roundedBorder)
                             .font(.system(size: 13))
                             .frame(maxWidth: 200)
@@ -2347,7 +2347,7 @@ extension AIEnhancementSettingsView {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .semibold))
-                        Text("Save")
+                        AppText("Save")
                     }
                 }
                 .fluidButton(.glass, size: .compact)
@@ -2355,7 +2355,7 @@ extension AIEnhancementSettingsView {
                     (self.viewModel.editProviderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
                         self.viewModel.editProviderBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
 
-                Button("Cancel") {
+                AppButton("Cancel") {
                     self.viewModel.clearEditProviderDraft()
                 }
                 .fluidButton(.compact, size: .compact)
@@ -2363,7 +2363,7 @@ extension AIEnhancementSettingsView {
 
             HStack(spacing: 10) {
                 if isVerified {
-                    Button("Reset Verification") {
+                    AppButton("Reset Verification") {
                         self.viewModel.resetVerification(for: self.viewModel.selectedProviderID)
                         self.viewModel.clearEditProviderDraft()
                     }
@@ -2378,7 +2378,7 @@ extension AIEnhancementSettingsView {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "trash")
-                            Text("Delete Provider")
+                            AppText("Delete Provider")
                         }
                         .font(.caption)
                     }
@@ -2409,10 +2409,10 @@ extension AIEnhancementSettingsView {
     var appleIntelligenceBadge: some View {
         HStack(spacing: 8) {
             Image(systemName: "apple.logo").font(.system(size: 14))
-            Text("On-Device").fontWeight(.medium)
-            Text("•").foregroundStyle(.secondary)
+            AppText("On-Device").fontWeight(.medium)
+            AppText("•").foregroundStyle(.secondary)
             Image(systemName: "lock.shield.fill").font(.system(size: 12))
-            Text("Private").fontWeight(.medium)
+            AppText("Private").fontWeight(.medium)
         }
         .font(.caption).foregroundStyle(Color.fluidGreen)
         .padding(.horizontal, 12).padding(.vertical, 8)
@@ -2426,7 +2426,7 @@ extension AIEnhancementSettingsView {
     var appleIntelligenceModelRow: some View {
         HStack(spacing: 12) {
             self.formLabel("Model:")
-            Text("System Language Model").foregroundStyle(.secondary).font(.system(.body))
+            AppText("System Language Model").foregroundStyle(.secondary).font(.system(.body))
             Spacer()
         }
     }
@@ -2447,14 +2447,14 @@ extension AIEnhancementSettingsView {
 
             if !ModelRepository.shared.isBuiltIn(self.viewModel.selectedProviderID) {
                 Button(action: { self.viewModel.deleteSelectedModel() }) {
-                    HStack(spacing: 4) { Image(systemName: "trash"); Text("Delete") }.font(.caption)
+                    HStack(spacing: 4) { Image(systemName: "trash"); AppText("Delete") }.font(.caption)
                 }
                 .fluidCompactButton(foreground: .red, borderColor: .red.opacity(0.6))
                 .frame(minWidth: AISettingsLayout.compactActionMinWidth, minHeight: AISettingsLayout.controlHeight)
             }
 
             if !self.viewModel.showingAddModel {
-                Button("+ Add Model") {
+                AppButton("+ Add Model") {
                     self.viewModel.showingAddModel = true
                     self.viewModel.newModelName = ""
                 }
@@ -2465,7 +2465,7 @@ extension AIEnhancementSettingsView {
             Button(action: { self.viewModel.openReasoningConfig() }) {
                 HStack(spacing: 4) {
                     Image(systemName: self.viewModel.hasReasoningConfigForCurrentModel() ? "brain.fill" : "brain")
-                    Text("Reasoning")
+                    AppText("Reasoning")
                 }
                 .font(.caption)
             }
@@ -2483,18 +2483,18 @@ extension AIEnhancementSettingsView {
 
     var addModelSection: some View {
         HStack(spacing: 8) {
-            TextField("Enter model name", text: self.$viewModel.newModelName)
+            TextField(AppLanguage.text("Enter model name"), text: self.$viewModel.newModelName)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit {
                     if !self.viewModel.newModelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         self.viewModel.addNewModel()
                     }
                 }
-            Button("Add") { self.viewModel.addNewModel() }
+            AppButton("Add") { self.viewModel.addNewModel() }
                 .fluidCompactButton(isReady: true)
                 .frame(minWidth: AISettingsLayout.compactActionMinWidth, minHeight: AISettingsLayout.controlHeight)
                 .disabled(self.viewModel.newModelName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Button("Cancel") {
+            AppButton("Cancel") {
                 self.viewModel.showingAddModel = false
                 self.viewModel.newModelName = ""
             }
@@ -2510,7 +2510,7 @@ extension AIEnhancementSettingsView {
                 Image(systemName: "brain.head.profile")
                     .font(.system(size: 14))
                     .foregroundStyle(self.theme.palette.accent)
-                Text("Reasoning for \(self.viewModel.selectedModel)")
+                AppText("Reasoning for {0}", arguments: [String(describing: self.viewModel.selectedModel)])
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(self.theme.palette.primaryText)
                 Spacer()
@@ -2520,7 +2520,7 @@ extension AIEnhancementSettingsView {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("Close")
+                .help(AppLanguage.text("Close"))
             }
 
             HStack(spacing: 16) {
@@ -2536,7 +2536,7 @@ extension AIEnhancementSettingsView {
                 VStack(alignment: .leading, spacing: 8) {
                     // Parameter type picker
                     HStack(spacing: 12) {
-                        Text("Parameter")
+                        AppText("Parameter")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(width: 70, alignment: .trailing)
@@ -2569,9 +2569,9 @@ extension AIEnhancementSettingsView {
                                 }
                             }
                         )) {
-                            Text("reasoning_effort").tag("reasoning_effort")
-                            Text("enable_thinking").tag("enable_thinking")
-                            Text("Custom...").tag("custom")
+                            AppText("reasoning_effort").tag("reasoning_effort")
+                            AppText("enable_thinking").tag("enable_thinking")
+                            AppText("Custom...").tag("custom")
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()
@@ -2583,11 +2583,11 @@ extension AIEnhancementSettingsView {
                         self.viewModel.editingReasoningParamName != "enable_thinking"
                     {
                         HStack(spacing: 12) {
-                            Text("Name")
+                            AppText("Name")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 70, alignment: .trailing)
-                            TextField("e.g., thinking_budget", text: self.$viewModel.editingReasoningParamName)
+                            TextField(AppLanguage.text("e.g., thinking_budget"), text: self.$viewModel.editingReasoningParamName)
                                 .textFieldStyle(.roundedBorder)
                                 .font(.caption)
                                 .frame(width: 140)
@@ -2596,32 +2596,32 @@ extension AIEnhancementSettingsView {
 
                     // Value picker/field
                     HStack(spacing: 12) {
-                        Text("Value")
+                        AppText("Value")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .frame(width: 70, alignment: .trailing)
 
                         if self.viewModel.editingReasoningParamName == "reasoning_effort" {
                             Picker("", selection: self.$viewModel.editingReasoningParamValue) {
-                                Text("none").tag("none")
-                                Text("minimal").tag("minimal")
-                                Text("low").tag("low")
-                                Text("medium").tag("medium")
-                                Text("high").tag("high")
+                                AppText("none").tag("none")
+                                AppText("minimal").tag("minimal")
+                                AppText("low").tag("low")
+                                AppText("medium").tag("medium")
+                                AppText("high").tag("high")
                             }
                             .pickerStyle(.menu)
                             .labelsHidden()
                             .frame(width: 100)
                         } else if self.viewModel.editingReasoningParamName == "enable_thinking" {
                             Picker("", selection: self.$viewModel.editingReasoningParamValue) {
-                                Text("true").tag("true")
-                                Text("false").tag("false")
+                                AppText("true").tag("true")
+                                AppText("false").tag("false")
                             }
                             .pickerStyle(.menu)
                             .labelsHidden()
                             .frame(width: 100)
                         } else {
-                            TextField("value", text: self.$viewModel.editingReasoningParamValue)
+                            TextField(AppLanguage.text("value"), text: self.$viewModel.editingReasoningParamValue)
                                 .textFieldStyle(.roundedBorder)
                                 .font(.caption)
                                 .frame(width: 100)
@@ -2633,13 +2633,13 @@ extension AIEnhancementSettingsView {
 
             HStack(spacing: 8) {
                 Button(action: { self.saveReasoningConfig() }) {
-                    Text("Save")
+                    AppText("Save")
                         .font(.system(size: 12, weight: .semibold))
                 }
                 .fluidButton(.accent, size: .small)
                 .frame(minWidth: 60, minHeight: 26)
 
-                Button("Cancel") { self.viewModel.showingReasoningConfig = false }
+                AppButton("Cancel") { self.viewModel.showingReasoningConfig = false }
                     .fluidButton(.compact, size: .compact)
                     .font(.system(size: 12))
                     .frame(minWidth: 60, minHeight: 26)
@@ -2683,13 +2683,13 @@ extension AIEnhancementSettingsView {
             if self.viewModel.connectionStatus == .success {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.fluidGreen).font(.caption)
-                    Text("Connection verified").font(.caption).foregroundStyle(Color.fluidGreen)
+                    AppText("Connection verified").font(.caption).foregroundStyle(Color.fluidGreen)
                 }
             } else if self.viewModel.connectionStatus == .failed {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red).font(.caption)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Connection failed").font(.caption).foregroundStyle(.red)
+                        AppText("Connection failed").font(.caption).foregroundStyle(.red)
                         if !self.viewModel.connectionErrorMessage.isEmpty {
                             Text(self.viewModel.connectionErrorMessage)
                                 .font(.caption2)
@@ -2701,7 +2701,7 @@ extension AIEnhancementSettingsView {
             } else if self.viewModel.connectionStatus == .testing {
                 HStack(spacing: 8) {
                     ProgressView().frame(width: 16, height: 16)
-                    Text("Verifying...").font(.caption).foregroundStyle(self.theme.palette.accent)
+                    AppText("Verifying...").font(.caption).foregroundStyle(self.theme.palette.accent)
                 }
             }
 
@@ -2716,7 +2716,7 @@ extension AIEnhancementSettingsView {
     var apiKeyManagementRow: some View {
         HStack(spacing: 8) {
             Button(action: { self.viewModel.handleAPIKeyButtonTapped() }) {
-                Label("Add or Modify API Key", systemImage: "key.fill")
+                AppLabel("Add or Modify API Key", systemImage: "key.fill")
                     .labelStyle(.titleAndIcon).font(.caption)
             }
             .fluidCompactButton(isReady: true)
@@ -2737,18 +2737,18 @@ extension AIEnhancementSettingsView {
 
     var apiKeyEditorSheet: some View {
         VStack(spacing: 14) {
-            Text("Enter \(self.viewModel.providerDisplayName(for: self.viewModel.selectedProviderID)) API Key")
+            AppText("Enter {0} API Key", arguments: [String(describing: self.viewModel.providerDisplayName(for: self.viewModel.selectedProviderID))])
                 .font(.headline)
-            SecureField("API Key (optional for local endpoints)", text: self.$viewModel.newProviderApiKey)
+            SecureField(AppLanguage.text("API Key (optional for local endpoints)"), text: self.$viewModel.newProviderApiKey)
                 .textFieldStyle(.roundedBorder).frame(width: 300)
                 .onTapGesture {
                     self.viewModel.ensureKeychainAccessForAPIKeyEdit()
                 }
             HStack(spacing: 12) {
-                Button("Cancel") { self.viewModel.showAPIKeyEditor = false }
+                AppButton("Cancel") { self.viewModel.showAPIKeyEditor = false }
                     .fluidButton(.compact, size: .compact)
                     .frame(minWidth: AISettingsLayout.actionMinWidth, minHeight: AISettingsLayout.controlHeight)
-                Button("OK") {
+                AppButton("OK") {
                     let trimmedKey = self.viewModel.newProviderApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
                     self.viewModel.updateProviderAPIKey(trimmedKey, for: self.viewModel.selectedProviderID)
                     guard self.viewModel.saveProviderAPIKeys() else { return }
@@ -2774,7 +2774,7 @@ extension AIEnhancementSettingsView {
                 Image(systemName: "plus.circle.fill")
                     .font(.system(size: 14))
                     .foregroundStyle(self.theme.palette.accent)
-                Text("Add Custom Provider")
+                AppText("Add Custom Provider")
                     .font(.system(size: 14, weight: .semibold))
             }
 
@@ -2784,7 +2784,7 @@ extension AIEnhancementSettingsView {
                         Image(systemName: "link")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("OpenAI-compatible base URL")
+                        AppText("OpenAI-compatible base URL")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
@@ -2798,11 +2798,11 @@ extension AIEnhancementSettingsView {
                         Image(systemName: "key")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("API Key (optional for local endpoints)")
+                        AppText("API Key (optional for local endpoints)")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
-                    SecureField("Enter API key", text: self.$viewModel.newProviderApiKey)
+                    SecureField(AppLanguage.text("Enter API key"), text: self.$viewModel.newProviderApiKey)
                         .textFieldStyle(.roundedBorder)
                         .font(.system(size: 13))
                         .onTapGesture {
@@ -2816,13 +2816,13 @@ extension AIEnhancementSettingsView {
                     HStack(spacing: 6) {
                         Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .semibold))
-                        Text("Save Provider")
+                        AppText("Save Provider")
                     }
                 }
                 .fluidButton(.glass, size: .compact)
                 .disabled(self.viewModel.newProviderBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                Button("Cancel") {
+                AppButton("Cancel") {
                     self.viewModel.showingSaveProvider = false
                     self.viewModel.newProviderName = ""
                     self.viewModel.newProviderBaseURL = ""

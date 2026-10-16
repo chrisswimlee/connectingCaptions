@@ -95,7 +95,7 @@ struct SearchableModelPicker: View {
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .foregroundStyle(.secondary)
-                        TextField("Search models...", text: self.$searchText)
+                        TextField(AppLanguage.text("Search models..."), text: self.$searchText)
                             .textFieldStyle(.plain)
                     }
                     .searchablePickerSearchFieldChrome()
@@ -108,10 +108,10 @@ struct SearchableModelPicker: View {
                                 Image(systemName: "tray")
                                     .font(.title2)
                                     .foregroundStyle(.secondary)
-                                Text("No models")
+                                AppText("No models")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("Click refresh to fetch from API")
+                                AppText("Click refresh to fetch from API")
                                     .font(.caption2)
                                     .foregroundStyle(.tertiary)
                             }
@@ -121,7 +121,7 @@ struct SearchableModelPicker: View {
                             ScrollView {
                                 LazyVStack(alignment: .leading, spacing: 0) {
                                     if self.filteredModels.isEmpty {
-                                        Text("No models match '\(self.searchText)'")
+                                        AppText("No models match '{0}'", arguments: [String(describing: self.searchText)])
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                             .padding()
@@ -156,7 +156,7 @@ struct SearchableModelPicker: View {
 
                             if self.filteredModels.count > 100 {
                                 Divider()
-                                Text("\(self.filteredModels.count - 100) more (use search)")
+                                AppText("{0} more (use search)", arguments: [String(describing: self.filteredModels.count - 100)])
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                     .padding(6)
@@ -185,7 +185,7 @@ struct SearchableModelPicker: View {
                     .buttonStyle(.borderless)
                     .disabled(self.isRefreshing || !self.refreshEnabled)
                     .opacity(self.refreshEnabled ? 1 : 0.45)
-                    .help("Refresh model list")
+                    .help(AppLanguage.text("Refresh model list"))
                 } else {
                     Button(action: {
                         Task { await onRefresh() }
@@ -205,7 +205,7 @@ struct SearchableModelPicker: View {
                     .fluidCompactButton(isReady: false)
                     .disabled(self.isRefreshing || !self.refreshEnabled)
                     .opacity(self.refreshEnabled ? 1 : 0.45)
-                    .help("Refresh model list")
+                    .help(AppLanguage.text("Refresh model list"))
                 }
             }
         }

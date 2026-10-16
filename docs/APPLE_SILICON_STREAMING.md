@@ -8,7 +8,7 @@ This note is the systems story, not a pitch. Numbers in the Theater HUD are meas
 
 ```mermaid
 flowchart TD
-  mic[Microphone HAL] --> ring[30s 16kHz ring]
+  mic["Input device HAL (mic / USB / line-in / Bluetooth / virtual loopback)"] --> ring[30s 16kHz ring]
   ring --> rms[RMS silence gate]
   rms --> asr[Timer ASR ticks]
   asr --> clause[Leftover-tail clauses]
@@ -20,7 +20,7 @@ flowchart TD
   window --> drop[past 48 leave the board]
 ```
 
-1. Direct Core Audio captures one microphone input stream. Packets carry `inputHostTime`. Multi-channel float or int16 buffers are downmixed to mono. Pause drops packets before `handle` and resets the sample-time anchor on resume so a hole does not look like silence. The first packet after Resume is written with 1.5 s of zeros ahead of it in the 16 kHz ring. Those zeros are not saved with History audio. Then the same 16 kHz pipeline. Leftover Watch / `SCStream` app-audio capture is not the product path and is not part of first-hour Theater.
+1. Direct Core Audio captures one input-device stream — any Core Audio input with an input stream, not just the built-in microphone: wired/USB/line-in gear, a Bluetooth headset in call (HFP) mode, or a BlackHole-class virtual loopback when audio is routed into it. Selection is channel-count based and liveness fails open, so unusual and virtual devices enumerate too. Packets carry `inputHostTime`. Multi-channel float or int16 buffers are downmixed to mono. Pause drops packets before `handle` and resets the sample-time anchor on resume so a hole does not look like silence. The first packet after Resume is written with 1.5 s of zeros ahead of it in the 16 kHz ring. Those zeros are not saved with History audio. Then the same 16 kHz pipeline. Leftover Watch / `SCStream` app-audio capture is not the product path and is not part of first-hour Theater.
 2. PCM is resampled to 16 kHz and kept in a 30-second ring. Hours of audio are not retained.
 3. ASR ticks on a timer (Parakeet Flash: 200 ms). The first tick always decodes, so the model can warm up, but pause-only audio from that tick does not print. After 400 ms of RMS silence, later ticks are skipped. On a trailing-window engine, a quiet stretch longer than a breath is left out of the decode, and a window that is only room noise is not decoded, so a pause does not become unsaid words. Streaming engines always receive the full window, including the first second before the ring drops samples, and skip a tick only when it is entirely a pause. A noise burst shorter than a word does not reopen the pause clock. A syllable dip of about 60 ms does not either.
 4. The growing transcript is split into finished clauses plus an open tail. Already-committed prefixes are stripped so the whole talk is not re-translated. During Theater, the live stitch is capped to the newest ~2,400 characters so a long listen cannot feed hours of text into every tick. Dictation Stop still stitches the full listen.
@@ -35,9 +35,15 @@ What we do instead:
 
 - **RMS hold** using the adaptive speech floor (`SpeechEnergyGate`), not the meter’s fixed `silenceThreshold`. The floor follows the room and will not rise past a quiet voice. First tick is immediate. After 400 ms below the floor, skip ASR ticks and start a new e2e measurement on the next voiced packet.
 - **English Flash EOU** is already computed by `StreamingEouAsrManager`. A rising edge is a breath. Theater holds 400 ms so the last ASR tick can land, then commits leftover speech that is a real clause. Thin leftovers stay open.
-- **Partial correction** is a fuller re-decode of the retained 30-second window. It runs on Stop and once per pause after the RMS hold for leftover speech only. A caption already on the board stays. It does not run on every ASR tick.
+- **Partial correction** is a fuller re-decode of the retained 30-second window. It runs on Stop and once per pause after the RMS hold for leftover speech only. A caption already on the board stays. It does not run on every ASR tick. It gives up after 7 seconds and keeps the wording it already had, so a decode that never returns cannot hold the board open-ended; a decode queued behind one that is still running shares that clock, and once a decode has spent its whole budget the chain counts as wedged, so the rest of that Listen is refused at once instead of queueing behind a call that may never return.
 
 Word-by-word Apple Translation stays out. The Neural Engine translates one finished clause at a time.
+
+## Wait ceilings, not latency targets
+
+Every wait on the speech path is bounded: a streaming preview decode gets 10 seconds, a pause or Stop re-decode of the retained window gets 7 seconds, and the final decode on Stop gets 30 seconds. These are ceilings for a provider that is not coming back, not latency targets, and they have not been validated against a recording — the only measured ASR figure here is a 383 ms per-clause engine readout (`docs/samples/LastListenLatency.json`), which is not a full-window re-decode, so do not quote it as headroom for the 7-second ceiling. Re-record a Listen and lower a ceiling only from what that recording shows.
+
+An expired ceiling abandons the *wait*; it cannot cancel the call. A CoreML invocation that ignores cancellation keeps running on its own thread, and the serialized chain keeps whatever queues behind it, because two decodes sharing one incremental provider would index the next window against samples the wedged call already accepted. What changes is that waiting stops: the tick returns, Stop completes, and the app never sits in a permanent "transcribing" state. A wedged provider still costs the rest of that Listen — later decodes are refused at once rather than queueing behind it — and the next Listen re-tests the provider, because starting a Listen drops the previous chain.
 
 ## Context windows
 
@@ -49,7 +55,7 @@ Capture is a first-party HAL IO path (`DirectCoreAudioInput` + a C ring), not `A
 
 Host time on every packet is the e2e clock. Theater needs microphone permission. Insert-into-another-app needs Accessibility. Those are separate.
 
-Devices must expose **one** input stream. Virtual devices are allowed (liveness fails open; clamshell still accepts external/virtual). Multi-stream aggregates fail with a clear error.
+Devices must expose **one** input stream. Virtual devices are allowed (liveness fails open; clamshell still accepts external/virtual) — that covers BlackHole and Loopback-class loopback drivers, Bluetooth HFP headsets, and USB or analog line-in gear, not just the built-in microphone. Multi-stream aggregates fail with a clear error.
 
 The app is **not sandboxed**. Hardened Runtime is on. Language packs and voice weights are user-downloaded (Apple Translation packs, Hugging Face Core ML / GGUF). Nothing of substance is vendored in the zip. Theater does not install a Zoom virtual microphone.
 
@@ -64,7 +70,7 @@ The app is **not sandboxed**. Hardened Runtime is on. Language packs and voice w
 | UserDefaults snapshot | visible window only |
 | Dictation history SQLite | 1 year / 20,000 rows default; Forever caps at 50,000 |
 
-Theater is a live subtitle board. It keeps the latest 48 captions and scrolls through what fits. History and bilingual export use this listen’s session record. SRT/VTT use commit times when every cue has a date; otherwise they fall back to 4-second slots.
+Theater is a live subtitle board. It keeps the latest 48 captions and scrolls through what fits. History and bilingual export use this listen’s session record. SRT/VTT prefer Apple Speech timestamps on the capture clock. Older or unmatched entries use estimated commit times, with 4-second slots only when no times exist.
 
 ## Quantization and weights
 

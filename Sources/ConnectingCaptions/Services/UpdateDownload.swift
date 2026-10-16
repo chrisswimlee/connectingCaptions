@@ -37,6 +37,12 @@ enum UpdateHandoff {
     /// The outdated updater replaces this bundle, opens the new copy, then waits on Quit.
     /// That wait never finishes, so the downloading panel stays up. Close that copy.
     static func closePreviousCopy() {
+        #if DEBUG
+        // Xcode and XCTest deliberately launch copies from the same development
+        // path. They are not updater handoffs and must not terminate each other.
+        return
+        #else
+        guard !SettingsStore.isRunningTests else { return }
         let myPID = ProcessInfo.processInfo.processIdentifier
         guard let bundleID = Bundle.main.bundleIdentifier else { return }
         let myPath = Bundle.main.bundleURL.resolvingSymlinksInPath().standardizedFileURL.path
@@ -58,6 +64,7 @@ enum UpdateHandoff {
                 app.forceTerminate()
             }
         }
+        #endif
     }
 }
 

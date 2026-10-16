@@ -24,7 +24,16 @@ extension ContentView {
         expectedOverlayLifecycleID: UInt64,
         stopOverlayDidRequestHide: Bool
     ) async {
+        // Until ownership transfers to History, every exit must dispose of the WAV.
+        var audioHandled = false
+        defer {
+            if !audioHandled, let audioFile {
+                DictationAudioHistoryStore.shared.discardPendingAudio(fileName: audioFile.fileName)
+            }
+        }
         let kind = LiveTranslationController.shared.listenKind ?? .captions
+        let capturedPID = NotchContentState.shared.recordingTargetPID
+        let capturedBundleID = self.recordingAppInfo?.bundleId
         let translated = await LiveTranslationController.shared.finishSession(finalSource: transcribedText)
         self.asr.finalText = translated
 
@@ -55,13 +64,19 @@ extension ContentView {
                 timestamp: historyTimestamp,
                 model: self.currentTranscriptionModelInfo().model
             )
+            audioHandled = true
         }
 
         self.exportCaptionSessionIfNeeded(kind: kind, route: route)
 
         if shouldPersistOutputs, kind == .insert {
-            let typingTarget = self.resolveTypingTargetPID()
-            let targetBundleID = typingTarget.pid.flatMap {
+            let runningBundleID = capturedPID.flatMap {
+                NSRunningApplication(processIdentifier: $0)?.bundleIdentifier
+            }
+            let typingTargetPID = TheaterInsertDelivery.capturedTargetPID(
+                recordedPID: capturedPID, recordedBundleID: capturedBundleID, runningBundleID: runningBundleID
+            )
+            let targetBundleID = typingTargetPID.flatMap {
                 NSRunningApplication(processIdentifier: $0)?.bundleIdentifier
             }
             if TheaterInsertDelivery.shouldTypeCurrentListen(
@@ -73,16 +88,23 @@ extension ContentView {
                     LiveTranslationController.shared.onAccessibilityNeeded?()
                     return
                 }
-                if typingTarget.shouldRestoreOriginalFocus {
+                if NotchContentState.shared.recordingTargetPID == typingTargetPID {
                     await self.restoreFocusToRecordingTarget()
                 }
                 self.asr.typeOutputPlanToActiveField(
                     .plain(translated),
-                    preferredTargetPID: typingTarget.pid,
+                    preferredTargetPID: typingTargetPID,
                     textReadyAt: ProcessInfo.processInfo.systemUptime,
                     tracksDictionaryCorrections: false,
                     preferPaste: InsertIMEGuard.shouldPreferPasteForTheaterCaption(),
-                    completion: { _ in }
+                    requiredTargetBundleID: capturedBundleID,
+                    completion: { outcome in
+                        if !outcome.didInsert {
+                            LiveTranslationController.shared.reportListenStatus(
+                                AppLanguage.text("Could not insert into the captured app. Your text is still available to copy."), kind: .warning
+                            )
+                        }
+                    }
                 )
                 if SettingsStore.shared.copyTranscriptionToClipboard {
                     ClipboardService.copyToClipboard(translated)
@@ -118,7 +140,7 @@ extension ContentView {
             _ = try TheaterCaptionExport.writeSessionFiles(pairs: pairs)
         } catch {
             DebugLogger.shared.warning(
-                "Could not save the session transcript: \(error.localizedDescription)",
+                "Could not save the session transcript: \(DiagnosticMetadata.error(error))",
                 source: "TheaterCaptionExport"
             )
         }
@@ -158,7 +180,7 @@ extension ContentView {
             )
             promptTest.lastOutputText = ASRService.applyGAAVFormatting(literalFormattedResult)
         } catch {
-            DebugLogger.shared.error("Prompt test AI call failed: \(error.localizedDescription)", source: "ContentView")
+            DebugLogger.shared.error("Prompt test AI call failed: \(DiagnosticMetadata.error(error))", source: "ContentView")
             promptTest.lastError = error.localizedDescription
         }
     }
@@ -371,6 +393,7 @@ extension ContentView {
         model _: String
     ) {
         guard let audio else { return }
+        defer { DictationAudioHistoryStore.shared.completePendingSave(fileName: audio.fileName) }
         guard SettingsStore.shared.saveTranscriptionHistory,
               SettingsStore.shared.saveAudioWithTranscriptionHistory
         else {
@@ -383,7 +406,6 @@ extension ContentView {
             to: entryID,
             expectedSaveGeneration: saveGeneration
         )
-        DictationAudioHistoryStore.shared.completePendingSave(fileName: audio.fileName)
     }
 
     var isOnboardingVoicePlaygroundStepActive: Bool {
@@ -521,7 +543,7 @@ extension ContentView {
                 aiTokensPerSecond = result.tokensPerSecond
             } catch {
                 DebugLogger.shared.error(
-                    "AI reprocess failed, falling back to raw transcription: \(error.localizedDescription)",
+                    "AI reprocess failed, falling back to raw transcription: \(DiagnosticMetadata.error(error))",
                     source: "ContentView"
                 )
                 aiFallbackReason = error.localizedDescription

@@ -2,6 +2,214 @@ import XCTest
 @testable import ConnectingCaptions_Debug
 
 @MainActor
+final class RecognizedCaptionOccurrenceTests: XCTestCase {
+    private var originalSource = ""
+    private var originalTarget = ""
+    private var originalMode = TheaterSessionMode.translation
+    private let repeated = "The next train leaves at noon."
+
+    override func setUp() async throws {
+        try await super.setUp()
+        let settings = SettingsStore.shared
+        self.originalSource = settings.translationSourceLanguageID
+        self.originalTarget = settings.translationTargetLanguageID
+        self.originalMode = settings.theaterSessionMode
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "ko"
+        settings.theaterSessionMode = .translation
+    }
+
+    override func tearDown() async throws {
+        let settings = SettingsStore.shared
+        settings.translationSourceLanguageID = self.originalSource
+        settings.translationTargetLanguageID = self.originalTarget
+        settings.theaterSessionMode = self.originalMode
+        try await super.tearDown()
+    }
+
+    func testAdjacentSpokenCopiesSurviveInOriginalLanguage() async {
+        SettingsStore.shared.theaterSessionMode = .transcription
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        let speech = "\(self.repeated) \(self.repeated)"
+        _ = await subscriber.translateFinal(speech)
+        XCTAssertEqual(subscriber.committedSourceLines, [self.repeated, self.repeated])
+        _ = await subscriber.translateFinal(speech)
+        XCTAssertEqual(subscriber.committedSourceLines, [self.repeated, self.repeated])
+        subscriber.endListening()
+    }
+
+    func testRepeatedSentenceWaitsForSlowTranslationWithoutChangingOrder() async {
+        let engine = FakeTranslationEngine()
+        engine.delayNanoseconds = 10_000_000
+        let subscriber = LiveTranslationSubscriber(translator: engine)
+        subscriber.beginListening()
+        let units = [self.repeated, "Please wait on the platform.", self.repeated, "The doors will open shortly."]
+        let speech = units.joined(separator: " ")
+        subscriber.handlePartial(speech)
+        subscriber.handlePartial(speech)
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, units)
+        subscriber.handlePartial(speech)
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, units)
+        subscriber.endListening()
+    }
+
+    func testPlanReportsUnacceptedCopiesOnly() throws {
+        let speech = "\(self.repeated) Please wait. \(self.repeated) and then we"
+        let plan = try XCTUnwrap(CaptionRecognizedOccurrences.plan(speech, languageID: "en"))
+        let repeatedKey = TranslationClauseSegmenter.clauseIdentity(self.repeated)
+        let waitKey = TranslationClauseSegmenter.clauseIdentity("Please wait.")
+        XCTAssertTrue(plan.hasUnaccepted([:]))
+        XCTAssertTrue(plan.hasUnaccepted([repeatedKey: 1, waitKey: 1]))
+        XCTAssertFalse(plan.hasUnaccepted([repeatedKey: 2, waitKey: 1]))
+    }
+
+    func testOpenTailAfterPrintedRepeatsDoesNotReprintThem() async {
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        let units = [self.repeated, "Please wait on the platform.", self.repeated]
+        let speech = units.joined(separator: " ")
+        subscriber.handlePartial(speech)
+        subscriber.handlePartial(speech)
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, units)
+        let withTail = speech + " and then we board"
+        subscriber.handlePartial(withTail)
+        subscriber.handlePartial(withTail)
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, units)
+        XCTAssertTrue(subscriber.sourceDraft.contains("and then we board"), subscriber.sourceDraft)
+        XCTAssertFalse(subscriber.sourceDraft.contains(self.repeated), subscriber.sourceDraft)
+        subscriber.endListening()
+    }
+
+    func testSecondCopyAfterPeelWindowPrintsOnce() async {
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        var units = [self.repeated]
+        units += (0..<(LiveTranslationTiming.peelWindowLines + 2)).map { "Announcement number \($0) is now complete." }
+        let first = units.joined(separator: " ")
+        subscriber.handlePartial(first)
+        subscriber.handlePartial(first)
+        await subscriber.waitForIdleForTesting()
+        units.append(self.repeated)
+        _ = await subscriber.translateFinal(units.joined(separator: " "))
+        XCTAssertEqual(subscriber.committedSourceLines.filter { $0 == self.repeated }.count, 2)
+        _ = await subscriber.translateFinal(units.joined(separator: " "))
+        XCTAssertEqual(subscriber.committedSourceLines.filter { $0 == self.repeated }.count, 2)
+        subscriber.endListening()
+    }
+
+    func testSingleRecognitionReplayStillPrintsOnlyOnce() async {
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        _ = await subscriber.translateFinal(self.repeated)
+        _ = await subscriber.translateFinal(self.repeated)
+        XCTAssertEqual(subscriber.committedSourceLines, [self.repeated])
+        subscriber.endListening()
+    }
+
+    func testRepeatedSpeechKeepsDistinctSubtitleTimes() async {
+        SettingsStore.shared.theaterSessionMode = .transcription
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        subscriber.noteTimedSegments([
+            ASRTimedSegment(text: self.repeated, start: 1, end: 3),
+            ASRTimedSegment(text: self.repeated, start: 4, end: 6),
+        ])
+        _ = await subscriber.translateFinal("\(self.repeated) \(self.repeated)")
+        XCTAssertEqual(subscriber.captionPairs.map(\.speechTiming), [
+            CaptionSpeechTiming(start: 1, end: 3), CaptionSpeechTiming(start: 4, end: 6),
+        ])
+        subscriber.endListening()
+    }
+
+    func testRecognitionTimingDoesNotInventMissingOccurrences() {
+        var timeline = CaptionSpeechTimeline()
+        timeline.ingest([ASRTimedSegment(text: self.repeated, start: 70, end: 73)])
+        XCTAssertNil(timeline.timing(for: self.repeated, occurrence: 1, expectedOccurrences: 2))
+        XCTAssertNil(timeline.timing(for: self.repeated, occurrence: 0, expectedOccurrences: 2))
+    }
+
+    func testNewTimedUtteranceSurvivesAfterRecognitionWindowSlides() async {
+        SettingsStore.shared.theaterSessionMode = .transcription
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        subscriber.noteTimedSegments([ASRTimedSegment(text: self.repeated, start: 1, end: 3)])
+        _ = await subscriber.translateFinal(self.repeated)
+        subscriber.noteTimedSegments([ASRTimedSegment(text: self.repeated, start: 70, end: 72)])
+        _ = await subscriber.translateFinal(self.repeated)
+        XCTAssertEqual(subscriber.committedSourceLines, [self.repeated, self.repeated])
+        XCTAssertEqual(subscriber.captionPairs.map(\.speechTiming), [
+            CaptionSpeechTiming(start: 1, end: 3), CaptionSpeechTiming(start: 70, end: 72),
+        ])
+        _ = await subscriber.translateFinal(self.repeated)
+        XCTAssertEqual(subscriber.committedSourceLines.count, 2)
+        subscriber.endListening()
+    }
+
+    func testClearDoesNotRecoverOldRepeatedSpeechFromRecognition() async {
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        let speech = "\(self.repeated) \(self.repeated)"
+        _ = await subscriber.translateFinal(speech)
+        subscriber.reset()
+        subscriber.handlePartial(speech)
+        subscriber.handlePartial(speech)
+        await subscriber.waitForIdleForTesting()
+        XCTAssertTrue(subscriber.committedSourceLines.isEmpty)
+        subscriber.endListening()
+    }
+
+    func testDiscardingUnacceptedCopiesDoesNotQueueThemWhenTranslationFinishes() async {
+        let engine = FakeTranslationEngine()
+        engine.delayNanoseconds = 20_000_000
+        let subscriber = LiveTranslationSubscriber(translator: engine)
+        subscriber.beginListening()
+        let speech = "\(self.repeated) \(self.repeated)"
+        subscriber.handlePartial(speech)
+        subscriber.handlePartial(speech)
+        subscriber.dropUnacceptedSpeech()
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, [self.repeated])
+        subscriber.endListening()
+    }
+
+    func testLaterSilenceDoesNotRejectAnAcceptedSpokenOutro() async {
+        let engine = FakeTranslationEngine()
+        engine.delayNanoseconds = 20_000_000
+        let subscriber = LiveTranslationSubscriber(translator: engine)
+        subscriber.beginListening()
+        let speech = "Thank you for watching. Thank you for watching."
+        subscriber.noteAudioContainsSpeech(true)
+        subscriber.handlePartial(speech)
+        subscriber.handlePartial(speech)
+        subscriber.noteAudioContainsSpeech(false)
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, ["Thank you for watching.", "Thank you for watching."])
+        subscriber.endListening()
+    }
+
+    func testClearSuppressesOldTimedSpeechAndAcceptsANewUtterance() async {
+        SettingsStore.shared.theaterSessionMode = .transcription
+        let subscriber = LiveTranslationSubscriber(translator: FakeTranslationEngine())
+        subscriber.beginListening()
+        subscriber.noteTimedSegments([ASRTimedSegment(text: self.repeated, start: 1, end: 3)])
+        _ = await subscriber.translateFinal(self.repeated)
+        subscriber.reset()
+        _ = await subscriber.translateFinal(self.repeated)
+        XCTAssertTrue(subscriber.committedSourceLines.isEmpty)
+        subscriber.noteTimedSegments([ASRTimedSegment(text: self.repeated, start: 4, end: 6)])
+        _ = await subscriber.translateFinal(self.repeated)
+        XCTAssertEqual(subscriber.committedSourceLines, [self.repeated])
+        XCTAssertEqual(subscriber.captionPairs.first?.speechTiming, CaptionSpeechTiming(start: 4, end: 6))
+        subscriber.endListening()
+    }
+}
+
+@MainActor
 final class TheaterRepeatTests: XCTestCase {
     func testLeftoverCollapsesAWhisperSentenceStutter() {
         XCTAssertEqual(

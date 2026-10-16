@@ -14,15 +14,20 @@ struct DictationAudioMetadata: Codable, Equatable, Sendable {
 
 final class DictationAudioHistoryStore {
     static let shared = DictationAudioHistoryStore()
-    @discardableResult func deleteAudio(fileName: String) -> Int64 { 0 }
-    func deleteAllAudioFiles() {}
-    func audioUsageBytes() -> Int64 { 0 }
-    func deleteUnreferencedAudioFiles(referencedFileNames: Set<String>) -> (fileCount: Int, byteCount: Int64) { (0, 0) }
+    var files: [String: Int64] = [:]
+    @discardableResult func deleteAudio(fileName: String) -> Int64 { self.files.removeValue(forKey: fileName) ?? 0 }
+    func deleteAllAudioFiles() { self.files.removeAll() }
+    func audioUsageBytes() -> Int64 { self.files.values.reduce(0, +) }
+    func deleteUnreferencedAudioFiles(referencedFileNames: Set<String>) -> (fileCount: Int, byteCount: Int64) {
+        let doomed = self.files.keys.filter { !referencedFileNames.contains($0) }
+        let bytes = doomed.reduce(Int64(0)) { $0 + self.deleteAudio(fileName: $1) }
+        return (doomed.count, bytes)
+    }
 }
 
 @MainActor final class SettingsStore {
     static let shared = SettingsStore()
-    var audioHistoryBudgetBytes: Int64 { 1_000_000 }
+    var audioHistoryBudgetBytes: Int64 = 1_000_000
     var weekendsDontBreakStreak: Bool { false }
     var historyRetentionPolicy: HistoryRetentionPolicy { .unlimited }
 }
@@ -172,6 +177,103 @@ enum ConnectingCaptionsProduct {
         precondition(afterRestore == [legacy[3]])
         print("PASS: restore during loading replaces both memory and disk")
         try await self.testTodaySummary(root: root, defaults: defaults, audio: audio)
+        try await self.testAudioPruningAndRetry(root: root, defaults: defaults)
+    }
+
+    @MainActor static func testAudioPruningAndRetry(root: URL, defaults: UserDefaults) async throws {
+        defer {
+            DictationAudioHistoryStore.shared.files.removeAll()
+            SettingsStore.shared.audioHistoryBudgetBytes = 1_000_000
+        }
+        let writer = TranscriptionHistoryWriter(defaults: defaults, url: root.appendingPathComponent("\(UUID()).sqlite3"))
+        let store = TranscriptionHistoryStore(writer: writer)
+        try await store.waitUntilLoaded()
+        let entries = (0..<205).map { i in
+            let audio = DictationAudioMetadata(fileName: "\(i).wav", durationMilliseconds: 1, byteCount: 100, sampleRate: 16000, channels: 1, model: "test")
+            DictationAudioHistoryStore.shared.files[audio.fileName] = 100
+            return TranscriptionHistoryEntry(timestamp: Date(timeIntervalSince1970: Double(i)), rawText: "row \(i)", processedText: "row \(i)", appName: "test", windowTitle: "test", wasAIProcessed: false, audio: audio)
+        }
+        store.restore(from: entries)
+        await store.finishPendingWrites()
+        SettingsStore.shared.audioHistoryBudgetBytes = 20_490
+        let reported = try await store.pruneAudioToBudget()
+        await store.finishPendingWrites()
+        let disk = try await writer.load()
+        precondition(reported == 1, "Only the oldest audio needed to reach the budget")
+        precondition(DictationAudioHistoryStore.shared.files.count == 204)
+        precondition(!disk.contains { $0.audio?.fileName == "0.wav" }, "Pruning must clear database metadata")
+        precondition(DictationAudioHistoryStore.shared.files["1.wav"] != nil, "Off-page referenced files are not orphans")
+
+        let failureURL = root.appendingPathComponent("\(UUID()).sqlite3")
+        let failureWriter = TranscriptionHistoryWriter(defaults: defaults, url: failureURL)
+        let failureStore = TranscriptionHistoryStore(writer: failureWriter)
+        try await failureStore.waitUntilLoaded()
+        failureStore.restore(from: [entries[0]])
+        await failureStore.finishPendingWrites()
+        try sql(failureURL, "CREATE TRIGGER reject_delete BEFORE DELETE ON history BEGIN SELECT RAISE(FAIL, 'simulated disk failure'); END")
+        failureStore.clearAllHistory()
+        await failureStore.finishPendingWrites()
+        for _ in 0..<20 { await Task.yield() }
+        precondition(failureStore.persistenceError != nil)
+        try sql(failureURL, "DROP TRIGGER reject_delete")
+        failureStore.retryPersistence()
+        await failureStore.finishPendingWrites()
+        for _ in 0..<20 { await Task.yield() }
+        let rowsAfterRetry = try await failureWriter.load()
+        precondition(rowsAfterRetry.isEmpty && failureStore.persistenceError == nil, "Retry must replay clear")
+        failureStore.restore(from: [entries[0]])
+        await failureStore.finishPendingWrites()
+
+        try sql(failureURL, "CREATE TRIGGER reject_insert BEFORE INSERT ON history BEGIN SELECT RAISE(FAIL, 'simulated disk failure'); END")
+        failureStore.restore(from: [entries[1]])
+        await failureStore.finishPendingWrites()
+        for _ in 0..<20 { await Task.yield() }
+        try sql(failureURL, "DROP TRIGGER reject_insert")
+        failureStore.retryPersistence()
+        await failureStore.finishPendingWrites()
+        for _ in 0..<20 { await Task.yield() }
+        let rowsAfterRestoreRetry = try await failureWriter.load()
+        precondition(rowsAfterRestoreRetry == [entries[1]], "Retry must replace old history, not merge it")
+
+        failureStore.restore(from: [entries[2], entries[3]])
+        await failureStore.finishPendingWrites()
+        try sql(failureURL, "CREATE TRIGGER reject_delete BEFORE DELETE ON history BEGIN SELECT RAISE(FAIL, 'simulated disk failure'); END")
+        failureStore.deleteEntry(id: entries[2].id)
+        failureStore.deleteEntries(ids: [entries[3].id])
+        let keptID = UUID()
+        failureStore.addEntry(id: keptID, rawText: "kept", processedText: "kept", appName: "test", windowTitle: "test")
+        await failureStore.finishPendingWrites()
+        let pendingBackup = try await failureStore.makeBackupPayload()
+        precondition(pendingBackup.map(\.id) == [keptID], "Failed deletes must not reappear in exports")
+        try sql(failureURL, "DROP TRIGGER reject_delete")
+        failureStore.retryPersistence()
+        await failureStore.finishPendingWrites()
+        let deletedRows = try await failureWriter.load()
+        precondition(deletedRows.map(\.id) == [keptID], "Retry must replay single/bulk deletes and preserve later inserts")
+
+        let corruptURL = root.appendingPathComponent("\(UUID()).sqlite3")
+        let corruptWriter = TranscriptionHistoryWriter(defaults: defaults, url: corruptURL)
+        let corruptStore = TranscriptionHistoryStore(writer: corruptWriter)
+        try await corruptStore.waitUntilLoaded()
+        corruptStore.restore(from: entries)
+        await corruptStore.finishPendingWrites()
+        DictationAudioHistoryStore.shared.files = Dictionary(uniqueKeysWithValues: entries.compactMap { $0.audio.map { ($0.fileName, Int64(100)) } })
+        try sql(corruptURL, "UPDATE history SET payload=X'6E6F746A736F6E' WHERE id='\(entries[0].id.uuidString)'")
+        do {
+            _ = try await corruptWriter.loadEntriesWithAudio()
+            preconditionFailure("Corrupted audio payload must fail")
+        } catch {}
+        let freshAudio = DictationAudioMetadata(fileName: "fresh.wav", durationMilliseconds: 1, byteCount: 100, sampleRate: 16000, channels: 1, model: "test")
+        DictationAudioHistoryStore.shared.files[freshAudio.fileName] = 100
+        corruptStore.addEntry(rawText: "fresh", processedText: "fresh", appName: "test", windowTitle: "test", audio: freshAudio)
+        for _ in 0..<30 { try await Task.sleep(nanoseconds: 20_000_000) }
+        precondition(DictationAudioHistoryStore.shared.files["1.wav"] != nil, "A failed reference query must not delete healthy recordings")
+        precondition(corruptStore.persistenceError != nil, "Pruning failure must surface")
+        do {
+            _ = try await corruptStore.pruneAudioToBudget()
+            preconditionFailure("Manual pruning must also refuse an incomplete reference query")
+        } catch {}
+        print("PASS: full-history audio pruning, read-failure preservation, clear/restore retries")
     }
 
     @MainActor static func testTodaySummary(root: URL, defaults: UserDefaults, audio: DictationAudioMetadata) async throws {

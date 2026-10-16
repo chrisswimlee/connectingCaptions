@@ -1,6 +1,7 @@
 import AppKit
 import CoreText
 import Foundation
+import NaturalLanguage
 
 /// Splits a bilingual caption into visual lines and stacks them:
 /// Show-as title first, spoken undertone underneath.
@@ -593,7 +594,9 @@ enum TheaterBilingualWrap {
         self.mergeUnbreakable(self.rawAtoms(text))
     }
 
-    /// Whitespace runs, Latin words, and one glyph for everything else.
+    /// Whitespace runs, Latin words, dictionary words in Thai, and one glyph
+    /// for other compact scripts. Preserve every character, including gaps the
+    /// tokenizer does not return, so reveal progress still matches the source.
     /// Glue / kinsoku happens in `mergeUnbreakable` so wrap points stay
     /// on a word, quote, or Japanese cluster instead of a stray mark.
     private static func rawAtoms(_ text: String) -> [String] {
@@ -601,18 +604,27 @@ enum TheaterBilingualWrap {
         var current = ""
         var kind: TokenKind?
 
+        func flush() {
+            guard !current.isEmpty else { return }
+            if kind == .thai {
+                result.append(contentsOf: Self.thaiWords(current))
+            } else {
+                result.append(current)
+            }
+            current = ""
+            kind = nil
+        }
+
         for character in text {
             let next: TokenKind
             if character.isWhitespace {
                 next = .space
             } else if character.isASCII, character.isLetter || character.isNumber {
                 next = .latin
+            } else if character.unicodeScalars.contains(where: { (0x0E00...0x0E7F).contains($0.value) }) {
+                next = .thai
             } else {
-                if !current.isEmpty {
-                    result.append(current)
-                    current = ""
-                    kind = nil
-                }
+                flush()
                 result.append(String(character))
                 continue
             }
@@ -620,15 +632,29 @@ enum TheaterBilingualWrap {
                 current.append(character)
                 kind = next
             } else {
-                result.append(current)
+                flush()
                 current = String(character)
                 kind = next
             }
         }
-        if !current.isEmpty {
-            result.append(current)
-        }
+        flush()
         return result
+    }
+
+    private static func thaiWords(_ text: String) -> [String] {
+        let tokenizer = NLTokenizer(unit: .word)
+        tokenizer.setLanguage(.thai)
+        tokenizer.string = text
+        var words: [String] = []
+        var cursor = text.startIndex
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            if cursor < range.lowerBound { words.append(String(text[cursor..<range.lowerBound])) }
+            words.append(String(text[range]))
+            cursor = range.upperBound
+            return true
+        }
+        if cursor < text.endIndex { words.append(String(text[cursor...])) }
+        return words.isEmpty ? [text] : words
     }
 
     private static func mergeUnbreakable(_ atoms: [String]) -> [String] {
@@ -724,6 +750,7 @@ enum TheaterBilingualWrap {
     private enum TokenKind {
         case space
         case latin
+        case thai
     }
 
     private static func lineWidth(_ text: String, font: NSFont) -> CGFloat {

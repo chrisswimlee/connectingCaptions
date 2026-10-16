@@ -2,6 +2,9 @@ import SwiftUI
 
 /// Speak and type. Its own section, separate from Theater captions.
 struct SpeakAndTypeView: View {
+    @ObservedObject private var controller = LiveTranslationController.shared
+    @ObservedObject private var settings = SettingsStore.shared
+    @ObservedObject private var asr = AppServices.shared.asr
     var showsPageHeader = true
     var tracksSearch = false
     var recordShortcut: (() -> Void)?
@@ -9,13 +12,14 @@ struct SpeakAndTypeView: View {
     var shortcutRecordingMessage: String?
     var accessibilityTrusted = true
     var openAccessibility: () -> Void = {}
+    var openVoiceEngine: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if self.showsPageHeader {
                 FluidPageHeader(
                     systemImage: "text.cursor",
-                    title: "Speak and type",
+                    title: AppLanguage.text("Speak & Type"),
                     subtitle: TheaterReadiness.speakAndTypeSubtitle
                 )
             }
@@ -23,15 +27,50 @@ struct SpeakAndTypeView: View {
             ThemedCard(style: .standard, hoverEffect: false) {
                 TheaterModeSection(
                     accessibilityIdentifier: "speakAndType.mode",
-                    title: "What gets typed"
+                    title: AppLanguage.text("What gets typed")
                 )
             }
 
+            if self.readiness.needsAttention {
+                ThemedCard(style: .standard, hoverEffect: false) {
+                    TheaterReadinessChecklist(
+                        openVoiceEngine: self.openVoiceEngine ?? { AppNavigationRouter.shared.request(.voiceEngine) },
+                        openTranslationEngine: { AppNavigationRouter.shared.request(.languagePacks) },
+                        compact: true
+                    )
+                }
+            }
             TranslationLanguagePairCard()
-
+            ThemedCard(style: .standard, hoverEffect: false) {
+                TheaterMicrophoneStatus()
+            }
             self.shortcutCard
+            ThemedCard(style: .standard, hoverEffect: false) {
+                DisclosureGroup(AppLanguage.text("Advanced")) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        TheaterEngineCards(
+                            openVoiceEngine: self.openVoiceEngine ?? { AppNavigationRouter.shared.request(.voiceEngine) },
+                            openTranslationEngine: { AppNavigationRouter.shared.request(.languagePacks) },
+                            showsPurpose: false
+                        )
+                        if SpokenLanguageResolver.showsEitherWayControl() {
+                            TheaterSharedSettingsNotice()
+                            TheaterEitherWaySection(accessibilityIdentifier: "speakAndType.eitherWay")
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+            }
         }
         .accessibilityIdentifier("speakAndType.home")
+    }
+
+    private var readiness: TheaterReadyGate.Snapshot {
+        TheaterReadyGate.liveSnapshot(
+            pack: self.controller.packAvailability,
+            microphone: self.asr.micStatus,
+            firstCaptionPrinted: self.settings.theaterListenUsed
+        )
     }
 
     @ViewBuilder

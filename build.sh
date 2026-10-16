@@ -6,9 +6,9 @@
 #   ./build.sh            # signed Debug build
 #   ./build.sh public     # signed Debug build
 #   ./build.sh unsigned   # unsigned Debug build (CI / no signing identity)
-#   ./build.sh release    # signed Release zip and disk image; notarize when Apple credentials are set
+#   ./build.sh release    # signed Release zip; notarize when Apple credentials are set
 #   ./build.sh preview    # ad-hoc signed Release zip for a GitHub pre-release
-#   ./build.sh disk-image /path/to/connectingCaptions.app
+#   ./build.sh verify-bundle # repair and verify the local Release build, ad-hoc signed
 
 set -euo pipefail
 
@@ -134,28 +134,26 @@ submit_notarization() {
 resolve_developer_id() {
     local development_team="$1"
     local identity="${CONNECTINGCAPTIONS_CODESIGN_IDENTITY:-${FLUIDSUBTITLES_CODESIGN_IDENTITY:-}}"
+    if [ -n "${identity}" ]; then
+        printf '%s\n' "${identity}"
+        return
+    fi
     local identity_hash=""
     identity_hash="$(security find-identity -v -p codesigning 2>/dev/null \
         | grep "Developer ID Application:.*(${development_team})" \
         | awk '{ print $2 }' \
-        | tail -n 1)"
-    if [[ "${identity}" =~ ^[A-Fa-f0-9]{40}$ ]]; then
-        printf '%s\n' "${identity}"
-        return
-    fi
+        | tail -n 1 || true)"
     if [ -n "${identity_hash}" ]; then
         printf '%s\n' "${identity_hash}"
         return
     fi
-    if [ -n "${identity}" ]; then
-        printf '%s\n' "${identity}"
-    fi
+    return 0
 }
 
 restore_ctranscribe_layout() {
     local framework="$1/Contents/Frameworks/CTranscribe.framework"
-    if [ ! -d "${framework}/Versions/A" ]; then
-        echo "CTranscribe.framework is missing from the Release app." >&2
+    if [ ! -f "${framework}/Versions/A/CTranscribe" ] || [ ! -f "${framework}/Versions/A/Resources/Info.plist" ]; then
+        echo "CTranscribe.framework is incomplete in the Release app." >&2
         exit 1
     fi
     rm -rf \
@@ -166,6 +164,26 @@ restore_ctranscribe_layout() {
     ln -s A "${framework}/Versions/Current"
     ln -s Versions/Current/CTranscribe "${framework}/CTranscribe"
     ln -s Versions/Current/Resources "${framework}/Resources"
+}
+
+prepare_adhoc_bundle() {
+    local app_path="$1"
+    restore_ctranscribe_layout "${app_path}"
+    codesign --force --sign - --options runtime \
+        "${app_path}/Contents/Frameworks/CTranscribe.framework"
+    codesign --force --sign - --options runtime \
+        --entitlements "${PROJECT_DIR}/connectingCaptions.entitlements" \
+        "${app_path}"
+    codesign --verify --deep --strict "${app_path}"
+}
+
+verify_release_bundle() {
+    local app_path="${DERIVED_DATA_PATH}/Build/Products/Release/${RELEASE_APP_BUNDLE_NAME}"
+    if [ ! -d "${app_path}" ]; then
+        echo "Build the Release app before running verify-bundle: ${app_path}" >&2
+        exit 1
+    fi
+    prepare_adhoc_bundle "${app_path}"
 }
 
 run_release_build() {
@@ -193,15 +211,7 @@ run_release_build() {
         exit 1
     fi
 
-    identity_hash="$(security find-identity -v -p codesigning 2>/dev/null \
-        | grep "Developer ID Application:.*(${development_team})" \
-        | awk '{ print $2 }' \
-        | tail -n 1)"
-    if [[ "${identity}" =~ ^[A-Fa-f0-9]{40}$ ]]; then
-        :
-    elif [ -n "${identity_hash}" ]; then
-        identity="${identity_hash}"
-    fi
+    identity="$(resolve_developer_id "${development_team}")"
     if [ -z "${identity}" ]; then
         echo "No Developer ID Application identity for team ${development_team}." >&2
         echo "Create one in Xcode → Settings → Accounts, then rerun ./scripts/prepare-release-signing.sh." >&2
@@ -293,13 +303,7 @@ run_preview_build() {
         exit 1
     fi
 
-    restore_ctranscribe_layout "${app_path}"
-    codesign --force --deep --sign - --options runtime \
-        "${app_path}/Contents/Frameworks/CTranscribe.framework"
-    codesign --force --deep --sign - --options runtime \
-        --entitlements "${PROJECT_DIR}/connectingCaptions.entitlements" \
-        "${app_path}"
-    codesign --verify --deep --strict "${app_path}"
+    prepare_adhoc_bundle "${app_path}"
 
     version="$(app_version)"
     zip_name="${RELEASE_ZIP_PREFIX}-${version}-preview-unsigned.zip"
@@ -325,9 +329,12 @@ case "${PROFILE}" in
     preview)
         run_preview_build
         ;;
+    verify-bundle)
+        verify_release_bundle
+        ;;
     *)
         echo "Unknown build profile: ${PROFILE}"
-        echo "Valid profiles: public, unsigned, release, preview"
+        echo "Valid profiles: public, unsigned, release, preview, verify-bundle"
         exit 1
         ;;
 esac

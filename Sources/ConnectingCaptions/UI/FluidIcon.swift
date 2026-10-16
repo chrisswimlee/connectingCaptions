@@ -150,10 +150,10 @@ struct TheaterSidebarIdentity: View {
         HStack(spacing: 10) {
             FluidIcon(size: 26)
             VStack(alignment: .leading, spacing: 0) {
-                Text(ConnectingCaptionsProduct.displayName)
+                AppText(ConnectingCaptionsProduct.displayName)
                     .font(self.theme.typography.sidebarItem)
                     .foregroundStyle(self.theme.palette.primaryText)
-                Text("Live captions")
+                AppText("Live captions")
                     .font(self.theme.typography.sidebarSection)
                     .foregroundStyle(self.theme.palette.secondaryText)
             }
@@ -163,7 +163,7 @@ struct TheaterSidebarIdentity: View {
         .padding(.top, 12)
         .padding(.bottom, 6)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(ConnectingCaptionsProduct.displayName), live captions")
+        .accessibilityLabel(AppLanguage.format("{0}, live captions", String(describing: ConnectingCaptionsProduct.displayName)))
     }
 }
 

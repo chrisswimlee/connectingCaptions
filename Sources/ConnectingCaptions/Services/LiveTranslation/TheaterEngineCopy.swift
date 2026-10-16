@@ -1,33 +1,5 @@
 import Foundation
 
-/// Apple Translation is the caption engine.
-enum TheaterTranslationEngineKind: String, CaseIterable, Identifiable {
-    /// Translation Engine is Apple Translation only for now. The local LLM
-    /// keeps its implementation; flip to `false` to offer it again.
-    static let appleTranslationOnly = true
-
-    case apple
-    case localLLM
-
-    var id: String { self.rawValue }
-
-    var displayName: String {
-        switch self {
-        case .apple: return "Apple Translation"
-        case .localLLM: return "Local small LLM (experimental)"
-        }
-    }
-
-    var purpose: String {
-        switch self {
-        case .apple:
-            return "Turns that text into a supported language. On this Mac. Not a chat model."
-        case .localLLM:
-            return "Experimental. A running local model can sharpen the first print. Apple Translation stays the fallback."
-        }
-    }
-}
-
 /// User-facing copy that keeps Voice Engine (speech to text) separate from
 /// Translation Engine (Apple Translation).
 enum TheaterEngineCopy {
@@ -57,17 +29,16 @@ enum TheaterEngineCopy {
     }
 
     static func voiceEngineDetail(_ model: SettingsStore.SpeechModel) -> String {
-        let languages = Self.languagesLine(for: model)
         switch model {
         case .appleSpeech:
-            return "Prints while you talk. The recognizer macOS has included for years. \(languages). No download."
+            return "Prints while you talk. The recognizer macOS has included for years. Offline language support varies by Mac."
         case .appleSpeechAnalyzer:
-            return "Prints while you talk. The recognizer added in macOS 26. \(languages)."
+            return "Prints while you talk. The recognizer added in macOS 26. Supported languages may need a speech asset download."
         case .whisperSmall:
-            return "Add-on for Either way. Hears both languages of the pair. \(model.downloadSize). Apple Speech stays the default for one speaker."
+            return "Prints while you talk. Also supports Either way for compatible translation pairs."
         default:
             let when = model.supportsStreaming ? "Prints while you talk" : "Prints when you stop"
-            return "\(when). \(languages). \(model.downloadSize)."
+            return "\(when). \(model.downloadSize). Runs locally after download."
         }
     }
 
@@ -87,9 +58,7 @@ enum TheaterEngineCopy {
     static let translationTitle = "Translation Engine"
     static let translationPurpose = "Apple Translation on this Mac, not a chat model."
 
-    static func translationName(settings: SettingsStore = .shared) -> String {
-        settings.theaterTranslationEngine.displayName
-    }
+    static let translationName = "Apple Translation"
 
     static func voiceRunningLine(settings: SettingsStore = .shared) -> String {
         SpokenLanguageResolver.stageEngineSummary(settings: settings)
@@ -98,8 +67,7 @@ enum TheaterEngineCopy {
     static func translationRunningLine(
         mode: TheaterSessionMode,
         sameLanguage: Bool,
-        pack: TranslationPackAvailability,
-        engine: TheaterTranslationEngineKind = .apple
+        pack: TranslationPackAvailability
     ) -> String {
         switch mode {
         case .transcription:
@@ -107,9 +75,6 @@ enum TheaterEngineCopy {
         case .translation:
             if sameLanguage {
                 return "Same language — Apple Translation is not needed."
-            }
-            if engine == .localLLM {
-                return "Experimental local LLM can sharpen the first print. Apple Translation stays the fallback."
             }
             switch pack {
             case .installed:

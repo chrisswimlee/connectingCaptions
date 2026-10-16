@@ -6,7 +6,7 @@ import Speech
 // MARK: - Apple Speech Provider
 
 /// A TranscriptionProvider that uses Apple's native SFSpeechRecognizer.
-/// This uses Apple's system speech path and lets macOS choose local or online recognition.
+/// Recognition stays on device; the chosen language must support offline speech.
 final class AppleSpeechProvider: TranscriptionProvider {
     var name: String { "Apple Speech (Legacy)" }
 
@@ -31,11 +31,17 @@ final class AppleSpeechProvider: TranscriptionProvider {
     // MARK: - Lifecycle
 
     func prepare(progressHandler: ((ModelPreparationProgress) -> Void)?) async throws {
+        self.isReady = false
         // 1. Request Authorization
         let status = await self.requestAuthorization()
 
         switch status {
         case .authorized:
+            guard let recognizer = self.updateRecognizerIfNeeded(), recognizer.supportsOnDeviceRecognition else {
+                throw NSError(domain: "AppleSpeechProvider", code: 7, userInfo: [
+                    NSLocalizedDescriptionKey: "This language is unavailable for offline Apple Speech on this Mac. Choose a supported language or another Voice Engine."
+                ])
+            }
             self.isReady = true
             DebugLogger.shared.info("AppleSpeechProvider authorized and ready", source: "AppleSpeechProvider")
         case .denied:
@@ -80,10 +86,16 @@ final class AppleSpeechProvider: TranscriptionProvider {
             throw NSError(domain: "AppleSpeechProvider", code: 6, userInfo: [NSLocalizedDescriptionKey: "SFSpeechRecognizer is currently unavailable"])
         }
 
+        guard recognizer.supportsOnDeviceRecognition else {
+            throw NSError(domain: "AppleSpeechProvider", code: 7, userInfo: [
+                NSLocalizedDescriptionKey: "On-device speech recognition is unavailable for this language on this Mac."
+            ])
+        }
+
         // 3. Create Request
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = false // We want the final result for this chunk
-        request.requiresOnDeviceRecognition = false // Allow macOS to use the best available Apple speech path.
+        request.requiresOnDeviceRecognition = true
         request.append(buffer)
         request.endAudio() // Signal that this buffer is the complete utterance for this request
 
@@ -98,7 +110,7 @@ final class AppleSpeechProvider: TranscriptionProvider {
                 if let error = error {
                     hasResumed = true
                     // Ignore "No speech detected" errors often returned for silent chunks
-                    DebugLogger.shared.warning("Apple transcribed error: \(error.localizedDescription)", source: "AppleSpeechProvider")
+                    DebugLogger.shared.warning("Apple transcribed error: \(DiagnosticMetadata.error(error))", source: "AppleSpeechProvider")
                     continuation.resume(returning: ASRTranscriptionResult(text: "", confidence: 0.0))
                     return
                 }
@@ -106,8 +118,11 @@ final class AppleSpeechProvider: TranscriptionProvider {
                 if let result = result, result.isFinal {
                     hasResumed = true
                     let transcription = result.bestTranscription.formattedString
-                    DebugLogger.shared.debug("AppleSpeechProvider: Got final result: '\(transcription)'", source: "AppleSpeechProvider")
-                    continuation.resume(returning: ASRTranscriptionResult(text: transcription, confidence: 1.0))
+                    DebugLogger.shared.debug("AppleSpeechProvider: Final result characters: \(transcription.count)", source: "AppleSpeechProvider")
+                    let segments = result.bestTranscription.segments.map {
+                        ASRTimedSegment(text: $0.substring, start: $0.timestamp, end: $0.timestamp + $0.duration)
+                    }
+                    continuation.resume(returning: ASRTranscriptionResult(text: transcription, confidence: 1.0, timedSegments: segments))
                 }
                 // Partial results ignored as we requested final only
             }
@@ -128,9 +143,8 @@ final class AppleSpeechProvider: TranscriptionProvider {
 
     private func theaterSpeechLocale() -> Locale {
         let sourceID = SpokenLanguageResolver.sourceLanguage().id
-        let identifier = VoiceEngineLanguageCatalog.preferredAppleSpeechAnalyzerLocale(
-            forLanguageID: sourceID
-        )
+        let identifier = VoiceEngineLanguageCatalog.appleSpeechLegacyLocaleIdentifier(for: sourceID)
+            ?? VoiceEngineLanguageCatalog.preferredAppleSpeechAnalyzerLocale(forLanguageID: sourceID)
         return Locale(identifier: identifier)
     }
 

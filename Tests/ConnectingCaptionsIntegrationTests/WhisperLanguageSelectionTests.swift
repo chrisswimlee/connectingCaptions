@@ -327,7 +327,9 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         XCTAssertNil(SpokenLanguageResolver.voiceEngineMismatchMessage(settings: settings))
         XCTAssertEqual(
             SpokenLanguageResolver.stageEngineSummary(settings: settings),
-            "Hearing English with Whisper Large."
+            SettingsStore.SpeechModel.whisperLarge.isInstalled
+                ? "Hearing English with Whisper Large."
+                : "Download English for Whisper Large in Voice Engine before Listen."
         )
     }
 

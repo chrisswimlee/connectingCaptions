@@ -505,7 +505,7 @@ final nonisolated class LLMClient: @unchecked Sendable {
 
         if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
             let errText = String(data: data, encoding: .utf8) ?? "Unknown error"
-            DebugLogger.shared.error("LLMClient: HTTP error \(http.statusCode): \(errText.prefix(200))", source: "LLMClient")
+            DebugLogger.shared.error("LLMClient: HTTP error \(http.statusCode), response bytes: \(data.count)", source: "LLMClient")
             throw LLMError.httpError(http.statusCode, errText)
         }
 
@@ -694,11 +694,11 @@ final nonisolated class LLMClient: @unchecked Sendable {
                 continue
             }
 
-            // Preserve bounded raw diagnostics without re-serializing every token.
+            // Provider deltas may echo the user's speech, including tool arguments.
             if thinkingBuffer.count + contentBuffer.count < 8 || delta["tool_calls"] != nil {
-                let rawDelta = jsonString
+                let deltaBytes = jsonData.count
                 DebugLogger.shared.logLazy(level: .debug, source: "LLMClient") {
-                    "LLMClient: Full Delta: \(rawDelta)"
+                    "LLMClient: Delta bytes: \(deltaBytes)"
                 }
             }
 
@@ -744,9 +744,8 @@ final nonisolated class LLMClient: @unchecked Sendable {
                     // Debug: Log first few chunks and any chunk containing think tags
                     let containsThinkTag = content.contains("<think") || content.contains("</think") || content.contains("<thinking") || content.contains("</thinking")
                     if thinkingBuffer.count + contentBuffer.count < 8 || containsThinkTag {
-                        let escaped = content.replacingOccurrences(of: "\n", with: "\\n")
                         let marker = containsThinkTag ? " [HAS THINK TAG!]" : ""
-                        DebugLogger.shared.debug("LLMClient: Chunk '\(escaped)'\(marker)", source: "LLMClient")
+                        DebugLogger.shared.debug("LLMClient: Chunk characters: \(content.count)\(marker)", source: "LLMClient")
                     }
 
                     let previousState = state

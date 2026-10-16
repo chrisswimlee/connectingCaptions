@@ -22,7 +22,7 @@ extension OnboardingFlowView {
                         firstDetail: "",
                         secondDetail: ""
                     ) {
-                        FluidOnboardingLandingPrimaryButton(title: "Get started") {
+                        FluidOnboardingLandingPrimaryButton(title: AppLanguage.text("Get started")) {
                             self.goNext()
                         }
                         .frame(
@@ -110,14 +110,14 @@ extension OnboardingFlowView {
                             FluidOnboardingCompactAppIconMark(size: 66)
                                 .padding(.bottom, 22)
 
-                            Text("What language will\nyou speak most?")
+                            AppText("What language will\nyou speak most?")
                                 .font(.system(size: 28, weight: .semibold))
                                 .foregroundStyle(Color.primary)
                                 .multilineTextAlignment(.center)
                                 .lineSpacing(4)
                                 .padding(.bottom, 18)
 
-                            Text("Pick the language you speak, then the one you want on screen.")
+                            AppText("Pick the language you speak, then the one you want on screen.")
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(Color.primary.opacity(0.62))
                                 .multilineTextAlignment(.center)
@@ -125,7 +125,8 @@ extension OnboardingFlowView {
 
                             VStack(alignment: .leading, spacing: 16) {
                                 self.onboardingLanguageMenu(
-                                    title: "I speak",
+                                    title: AppLanguage.text("I speak"),
+                                    isSource: true,
                                     selection: Binding(
                                         get: { self.selectedLanguageID },
                                         set: { id in
@@ -135,13 +136,14 @@ extension OnboardingFlowView {
                                     )
                                 )
                                 self.onboardingLanguageMenu(
-                                    title: "Show as",
+                                    title: AppLanguage.text("Show as"),
+                                    isSource: false,
                                     selection: self.$settings.translationTargetLanguageID
                                 )
                             }
                             .frame(width: 320)
 
-                            Text("Translate follows I speak into Show as. Same language needs no download. A different pair downloads its pack when you press Listen.")
+                            AppText("Translate follows I speak into Show as. Same-language captions need no translation pack. Speech assets are managed separately in Voice Engine.")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(Color.primary.opacity(0.44))
                                 .multilineTextAlignment(.center)
@@ -184,14 +186,16 @@ extension OnboardingFlowView {
         }
     }
 
-    func onboardingLanguageMenu(title: String, selection: Binding<String>) -> some View {
+    func onboardingLanguageMenu(title: String, isSource: Bool, selection: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title)
+            AppText(title)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.primary.opacity(0.7))
             TheaterLanguageMenu(
                 title: title,
-                selection: selection
+                selection: selection,
+                languages: isSource ? LanguageChoicePolicy.onboardingSourceLanguages() : LanguageChoicePolicy.targetLanguages(),
+                status: { LanguageChoicePolicy.status(for: $0, isSource: isSource, includeSpeech: false) }
             )
         }
     }
@@ -208,7 +212,7 @@ extension OnboardingFlowView {
 
         return HStack {
             self.cinematicFooterButton(
-                title: "Back",
+                title: AppLanguage.text("Back"),
                 kind: .back,
                 isEnabled: canNavigateBack
             ) {
@@ -348,7 +352,7 @@ extension OnboardingFlowView {
                             FluidOnboardingCompactAppIconMark(size: 66)
                                 .padding(.bottom, 22)
 
-                            Text("Voice Engine\nis ready")
+                            AppText("Voice Engine\nis ready")
                                 .font(.system(size: 28, weight: .semibold))
                                 .foregroundStyle(Color.primary)
                                 .multilineTextAlignment(.center)
@@ -362,7 +366,7 @@ extension OnboardingFlowView {
                                 .multilineTextAlignment(.center)
                                 .padding(.bottom, 14)
 
-                            Text(self.selectedOnboardingLanguage.displayName)
+                            AppText(self.selectedOnboardingLanguage.displayName)
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(FluidOnboardingLandingColors.blue)
                                 .padding(.horizontal, 12)
@@ -418,7 +422,7 @@ extension OnboardingFlowView {
                                     .multilineTextAlignment(.center)
                                     .padding(.top, 14)
                                 if self.voiceSetupFailureOffersSettings {
-                                    Button("Open Speech Settings") {
+                                    AppButton("Open Speech Settings") {
                                         self.openSpeechRecognitionSettings()
                                     }
                                     .buttonStyle(.bordered)
@@ -427,7 +431,7 @@ extension OnboardingFlowView {
                             }
 
                             if self.isModelPreparationInProgress {
-                                Label("Getting this Mac ready to caption. This can take a minute.", systemImage: "clock.arrow.circlepath")
+                                AppLabel("Getting this Mac ready to caption. This can take a minute.", systemImage: "clock.arrow.circlepath")
                                     .font(self.theme.typography.captionStrong)
                                     .foregroundStyle(Color.primary.opacity(0.58))
                                     .labelStyle(.titleAndIcon)
@@ -443,7 +447,7 @@ extension OnboardingFlowView {
                                     .padding(.top, 14)
                             }
 
-                            Text("Voice Engine can switch the newer or older Apple Speech later.")
+                            AppText("Voice Engine can switch the newer or older Apple Speech later.")
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundStyle(Color.primary.opacity(0.44))
                                 .padding(.top, self.isModelPreparationInProgress ? 8 : 18)
@@ -474,16 +478,8 @@ extension OnboardingFlowView {
             }
         }
         .task {
-            self.prepareBuiltInVoiceEngineIfNeeded()
+            await AppleSpeechLiveCapability.refreshAnalyzer()
         }
-    }
-
-    func prepareBuiltInVoiceEngineIfNeeded() {
-        guard self.step == .voiceModel else { return }
-        guard let route = self.selectedOnboardingRoute else { return }
-        guard route.model == .appleSpeech || route.model == .appleSpeechAnalyzer else { return }
-        guard !self.isOnboardingRouteReady(route), !self.isModelPreparationInProgress else { return }
-        self.prepareOnboardingRoute(route)
     }
 
     var permissionsStep: some View {
@@ -500,14 +496,14 @@ extension OnboardingFlowView {
                             FluidOnboardingCompactAppIconMark(size: 66)
                                 .padding(.bottom, 22)
 
-                            Text("Let \(ConnectingCaptionsProduct.displayName)\nhear you")
+                            AppText("Let {0}\nhear you", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                                 .font(.system(size: 28, weight: .semibold))
                                 .foregroundStyle(Color.primary)
                                 .multilineTextAlignment(.center)
                                 .lineSpacing(4)
                                 .padding(.bottom, 16)
 
-                            Text("macOS will ask once. Theater captions need the microphone.")
+                            AppText("macOS will ask once. Theater captions need the microphone.")
                                 .font(.system(size: 15, weight: .medium))
                                 .foregroundStyle(Color.primary.opacity(0.62))
                                 .padding(.bottom, 28)
@@ -850,12 +846,9 @@ extension OnboardingFlowView {
 
     func isOnboardingModelReady(_ model: SettingsStore.SpeechModel) -> Bool {
         guard self.isOnboardingModelSelected(model) else { return false }
-        // Apple Speech needs no download. Waiting on isAsrReady stranded first run
-        // on Voice Engine while the checklist already treated it as ready.
-        if model == .appleSpeech || model == .appleSpeechAnalyzer {
-            return model.isInstalled
-        }
-        return self.asr.isAsrReady
+        let readiness = VoiceEngineLanguageReadiness.current(model: model, languageID: self.selectedLanguageID)
+        guard readiness == .ready else { return false }
+        return model == .appleSpeech || model == .appleSpeechAnalyzer || self.asr.isAsrReady
     }
 
     func isOnboardingRouteReady(_ route: VoiceEngineLanguageRoute) -> Bool {
@@ -863,11 +856,11 @@ extension OnboardingFlowView {
     }
 
     func isOnboardingModelDownloaded(_ model: SettingsStore.SpeechModel) -> Bool {
-        self.isOnboardingModelBundledOrInstalled(model) || (self.isOnboardingModelSelected(model) && (self.asr.isAsrReady || self.asr.modelsExistOnDisk))
+        self.isOnboardingModelBundledOrInstalled(model)
     }
 
     func isOnboardingModelBundledOrInstalled(_ model: SettingsStore.SpeechModel) -> Bool {
-        model.isInstalled
+        VoiceEngineLanguageReadiness.current(model: model, languageID: self.selectedLanguageID) == .ready
     }
 
     func isPreparingOnboardingModel(_ model: SettingsStore.SpeechModel) -> Bool {
@@ -888,7 +881,7 @@ extension OnboardingFlowView {
     }
 
     func prepareOnboardingRoute(_ route: VoiceEngineLanguageRoute) {
-        guard !self.asr.isRunning, !self.isModelPreparationInProgress, self.uninstallingModelRouteID == nil else { return }
+        guard !self.asr.isRunningOrStarting, !self.isModelPreparationInProgress, self.uninstallingModelRouteID == nil else { return }
 
         self.modelPreparationTask?.cancel()
         self.preparingModelRouteID = route.id
@@ -906,6 +899,7 @@ extension OnboardingFlowView {
 
             do {
                 try await self.asr.ensureAsrReady()
+                await AppleSpeechLiveCapability.refreshAnalyzer()
                 if self.asr.errorTitle == "Voice Model Setup Failed" {
                     self.asr.errorMessage = ""
                     self.asr.showError = false
@@ -922,6 +916,7 @@ extension OnboardingFlowView {
                 self.asr.showError = true
             }
             guard !Task.isCancelled else { return }
+            await AppleSpeechLiveCapability.refreshAnalyzer()
             await self.asr.checkIfModelsExistAsync()
         }
     }
@@ -932,7 +927,7 @@ extension OnboardingFlowView {
     }
 
     func uninstallOnboardingRoute(_ route: VoiceEngineLanguageRoute) {
-        guard !self.asr.isRunning, !self.isModelPreparationInProgress, self.uninstallingModelRouteID == nil else { return }
+        guard !self.asr.isRunningOrStarting, !self.isModelPreparationInProgress, self.uninstallingModelRouteID == nil else { return }
 
         self.uninstallingModelRouteID = route.id
 
@@ -961,11 +956,12 @@ extension OnboardingFlowView {
         let isSelected = self.isOnboardingRouteSelected(route)
         let isHovered = enablesHover && self.hoveredModelRouteID == route.id
         let isRouteActiveInSettings = self.isRouteSelectedInSettings(route)
-        let isDownloaded = self.isOnboardingModelBundledOrInstalled(model) || (isRouteActiveInSettings && (self.asr.isAsrReady || self.asr.modelsExistOnDisk))
+        let readiness = VoiceEngineLanguageReadiness.current(model: model, languageID: route.language.id)
+        let isDownloaded = readiness == .ready
         let isPreparing = self.preparingModelRouteID == route.id || (isRouteActiveInSettings && (self.asr.isDownloadingModel || (self.asr.isLoadingModel && !self.asr.isAsrReady)))
         let isReady = self.isOnboardingRouteReady(route)
         let isUninstalling = self.uninstallingModelRouteID == route.id
-        let areModelActionsBlocked = self.asr.isRunning || self.uninstallingModelRouteID != nil || self.preparingModelRouteID != nil || isPreparing || self.isModelPreparationInProgress
+        let areModelActionsBlocked = self.asr.isRunningOrStarting || self.uninstallingModelRouteID != nil || self.preparingModelRouteID != nil || isPreparing || self.isModelPreparationInProgress
         let isBuiltInAppleModel = model == .appleSpeech || model == .appleSpeechAnalyzer
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         let cardFill = isHovered
@@ -1039,6 +1035,22 @@ extension OnboardingFlowView {
                     }
                 }
                 .frame(height: 42, alignment: .center)
+            } else if readiness == .checking || readiness == .unsupported {
+                Text(readiness.message(model: model, language: SpokenLanguageResolver.sourceLanguage()))
+                    .font(self.theme.typography.bodySmall)
+                    .foregroundStyle(self.theme.palette.warning)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if readiness == .permissionRequired {
+                self.onboardingModelActionButton(
+                    id: "\(route.id)-speech-permission",
+                    title: AppLanguage.text("Allow Speech Recognition"),
+                    systemImage: "mic",
+                    tone: .primary,
+                    width: nil,
+                    isDisabled: areModelActionsBlocked
+                ) {
+                    AppleSpeechLiveCapability.requestLegacyAccess()
+                }
             } else if isDownloaded, isBuiltInAppleModel {
                 self.onboardingModelActionButton(
                     id: "\(route.id)-activate",
@@ -1065,7 +1077,7 @@ extension OnboardingFlowView {
 
                     self.onboardingModelActionButton(
                         id: "\(route.id)-uninstall",
-                        title: "Delete",
+                        title: AppLanguage.text("Delete"),
                         systemImage: "trash",
                         tone: .destructive,
                         width: 124,
@@ -1132,7 +1144,7 @@ extension OnboardingFlowView {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Speed \(Int(model.speedPercent * 100)) percent. Accuracy \(Int(model.accuracyPercent * 100)) percent.")
+        .accessibilityLabel(AppLanguage.format("Speed {0} percent. Accuracy {1} percent.", String(describing: Int(model.speedPercent * 100)), String(describing: Int(model.accuracyPercent * 100))))
     }
 
     func onboardingModelPreparationStatus(isUninstalling: Bool) -> some View {
@@ -1143,7 +1155,7 @@ extension OnboardingFlowView {
                         .controlSize(.small)
                         .fixedSize()
 
-                    Text("Cancelling...")
+                    AppText("Cancelling...")
                         .font(self.theme.typography.captionStrong)
                         .foregroundStyle(Color.primary.opacity(0.62))
                 }
@@ -1211,7 +1223,7 @@ extension OnboardingFlowView {
                     .font(self.theme.typography.captionStrong)
                     .foregroundStyle(color)
 
-                Text(label)
+                AppText(label)
                     .font(self.theme.typography.captionStrong)
                     .foregroundStyle(Color.primary.opacity(0.66))
                     .lineLimit(1)
@@ -1250,7 +1262,7 @@ extension OnboardingFlowView {
             }
             .frame(height: 9)
 
-            Text("\(Int(fillPercent * 100))%")
+            AppText("{0}%", arguments: [String(describing: Int(fillPercent * 100))])
                 .font(self.theme.typography.bodySmallStrong)
                 .foregroundStyle(fillPercent > 0 ? color : Color.primary.opacity(0.48))
                 .lineLimit(1)
@@ -1317,7 +1329,7 @@ extension OnboardingFlowView {
                         .font(.system(size: configuration.iconSize, weight: .regular))
                 }
 
-                Text(configuration.title)
+                AppText(configuration.title)
                     .font(.system(size: configuration.fontSize, weight: .medium))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -1339,7 +1351,8 @@ extension OnboardingFlowView {
     func onboardingModelTooltip(for route: VoiceEngineLanguageRoute) -> String {
         let model = route.model
         if model == .appleSpeech || model == .appleSpeechAnalyzer {
-            return "Built in on this Mac. No download."
+            guard let language = TranslationLanguageCatalog.language(id: route.language.id) else { return "" }
+            return VoiceEngineLanguageReadiness.current(model: model, languageID: language.id).message(model: model, language: language)
         }
         return "\(self.onboardingModelSubtitle(for: model)). \(model.downloadSize)."
     }
@@ -1409,7 +1422,7 @@ extension OnboardingFlowView {
                         Image(systemName: systemImage)
                             .font(.system(size: 14, weight: .bold))
 
-                        Text("\(stepNumber)")
+                        AppText("{0}", arguments: [String(describing: stepNumber)])
                             .font(.system(size: 10, weight: .bold))
                     }
                     .foregroundStyle(FluidOnboardingLandingColors.blue)
@@ -1418,7 +1431,7 @@ extension OnboardingFlowView {
 
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
-                    Text(title)
+                    AppText(title)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color.primary)
 
@@ -1433,7 +1446,7 @@ extension OnboardingFlowView {
                         )
                 }
 
-                Text(subtitle)
+                AppText(subtitle)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(Color.primary.opacity(0.55))
                     .lineLimit(3)

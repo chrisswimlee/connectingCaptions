@@ -198,6 +198,14 @@ final class FluidAudioProvider: TranscriptionProvider {
         Self.usesIncrementalCaptionWindow ? .incrementalDelta : .trailingWindow
     }
 
+    var acceptedStreamingSampleCount: Int? {
+        self.incrementalSession == nil ? nil : self.incrementalAcceptedSampleCount
+    }
+
+    func resetStreamingSession() async {
+        self.resetStreamingPreviewCache()
+    }
+
     var hasIncrementalSession: Bool {
         self.incrementalSession != nil
     }

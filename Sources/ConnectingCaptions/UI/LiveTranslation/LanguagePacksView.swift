@@ -31,13 +31,18 @@ struct LanguagePacksView: View {
         VStack(alignment: .leading, spacing: 16) {
             FluidPageHeader(
                 systemImage: "arrow.down.circle",
-                title: "Language packs",
-                subtitle: "Most languages already translate using Apple Intelligence. " +
-                    "Download the fast pack for a language to use it without Apple Intelligence, or to speed it up."
+                title: AppLanguage.text("Language packs"),
+                subtitle: AppLanguage.text("Translation pairs for the current I speak language. Unsupported pairs are hidden. Speech recognition languages and downloads are listed in Voice Engine.")
             )
 
+            if !self.model.checkingRows.isEmpty {
+                AppButton("Check again") { Task { await self.model.refresh() } }
+                    .buttonStyle(.theaterText)
+                    .disabled(self.model.isRefreshing)
+            }
+
             if let message = self.model.downloadError {
-                Text(message)
+                AppText(message)
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.theme.palette.warning)
                     .fixedSize(horizontal: false, vertical: true)
@@ -45,22 +50,26 @@ struct LanguagePacksView: View {
 
             if self.model.rows.isEmpty {
                 ThemedCard(style: .standard, hoverEffect: false) {
-                    Text("Checking packs on this Mac…")
+                    AppText(self.model.isRefreshing ? AppLanguage.text("Checking packs on this Mac…") : AppLanguage.text("No supported translation packs for this I speak language."))
                         .font(self.theme.typography.bodySmall)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
             } else {
                 self.section(
-                    title: "Ready to use",
+                    title: AppLanguage.text("Ready to use"),
                     systemImage: "checkmark.circle",
                     rows: self.model.readyRows,
-                    emptyText: "No languages are ready yet."
+                    emptyText: AppLanguage.text("No languages are ready yet.")
                 )
+                if !self.model.checkingRows.isEmpty {
+                    self.section(title: AppLanguage.text("Checking availability…"), systemImage: "clock",
+                                 rows: self.model.checkingRows, emptyText: "")
+                }
                 self.section(
-                    title: "Needs a download",
+                    title: AppLanguage.text("Needs a download"),
                     systemImage: "arrow.down.circle",
                     rows: self.model.needsDownloadRows,
-                    emptyText: "Every language is ready."
+                    emptyText: AppLanguage.text("No confirmed downloads needed.")
                 )
             }
         }
@@ -86,7 +95,7 @@ struct LanguagePacksView: View {
             VStack(alignment: .leading, spacing: 12) {
                 FluidSectionHeader(title: title, systemImage: systemImage)
                 if rows.isEmpty {
-                    Text(emptyText)
+                    AppText(emptyText)
                         .font(self.theme.typography.bodySmall)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 } else {
@@ -102,15 +111,18 @@ struct LanguagePacksView: View {
         TheaterSideBySide(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 8) {
-                    Text(row.language.displayName)
+                    Text(AppLanguage.localizedName(for: row.language))
                         .font(self.theme.typography.bodyStrong)
                         .foregroundStyle(self.theme.palette.primaryText)
                     ForEach(row.roles, id: \.self) { role in
-                        Text(role)
+                        AppText(role)
                             .font(self.theme.typography.caption)
                             .foregroundStyle(self.theme.palette.accent)
                     }
                 }
+                Text(self.model.pairLabel(for: row))
+                    .font(self.theme.typography.caption)
+                    .foregroundStyle(self.theme.palette.secondaryText)
                 Text(row.statusLine)
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(row.isWarning ? self.theme.palette.warning : self.theme.palette.secondaryText)
@@ -129,32 +141,35 @@ struct LanguagePacksView: View {
             self.downloadProgress(started: self.model.downloadStartedAt ?? Date())
         } else {
             switch row.coverage {
+            case .checking:
+                AppText("Checking availability…")
+                    .font(self.theme.typography.caption)
             case .packDownloaded:
-                Text("Pack downloaded")
+                AppText("Pack downloaded")
                     .font(self.theme.typography.captionStrong)
                     .foregroundStyle(self.theme.palette.accent)
             case .appleIntelligence:
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text("Ready")
+                    AppText("Ready")
                         .font(self.theme.typography.captionStrong)
                         .foregroundStyle(self.theme.palette.accent)
-                    Button("Download pack") {
+                    AppButton("Download pack") {
                         Task { await self.model.download(row) }
                     }
                     .buttonStyle(.theaterText)
-                    .disabled(self.model.downloadingID != nil)
+                    .disabled(self.model.downloadingID != nil || self.model.isRefreshing)
                     .accessibilityIdentifier("languagePacks.download.\(row.language.id)")
                 }
             case .unsupported:
-                Text("Not supported")
+                AppText("Not supported")
                     .font(self.theme.typography.caption)
                     .foregroundStyle(self.theme.palette.warning)
             case .needsDownload:
-                Button("Download") {
+                AppButton("Download") {
                     Task { await self.model.download(row) }
                 }
                 .buttonStyle(.theaterTextProminent)
-                .disabled(self.model.downloadingID != nil)
+                .disabled(self.model.downloadingID != nil || self.model.isRefreshing)
                 .accessibilityIdentifier("languagePacks.download.\(row.language.id)")
             }
         }
@@ -189,22 +204,30 @@ final class LanguagePacksViewModel: ObservableObject {
         var roles: [String]
         var isDownloading: Bool
 
-        var id: String { self.language.id }
+        var id: String {
+            self.language.id
+        }
 
         var statusLine: String {
             if self.isDownloading {
-                return "Downloading the \(self.language.displayName) pack. Keep the app open until it finishes."
+                return AppLanguage.text("Downloading this translation pair. Keep the app open until it finishes.")
             }
             switch self.coverage {
+            case .checking:
+                return AppLanguage.text("Translation availability has not been confirmed. Try checking again.")
             case .packDownloaded:
-                return "The fast pack for \(self.language.displayName) is on this Mac."
+                return AppLanguage.text("The translation pack for this direction is on this Mac.")
             case .appleIntelligence:
-                return "\(self.language.displayName) translates now using Apple Intelligence."
+                return AppLanguage.text("This direction translates now using Apple Intelligence.")
             case .needsDownload:
-                return "Download \(self.language.displayName) once to use it."
+                return AppLanguage.text("Download this translation pair once to use it.")
             case .unsupported:
-                return "Apple Translation does not support \(self.language.displayName) yet."
+                return AppLanguage.text("Apple Translation does not support this direction.")
             }
+        }
+
+        var canDownload: Bool {
+            self.coverage == .needsDownload || self.coverage == .appleIntelligence
         }
 
         var isWarning: Bool {
@@ -216,16 +239,47 @@ final class LanguagePacksViewModel: ObservableObject {
     typealias PairStatus = (TranslationLanguage, TranslationLanguage) async -> LanguagePackCoverage
 
     @Published private(set) var rows: [Row] = []
+    @Published private(set) var isRefreshing = true
     @Published private(set) var downloadingID: String?
     @Published private(set) var downloadStartedAt: Date?
     @Published private(set) var downloadError: String?
 
     private var pollTask: Task<Void, Never>?
+    private var refreshRevision: UInt64 = 0
+    private var displayedPair: TranslationPairKey?
 
-    var readyRows: [Row] { self.rows.filter { $0.coverage != .needsDownload && $0.coverage != .unsupported } }
-    var needsDownloadRows: [Row] { self.rows.filter { $0.coverage == .needsDownload || $0.coverage == .unsupported } }
+    static func visibleRows(_ rows: [Row]) -> [Row] {
+        rows.filter { $0.coverage != .unsupported }
+    }
+
+    var readyRows: [Row] {
+        self.rows.filter { $0.coverage == .packDownloaded || $0.coverage == .appleIntelligence }
+    }
+
+    var checkingRows: [Row] {
+        self.rows.filter { $0.coverage == .checking }
+    }
+
+    func pairLabel(for row: Row) -> String {
+        guard let pair = Self.downloadPair(for: row.language, source: SpokenLanguageResolver.sourceLanguage(),
+                                          target: SpokenLanguageResolver.targetLanguage()) else { return "" }
+        return AppLanguage.format("{0} → {1}", AppLanguage.localizedName(for: pair.source), AppLanguage.localizedName(for: pair.target))
+    }
+
+    var needsDownloadRows: [Row] {
+        self.rows.filter { $0.coverage == .needsDownload }
+    }
 
     func refresh() async {
+        self.refreshRevision &+= 1
+        let revision = self.refreshRevision
+        self.isRefreshing = true
+        defer { if revision == self.refreshRevision { self.isRefreshing = false } }
+        let pair = TranslationPairKey.current()
+        if pair != self.displayedPair {
+            self.rows = []
+            self.displayedPair = pair
+        }
         let source = SpokenLanguageResolver.sourceLanguage()
         let target = SpokenLanguageResolver.targetLanguage()
         let languages = TranslationLanguageCatalog.menuOrder
@@ -242,9 +296,14 @@ final class LanguagePacksViewModel: ObservableObject {
             } else {
                 coverage = await AppleTranslationEngine.shared.languagePackCoverage(source: source, target: language)
             }
+            guard coverage != .unsupported else { continue }
             var roles: [String] = []
-            if language.id == source.id { roles.append("I speak") }
-            if language.id == target.id, source.id != target.id { roles.append("Show as") }
+            if language.id == source.id {
+                roles.append("I speak")
+            }
+            if language.id == target.id, source.id != target.id {
+                roles.append("Show as")
+            }
             rows.append(Row(
                 language: language,
                 coverage: coverage,
@@ -252,7 +311,14 @@ final class LanguagePacksViewModel: ObservableObject {
                 isDownloading: language.id == downloading
             ))
         }
-        self.rows = rows
+        guard !Task.isCancelled, revision == self.refreshRevision, pair == .current() else { return }
+        self.rows = Self.visibleRows(rows).map { row in
+            var updated = row
+            updated.isDownloading = row.id == self.downloadingID
+            return updated
+        }
+        // Download completion and Check again must update Listen and the shared menus too.
+        await LiveTranslationController.shared.refreshPackAvailability()
     }
 
     /// `languagePackCoverage` needs a direction. For "I speak," pair it with
@@ -278,26 +344,30 @@ final class LanguagePacksViewModel: ObservableObject {
         (ready + fallbacks).first { $0.id != language.id }
     }
 
+    static func downloadPair(
+        for language: TranslationLanguage,
+        source: TranslationLanguage,
+        target: TranslationLanguage
+    ) -> (source: TranslationLanguage, target: TranslationLanguage)? {
+        if language.id != source.id { return (source, language) }
+        let partner = source.id != target.id ? target : TranslationLanguageCatalog.menuOrder.first { $0.id != source.id }
+        guard let partner else { return nil }
+        return (source, partner)
+    }
+
     func download(_ row: Row) async {
-        guard self.downloadingID == nil else { return }
-        let fallbacks = [
-            SpokenLanguageResolver.sourceLanguage(),
-            SpokenLanguageResolver.targetLanguage(),
-        ] + TranslationLanguageCatalog.menuOrder
-        let ready = self.rows.filter { $0.coverage != .needsDownload && $0.coverage != .unsupported }.map(\.language)
-        guard let partner = Self.downloadPartner(
-            for: row.language,
-            ready: ready,
-            fallbacks: fallbacks
-        ) else { return }
+        guard self.downloadingID == nil, !self.isRefreshing, self.displayedPair == .current(), row.canDownload else { return }
+        let source = SpokenLanguageResolver.sourceLanguage()
+        let target = SpokenLanguageResolver.targetLanguage()
+        guard let pair = Self.downloadPair(for: row.language, source: source, target: target) else { return }
         self.downloadingID = row.id
         self.downloadStartedAt = Date()
         self.downloadError = nil
         self.updateDownloadingFlags()
-        AppleTranslationEngine.shared.requestLanguagePackDownload(source: row.language, target: partner)
+        AppleTranslationEngine.shared.requestLanguagePackDownload(source: pair.source, target: pair.target)
         self.pollTask?.cancel()
         self.pollTask = Task { [weak self] in
-            await self?.poll(language: row.language, partner: partner)
+            await self?.poll(language: pair.source, partner: pair.target)
         }
     }
 

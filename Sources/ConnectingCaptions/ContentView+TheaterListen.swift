@@ -133,6 +133,9 @@ extension ContentView {
         let kind = LiveTranslationController.shared.listenKind ?? .captions
         let transcribedText = await self.asr.stop(onFinalTranscriptionStarted: nil)
         let audioFile = self.asr.consumeLastCompletedAudioFile()
+        if kind != .insert, let audioFile {
+            DictationAudioHistoryStore.shared.discardPendingAudio(fileName: audioFile.fileName)
+        }
         let transcriptionDurationMilliseconds = self.asr.consumeLastFinalTranscriptionDurationMs()
         await self.processStoppedTranslation(
             transcribedText: transcribedText,

@@ -43,7 +43,7 @@ struct TheaterAppCommands: Commands {
             .keyboardShortcut(self.shortcut(.togglePause), modifiers: self.presenterModifiers)
             .disabled(!self.isCaptionListening)
 
-            Button("Show Overlay Tools") {
+            AppButton("Show Overlay Tools") {
                 PresenterCaptionController.shared.toggleOverlayToolsPinned()
             }
             .keyboardShortcut(self.shortcut(.toggleTools), modifiers: self.presenterModifiers)
@@ -59,37 +59,37 @@ struct TheaterAppCommands: Commands {
             }
             .keyboardShortcut(self.shortcut(.toggleVisible), modifiers: self.presenterModifiers)
 
-            Button("Larger Captions") {
+            AppButton("Larger Captions") {
                 self.settings.presenterFontSize += TheaterPresenterHotkey.fontStep
             }
             .keyboardShortcut(self.shortcut(.fontLarger), modifiers: self.presenterModifiers)
 
-            Button("Smaller Captions") {
+            AppButton("Smaller Captions") {
                 self.settings.presenterFontSize -= TheaterPresenterHotkey.fontStep
             }
             .keyboardShortcut(self.shortcut(.fontSmaller), modifiers: self.presenterModifiers)
 
             Divider()
 
-            Button("Copy All") {
+            AppButton("Copy All") {
                 self.controller.copyCaptionText()
             }
             .keyboardShortcut(self.shortcut(.copy), modifiers: self.presenterModifiers)
             .disabled(!PresenterCaptionController.shared.hasDeliverableText)
 
-            Button("Undo Last Caption") {
+            AppButton("Undo Last Caption") {
                 self.controller.undoLastCaption()
             }
             .keyboardShortcut(self.shortcut(.undo), modifiers: self.presenterModifiers)
             .disabled(!self.controller.hasUndoableCaption)
 
-            Button("Retry Translation") {
+            AppButton("Retry Translation") {
                 self.controller.retryFailedTranslation()
             }
             .keyboardShortcut(self.shortcut(.retry), modifiers: self.presenterModifiers)
             .disabled(!self.controller.subscriber.canRetryTranslation)
 
-            Button("Clear Captions") {
+            AppButton("Clear Captions") {
                 self.controller.requestClearBoard()
             }
             .keyboardShortcut(self.shortcut(.clear), modifiers: self.presenterModifiers)

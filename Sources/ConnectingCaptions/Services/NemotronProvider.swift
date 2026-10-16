@@ -15,9 +15,9 @@ final class NemotronProvider: TranscriptionProvider {
 
         var displayName: String {
             switch self {
-            case .offline: return "Nemotron 3.5 Multilingual"
-            case .streaming: return "Nemotron Speech 3.5 - Ultra Fast Low Latency"
-            case .streaming320: return "Nemotron Speech 3.5 - Ultra Fast Low Latency"
+            case .offline: return AppLanguage.text("Nemotron 3.5 Multilingual")
+            case .streaming: return AppLanguage.text("Nemotron Speech 3.5 - Ultra Fast Low Latency")
+            case .streaming320: return AppLanguage.text("Nemotron Speech 3.5 - Ultra Fast Low Latency")
             }
         }
 
@@ -37,6 +37,18 @@ final class NemotronProvider: TranscriptionProvider {
     private(set) var isReady: Bool = false
     var streamingPreviewMode: StreamingPreviewMode {
         self.mode == .offline ? .trailingWindow : .incrementalDelta
+    }
+
+    var acceptedStreamingSampleCount: Int? {
+        self.mode == .offline ? nil : self.streamedSampleCount
+    }
+
+    func resetStreamingSession() async {
+        if let manager = self.manager {
+            await self.stopComponentProfilingIfNeeded(on: manager)
+            await manager.reset()
+        }
+        self.streamedSampleCount = 0
     }
 
     private let repositoryOwner = "BarathwajAnandan"
@@ -630,9 +642,9 @@ final class NemotronProvider: TranscriptionProvider {
 
         var displayName: String {
             switch self {
-            case .offline: return "Nemotron 3.5 Multilingual"
-            case .streaming: return "Nemotron Speech 3.5 - Ultra Fast Low Latency"
-            case .streaming320: return "Nemotron Speech 3.5 - Ultra Fast Low Latency"
+            case .offline: return AppLanguage.text("Nemotron 3.5 Multilingual")
+            case .streaming: return AppLanguage.text("Nemotron Speech 3.5 - Ultra Fast Low Latency")
+            case .streaming320: return AppLanguage.text("Nemotron Speech 3.5 - Ultra Fast Low Latency")
             }
         }
     }

@@ -55,12 +55,12 @@ struct FluidPageHeader<Trailing: View>: View {
         HStack(alignment: .center, spacing: self.theme.metrics.spacing.sm) {
             SettingsIconTile(systemName: self.systemImage, size: 24)
             VStack(alignment: .leading, spacing: 4) {
-                Text(self.title)
+                AppText(self.title)
                     .font(self.theme.typography.title)
                     .foregroundStyle(self.theme.palette.primaryText)
                     .lineLimit(1)
                 if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
+                    AppText(subtitle)
                         .font(self.theme.typography.bodySmall)
                         .foregroundStyle(self.theme.palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -90,7 +90,7 @@ struct FluidSectionHeader: View {
             if let systemImage {
                 SettingsIconTile(systemName: systemImage, size: 18)
             }
-            Text(self.title)
+            AppText(self.title)
                 .font(self.theme.typography.sectionTitle)
                 .foregroundStyle(self.theme.palette.primaryText)
         }

@@ -15,8 +15,12 @@
 #    "Foo.swift in Sources" build-phase entry OR as a path-like swiftc input on a
 #    non-comment line of Tests/run_*.sh -> catches ORPHANED tests;
 # 2. every path = <leaf>.(swift|wav|txt) in project.pbxproj exists on disk under
-#    Sources/ or Tests/ (or repo root) -> catches DANGLING build-file entries.
-# Exit 1 = drift found. Needs only sh+grep+find+sed; CI-safe (no Xcode required).
+#    Sources/ or Tests/ (or repo root) -> catches DANGLING build-file entries;
+# 3. no "DEVELOPMENT_TEAM = <team ID of 10 or more characters>" in project.pbxproj and
+#    xcconfig/Local.xcconfig stays untracked -> a committed team ID silently
+#    re-points the signing identity on every other machine (CI-safe twin of
+#    scripts/check-team-id.sh, so the rule holds even if that hook is skipped).
+# Exit 1 = drift found. Needs only sh+grep+find+sed+git; CI-safe (no Xcode required).
 
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -99,6 +103,17 @@ while IFS= read -r leaf; do
         fail=1
     fi
 done < "$refs.dangling"
+
+# 3) TEAM-ID DRIFT: a committed 10-character DEVELOPMENT_TEAM (or a tracked
+# xcconfig/Local.xcconfig) re-points every machine's signing identity.
+if grep -E 'DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*"?[A-Z0-9]{10,}"?[[:space:]]*;' "$PBXPROJ"; then
+    echo "COMMITTED DEVELOPMENT TEAM ID (above): move it to gitignored xcconfig/Local.xcconfig."
+    fail=1
+fi
+if git -C "$ROOT" ls-files --error-unmatch xcconfig/Local.xcconfig >/dev/null 2>&1; then
+    echo "TRACKED TEAM ID FILE: xcconfig/Local.xcconfig is tracked. Keep team IDs gitignored."
+    fail=1
+fi
 
 if [ "$fail" = 1 ]; then
     cat <<'HINT'

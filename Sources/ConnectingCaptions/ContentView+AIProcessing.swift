@@ -169,7 +169,7 @@ extension ContentView {
             }
         }
 
-        DebugLogger.shared.debug("Using app context for AI: app=\(appInfo.name), bundleId=\(appInfo.bundleId), title=\(appInfo.windowTitle)", source: "ContentView")
+        DebugLogger.shared.debug("Using app context for AI: app=\(appInfo.name), bundleId=\(appInfo.bundleId), windowTitleCharacters=\(appInfo.windowTitle.count)", source: "ContentView")
         if self.shouldTracePromptProcessing {
             let activeSlot = dictationSlot ?? self.currentDictationShortcutSlot() ?? .primary
             let selectedProfile = SettingsStore.shared.resolvedDictationPromptProfile(
@@ -270,7 +270,7 @@ extension ContentView {
                 }
                 self.appBench("ai_streaming_fallback_start")
                 DebugLogger.shared.warning(
-                    "Streaming dictation post-processing failed; retrying without streaming: \(error.localizedDescription)",
+                    "Streaming dictation post-processing failed; retrying without streaming: \(DiagnosticMetadata.error(error))",
                     source: "ContentView"
                 )
                 let fallbackConfig = LLMClient.Config(

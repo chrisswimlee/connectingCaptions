@@ -315,6 +315,22 @@ extension SettingsStore {
         }
     }
 
+    /// `SettingsStore+MLXRunner.swift` and the local LLM translation fallback
+    /// it configured were removed; Apple Translation is now the only
+    /// translation engine. These keys have no reader left, so leaving them in
+    /// defaults would just strand them there forever.
+    func purgeRetiredMLXRunnerKeysIfNeeded() {
+        let retiredKeys = [
+            "LLMTranslationPolishEnabled",
+            "MLXRunnerEnabled",
+            "MLXRunnerModelID",
+            "MLXRunnerPort",
+        ]
+        for key in retiredKeys {
+            self.defaults.removeObject(forKey: key)
+        }
+    }
+
     func migrateOverlayBottomOffsetTo50IfNeeded() {
         if self.defaults.bool(forKey: Keys.overlayBottomOffsetMigratedTo50) {
             return

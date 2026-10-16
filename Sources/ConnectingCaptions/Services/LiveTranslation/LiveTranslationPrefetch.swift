@@ -10,13 +10,16 @@ enum LiveTranslationPrefetch {
     static func unitToPrefetch(
         leftover: String,
         languageID: String,
-        wordByWord: Bool = false
+        wordByWord: Bool = false,
+        audioContainsSpeech: Bool? = nil
     ) -> String? {
         let trimmed = leftover.trimmingCharacters(in: .whitespacesAndNewlines)
         if wordByWord {
             let open = TranslationClauseSegmenter.liveOpenText(trimmed, languageID: languageID)
             let unit = open.isEmpty ? trimmed : open
-            guard !unit.isEmpty, !CaptionJunkGate.shouldDrop(unit) else { return nil }
+            guard !unit.isEmpty,
+                  !CaptionJunkGate.shouldDrop(unit, audioContainsSpeech: audioContainsSpeech)
+            else { return nil }
             if TranslationClauseSegmenter.isCompactScript(languageID) {
                 return unit
             }

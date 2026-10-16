@@ -6,6 +6,12 @@ enum TheaterInsertDelivery {
     static let needsAnotherAppCopy =
         "Click into another app, then use Listen, then type."
 
+    static func capturedTargetPID(recordedPID: pid_t?, recordedBundleID: String?, runningBundleID: String?) -> pid_t? {
+        guard let recordedPID, recordedPID > 0, let recordedBundleID, !recordedBundleID.isEmpty,
+              runningBundleID == recordedBundleID else { return nil }
+        return recordedPID
+    }
+
     static func shouldTypeCurrentListen(
         text: String,
         targetBundleID: String?,

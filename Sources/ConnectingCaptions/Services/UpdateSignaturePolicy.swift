@@ -127,12 +127,13 @@ nonisolated enum UpdateSignaturePolicy {
     }
 
     static func isSafeExtractedApp(_ appURL: URL, workDirectory: URL) -> Bool {
-        let app = appURL.standardizedFileURL.path
-        let root = workDirectory.standardizedFileURL.path
-        guard app.hasPrefix(root.hasSuffix("/") ? root : root + "/") || app == root else {
-            return false
-        }
-        return appURL.pathExtension == "app"
+        guard appURL.pathExtension == "app",
+              let values = try? appURL.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+              values.isDirectory == true, values.isSymbolicLink != true
+        else { return false }
+        let app = appURL.resolvingSymlinksInPath().standardizedFileURL.path
+        let root = workDirectory.resolvingSymlinksInPath().standardizedFileURL.path
+        return app.hasPrefix(root.hasSuffix("/") ? root : root + "/")
     }
 
     static func selectSoleTopLevelApp(in directory: URL) -> URL? {
@@ -145,6 +146,6 @@ nonisolated enum UpdateSignaturePolicy {
         guard apps.count == 1, let app = apps.first else {
             return nil
         }
-        return app
+        return self.isSafeExtractedApp(app, workDirectory: directory) ? app : nil
     }
 }

@@ -72,15 +72,15 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .translation: return "Theater"
-        case .speakAndType: return "Speak and type"
-        case .general: return "General"
-        case .dictation: return "Dictation"
-        case .aiProviders: return "AI Providers"
-        case .notifications: return "Notifications"
-        case .audio: return "Audio"
-        case .dataAndDiagnostics: return "Data & Diagnostics"
-        case .experimental: return "Experimental"
+        case .translation: return AppLanguage.text("Theater")
+        case .speakAndType: return AppLanguage.text("Speak and type")
+        case .general: return AppLanguage.text("General")
+        case .dictation: return AppLanguage.text("Dictation")
+        case .aiProviders: return AppLanguage.text("AI Providers")
+        case .notifications: return AppLanguage.text("Notifications")
+        case .audio: return AppLanguage.text("Audio")
+        case .dataAndDiagnostics: return AppLanguage.text("Data & Diagnostics")
+        case .experimental: return AppLanguage.text("Experimental")
         }
     }
 

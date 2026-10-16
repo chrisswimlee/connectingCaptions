@@ -402,6 +402,31 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
     }
 
     var overlayToolsPinned: Bool { self.model.overlayToolsPinned }
+    var overlayPlacementLocked: Bool {
+        TheaterOverlayPolicy.geometryLocked(presentation: SettingsStore.shared.theaterPresentation, placing: self.model.isPlacingOverlay)
+    }
+    var canLockOverlayPlacement: Bool { self.model.canConfirmOverlayPlacement }
+
+    func toggleOverlayPlacementLock() {
+        if self.model.isPlacingOverlay {
+            self.confirmOverlayPlacement()
+        } else {
+            self.beginOverlayPlacement()
+        }
+    }
+
+    func beginOverlayPlacement() {
+        let settings = SettingsStore.shared
+        guard settings.theaterPresentation == .transparent, settings.theaterWindowEnabled, !settings.theaterMinimized else { return }
+        if self.panel?.isVisible != true { self.show() }
+        guard let panel = self.panel else { return }
+        self.persistFrameWork?.cancel()
+        self.model.isPlacingOverlay = true
+        self.refreshPlacementConfirmation()
+        self.applyOverlayPin()
+        self.makeKeyForInteraction()
+        panel.orderFront(nil)
+    }
 
     func toggleOverlayToolsPinned() {
         let settings = SettingsStore.shared
@@ -422,8 +447,8 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         guard self.model.isPlacingOverlay, let panel = self.panel, panel.isVisible else { return }
         let screen = panel.screen ?? Self.preferredScreen()
         guard let screen else { return }
-        guard !TheaterWindowPlacement.needsOverlayPlacement(
-            stored: panel.frame,
+        guard TheaterWindowPlacement.canLockOverlayFrame(
+            panel.frame,
             visible: screen.visibleFrame
         ) else {
             self.refreshPlacementConfirmation()
@@ -433,6 +458,7 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         self.model.canConfirmOverlayPlacement = false
         self.persistFrame()
         self.applyOverlayPin()
+        self.scheduleReleaseKeyToExternalApp()
     }
 
     private func updateOverlayPlacementGate() {
@@ -472,8 +498,8 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
            let panel = self.panel,
            let screen = panel.screen ?? Self.preferredScreen()
         {
-            next = !TheaterWindowPlacement.needsOverlayPlacement(
-                stored: panel.frame,
+            next = TheaterWindowPlacement.canLockOverlayFrame(
+                panel.frame,
                 visible: screen.visibleFrame
             )
         } else {
@@ -570,6 +596,7 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         let pinned = self.model.overlayToolsPinned
         let minimized = settings.theaterMinimized
         let placing = self.model.isPlacingOverlay
+        Self.applyGeometryLock(to: panel, presentation: presentation, placing: placing, minimized: minimized)
         self.refreshOverlayHoverCapture()
         panel.isMovableByWindowBackground = TheaterOverlayPolicy.movableByBackground(
             presentation: presentation,
@@ -603,6 +630,12 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
             presentation: presentation,
             appIsActive: appIsActive
         )
+    }
+
+    static func applyGeometryLock(to panel: NSPanel, presentation: TheaterPresentationStyle, placing: Bool, minimized: Bool) {
+        panel.isMovable = !TheaterOverlayPolicy.geometryLocked(presentation: presentation, placing: placing)
+        let canResize = TheaterOverlayPolicy.canResize(presentation: presentation, placing: placing, minimized: minimized)
+        if canResize { panel.styleMask.insert(.resizable) } else { panel.styleMask.remove(.resizable) }
     }
 
     /// A projector unplugged mid-talk must not strand captions off-screen.
@@ -827,6 +860,7 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
 
     /// Snap the board to a preset on the display it is on now.
     func applyPositionPreset(_ preset: TheaterPositionPreset) {
+        guard !self.overlayPlacementLocked else { return }
         guard let panel = self.panel else { return }
         guard let screen = panel.screen ?? Self.preferredScreen() else { return }
         let resolved = preset.resolved(for: SettingsStore.shared.theaterPresentation)
@@ -874,12 +908,15 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         case .vtt:
             text = TheaterCaptionExport.vtt(pairs: pairs)
             ext = "vtt"
+        case .qualityReview:
+            text = TheaterCaptionExport.qualityReview(pairs: pairs)
+            ext = "jsonl"
         }
         guard !text.isEmpty else { return }
         self.makeKeyForInteraction()
         self.model.exportShowsSaved = true
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
+        panel.allowedContentTypes = [UTType(filenameExtension: ext, conformingTo: .plainText) ?? .plainText]
         panel.nameFieldStringValue = TheaterCaptionExport.savePanelName(extension: ext)
         panel.begin { response in
             if response == .OK, let url = panel.url {

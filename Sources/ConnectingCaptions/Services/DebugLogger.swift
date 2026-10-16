@@ -46,6 +46,21 @@ final nonisolated class DebugLogger: @unchecked Sendable {
         }
     }
 
+    /// The logger queue is drained before deletion, so old queued lines cannot
+    /// reappear immediately after a successful clear.
+    func clearDiagnostics() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            self.queue.async {
+                do {
+                    try FileLogger.shared.clear()
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
     private func write(_ message: String, level: LogLevel, source: String, pipelineID: String?) {
         let timestampString = Self.logFormatter.string(from: Date())
         let formattedLine = self.formatLogLine(

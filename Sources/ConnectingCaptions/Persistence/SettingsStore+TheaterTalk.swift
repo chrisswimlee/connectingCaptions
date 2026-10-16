@@ -16,7 +16,7 @@ extension SettingsStore {
         }
     }
 
-    /// Names from this talk's notes. Used by glossary lock and the local LLM.
+    /// Names from this talk's notes. Used by glossary lock.
     var theaterTalkPackTerms: [String] {
         get { self.defaults.stringArray(forKey: TheaterTalkDefaults.terms) ?? [] }
         set {

@@ -108,6 +108,7 @@ final nonisolated class ModelPreparationProgressRelay: @unchecked Sendable {
 /// Unified result type used by every Voice Engine.
 struct ASRTranscriptionResult {
     let text: String
+    let timedSegments: [ASRTimedSegment]
     let confidence: Float
     let pronunciationEnrollment: PronunciationEnrollmentCapture?
     let endOfUtterance: Bool
@@ -119,9 +120,11 @@ struct ASRTranscriptionResult {
         confidence: Float = 1.0,
         pronunciationEnrollment: PronunciationEnrollmentCapture? = nil,
         endOfUtterance: Bool = false,
-        detectedLanguageID: String? = nil
+        detectedLanguageID: String? = nil,
+        timedSegments: [ASRTimedSegment] = []
     ) {
         self.text = text
+        self.timedSegments = timedSegments
         self.confidence = confidence
         self.pronunciationEnrollment = pronunciationEnrollment
         self.endOfUtterance = endOfUtterance
@@ -180,6 +183,12 @@ protocol TranscriptionProvider {
     /// How live previews should copy PCM from the retained ring.
     var streamingPreviewMode: StreamingPreviewMode { get }
 
+    /// Logical PCM position already consumed by an incremental session.
+    var acceptedStreamingSampleCount: Int? { get }
+
+    /// Clears per-listen state while keeping downloaded models warm.
+    func resetStreamingSession() async
+
     /// Advance an incremental session with only newly captured samples.
     func transcribeStreamingDelta(
         _ newSamples: [Float],
@@ -217,6 +226,15 @@ extension TranscriptionProvider {
     }
 
     var streamingPreviewMode: StreamingPreviewMode { .trailingWindow }
+    var acceptedStreamingSampleCount: Int? { nil }
+    func resetStreamingSession() async {}
+
+    func transcribeStoppedAudio(_ samples: [Float], totalSampleCount: Int) async throws -> ASRTranscriptionResult {
+        if self.streamingPreviewMode == .incrementalDelta {
+            return try await self.transcribeFinalDelta(samples, totalSampleCount: totalSampleCount)
+        }
+        return try await self.transcribeFinal(samples)
+    }
 
     func transcribeStreamingDelta(
         _ newSamples: [Float],

@@ -27,6 +27,8 @@ final class TheaterMenuBarController: NSObject {
         case retry
         case speakLanguage
         case showAsLanguage
+        case overlayPlacement
+        case position
     }
 
     static func appendOverlayControls(to menu: NSMenu, target: TheaterMenuBarController) {
@@ -41,7 +43,7 @@ final class TheaterMenuBarController: NSObject {
         }
 
         let pause = TheaterPresenterHotkey.menuItem(
-            title: "Pause",
+            title: AppLanguage.text("Pause"),
             action: #selector(togglePause),
             shortcut: .togglePause
         )
@@ -50,7 +52,7 @@ final class TheaterMenuBarController: NSObject {
         add(pause, symbol: "pause.fill")
 
         let tools = TheaterPresenterHotkey.menuItem(
-            title: "Show Overlay Tools",
+            title: AppLanguage.text("Show Overlay Tools"),
             action: #selector(toggleOverlayTools),
             shortcut: .toggleTools
         )
@@ -58,20 +60,25 @@ final class TheaterMenuBarController: NSObject {
         tools.toolTip = TheaterChromeHelp.overlayTools
         add(tools, symbol: "slider.horizontal.3")
 
+        let placement = NSMenuItem(title: AppLanguage.text("Unlock text area"), action: #selector(toggleOverlayPlacement), keyEquivalent: "")
+        placement.tag = ItemTag.overlayPlacement.rawValue
+        placement.toolTip = TheaterChromeHelp.unlockOverlayText
+        add(placement, symbol: "lock.open")
+
         menu.addItem(.separator())
 
         // Only ever lists packs already on disk — this menu is a quick popup,
         // not a place to launch a language-pack download.
-        let speak = NSMenuItem(title: "I Speak", action: nil, keyEquivalent: "")
+        let speak = NSMenuItem(title: AppLanguage.text("I Speak"), action: nil, keyEquivalent: "")
         speak.tag = ItemTag.speakLanguage.rawValue
-        let speakMenu = NSMenu(title: "I Speak")
+        let speakMenu = NSMenu(title: AppLanguage.text("I Speak"))
         speak.submenu = speakMenu
         speak.toolTip = TheaterChromeHelp.iSpeak
         add(speak, symbol: "mic")
 
-        let showAs = NSMenuItem(title: "Show As", action: nil, keyEquivalent: "")
+        let showAs = NSMenuItem(title: AppLanguage.text("Show As"), action: nil, keyEquivalent: "")
         showAs.tag = ItemTag.showAsLanguage.rawValue
-        let showAsMenu = NSMenu(title: "Show As")
+        let showAsMenu = NSMenu(title: AppLanguage.text("Show As"))
         showAs.submenu = showAsMenu
         showAs.toolTip = TheaterChromeHelp.showAs
         add(showAs, symbol: "translate")
@@ -99,7 +106,7 @@ final class TheaterMenuBarController: NSObject {
         add(popup, symbol: "rectangle.on.rectangle")
 
         let plate = NSMenuItem(
-            title: "Caption Plate",
+            title: AppLanguage.text("Caption Plate"),
             action: #selector(toggleCaptionPlate),
             keyEquivalent: ""
         )
@@ -110,7 +117,7 @@ final class TheaterMenuBarController: NSObject {
         menu.addItem(.separator())
 
         let larger = TheaterPresenterHotkey.menuItem(
-            title: "Larger Captions",
+            title: AppLanguage.text("Larger Captions"),
             action: #selector(makeTextLarger),
             shortcut: .fontLarger
         )
@@ -119,7 +126,7 @@ final class TheaterMenuBarController: NSObject {
         add(larger, symbol: "plus")
 
         let smaller = TheaterPresenterHotkey.menuItem(
-            title: "Smaller Captions",
+            title: AppLanguage.text("Smaller Captions"),
             action: #selector(makeTextSmaller),
             shortcut: .fontSmaller
         )
@@ -127,12 +134,12 @@ final class TheaterMenuBarController: NSObject {
         smaller.toolTip = TheaterChromeHelp.smaller
         add(smaller, symbol: "minus")
 
-        let size = NSMenuItem(title: "Size", action: nil, keyEquivalent: "")
+        let size = NSMenuItem(title: AppLanguage.text("Size"), action: nil, keyEquivalent: "")
         size.tag = ItemTag.sizeLabel.rawValue
         size.isEnabled = false
         menu.addItem(size)
 
-        let fontMenu = NSMenu(title: "Caption Font")
+        let fontMenu = NSMenu(title: AppLanguage.text("Caption Font"))
         for face in TheaterTypeface.allCases {
             let item = NSMenuItem(
                 title: face.displayName,
@@ -144,13 +151,13 @@ final class TheaterMenuBarController: NSObject {
             item.target = target
             fontMenu.addItem(item)
         }
-        let fontItem = NSMenuItem(title: "Caption Font", action: nil, keyEquivalent: "")
+        let fontItem = NSMenuItem(title: AppLanguage.text("Caption Font"), action: nil, keyEquivalent: "")
         fontItem.submenu = fontMenu
         fontItem.image = NSImage(systemSymbolName: "textformat", accessibilityDescription: nil)
         fontItem.toolTip = TheaterChromeHelp.captionFont
         menu.addItem(fontItem)
 
-        let themeMenu = NSMenu(title: "Theme")
+        let themeMenu = NSMenu(title: AppLanguage.text("Theme"))
         for appearance in TheaterAppearance.allCases {
             let item = NSMenuItem(
                 title: appearance.displayName,
@@ -162,7 +169,7 @@ final class TheaterMenuBarController: NSObject {
             item.target = target
             themeMenu.addItem(item)
         }
-        let themeItem = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")
+        let themeItem = NSMenuItem(title: AppLanguage.text("Theme"), action: nil, keyEquivalent: "")
         themeItem.submenu = themeMenu
         themeItem.toolTip = TheaterChromeHelp.theme
         menu.addItem(themeItem)
@@ -203,7 +210,7 @@ final class TheaterMenuBarController: NSObject {
 
         menu.addItem(.separator())
 
-        let spokenMenu = NSMenu(title: "Spoken Line")
+        let spokenMenu = NSMenu(title: AppLanguage.text("Spoken Line"))
         for mode in TheaterSpokenLineMode.allCases {
             let item = NSMenuItem(
                 title: mode.displayName,
@@ -215,14 +222,14 @@ final class TheaterMenuBarController: NSObject {
             item.target = target
             spokenMenu.addItem(item)
         }
-        let spoken = NSMenuItem(title: "Spoken Line", action: nil, keyEquivalent: "")
+        let spoken = NSMenuItem(title: AppLanguage.text("Spoken Line"), action: nil, keyEquivalent: "")
         spoken.tag = ItemTag.spokenLine.rawValue
         spoken.submenu = spokenMenu
         spoken.toolTip = TheaterChromeHelp.spokenLine
         add(spoken, symbol: "captions.bubble")
 
         let contrast = NSMenuItem(
-            title: "High Contrast",
+            title: AppLanguage.text("High Contrast"),
             action: #selector(toggleHighContrast),
             keyEquivalent: ""
         )
@@ -230,7 +237,7 @@ final class TheaterMenuBarController: NSObject {
         contrast.toolTip = TheaterChromeHelp.highContrast
         add(contrast, symbol: "circle.lefthalf.filled")
 
-        let positionMenu = NSMenu(title: "Position")
+        let positionMenu = NSMenu(title: AppLanguage.text("Position"))
         for preset in TheaterPositionPreset.allCases {
             let item = NSMenuItem(
                 title: preset.displayName,
@@ -242,14 +249,15 @@ final class TheaterMenuBarController: NSObject {
             item.target = target
             positionMenu.addItem(item)
         }
-        let positionItem = NSMenuItem(title: "Position", action: nil, keyEquivalent: "")
+        let positionItem = NSMenuItem(title: AppLanguage.text("Position"), action: nil, keyEquivalent: "")
+        positionItem.tag = ItemTag.position.rawValue
         positionItem.submenu = positionMenu
         menu.addItem(positionItem)
 
         menu.addItem(.separator())
 
         let minimize = TheaterPresenterHotkey.menuItem(
-            title: "Minimize Theater",
+            title: AppLanguage.text("Minimize Theater"),
             action: #selector(toggleMinimized),
             shortcut: .toggleVisible
         )
@@ -258,7 +266,7 @@ final class TheaterMenuBarController: NSObject {
         add(minimize, symbol: "arrow.down.right.and.arrow.up.left")
 
         let copy = TheaterPresenterHotkey.menuItem(
-            title: "Copy All",
+            title: AppLanguage.text("Copy All"),
             action: #selector(copyAll),
             shortcut: .copy
         )
@@ -268,7 +276,7 @@ final class TheaterMenuBarController: NSObject {
 
         // Overlay users can type captions without pinning the tools.
         let insert = NSMenuItem(
-            title: "Type the Board",
+            title: AppLanguage.text("Type the Board"),
             action: #selector(typeIntoApp),
             keyEquivalent: ""
         )
@@ -277,7 +285,7 @@ final class TheaterMenuBarController: NSObject {
         add(insert, symbol: "text.cursor")
 
         let undo = TheaterPresenterHotkey.menuItem(
-            title: "Undo Last Caption",
+            title: AppLanguage.text("Undo Last Caption"),
             action: #selector(undoLast),
             shortcut: .undo
         )
@@ -286,7 +294,7 @@ final class TheaterMenuBarController: NSObject {
         add(undo, symbol: "arrow.uturn.backward")
 
         let retry = TheaterPresenterHotkey.menuItem(
-            title: "Retry Translation",
+            title: AppLanguage.text("Retry Translation"),
             action: #selector(retryTranslation),
             shortcut: .retry
         )
@@ -295,7 +303,7 @@ final class TheaterMenuBarController: NSObject {
         add(retry, symbol: "arrow.clockwise")
 
         let clear = TheaterPresenterHotkey.menuItem(
-            title: "Clear Captions",
+            title: AppLanguage.text("Clear Captions"),
             action: #selector(clearCaptions),
             shortcut: .clear
         )
@@ -345,9 +353,8 @@ final class TheaterMenuBarController: NSObject {
         }
     }
 
-    /// Only lists languages Apple has already confirmed installed for the
-    /// fixed side of the pair, plus whatever is selected now, so choosing an
-    /// item never lands on a pack that still needs to download.
+    /// Quick-switch menus only offer confirmed ready speech and translation
+    /// assets. Setup exposes supported choices that still need downloads.
     private static func rebuildLanguageMenus(in menu: NSMenu) {
         guard let speakItem = item(.speakLanguage, in: menu), let speakMenu = speakItem.submenu,
               let showAsItem = item(.showAsLanguage, in: menu), let showAsMenu = showAsItem.submenu
@@ -361,17 +368,16 @@ final class TheaterMenuBarController: NSObject {
         let target = SpokenLanguageResolver.targetLanguage()
         let engine = AppleTranslationEngine.shared
 
-        let speakCandidates = TranslationLanguageCatalog.menuOrder.filter { candidate in
-            candidate.id == source.id
-                || !translating
-                || engine.isPackInstalledIfKnown(source: candidate, target: target)
+        let speakCandidates = LanguageChoicePolicy.spokenLanguages().filter { candidate in
+            VoiceEngineLanguageReadiness.current(model: SettingsStore.shared.selectedSpeechModel, languageID: candidate.id) == .ready
+                && (!translating || engine.isPackInstalledIfKnown(source: candidate, target: target))
         }
         Self.rebuild(speakMenu, candidates: speakCandidates, selected: source.id, action: #selector(chooseSpeakLanguage(_:)))
         speakItem.isEnabled = !speakCandidates.isEmpty
 
         showAsItem.isHidden = !translating
-        let showAsCandidates = TranslationLanguageCatalog.menuOrder.filter { candidate in
-            candidate.id == target.id || engine.isPackInstalledIfKnown(source: source, target: candidate)
+        let showAsCandidates = LanguageChoicePolicy.targetLanguages().filter { candidate in
+            engine.isPackInstalledIfKnown(source: source, target: candidate)
         }
         Self.rebuild(showAsMenu, candidates: showAsCandidates, selected: target.id, action: #selector(chooseShowAsLanguage(_:)))
         showAsItem.isEnabled = translating && !showAsCandidates.isEmpty
@@ -385,7 +391,9 @@ final class TheaterMenuBarController: NSObject {
     ) {
         submenu.removeAllItems()
         for language in candidates {
-            let item = NSMenuItem(title: AppLanguage.localizedName(for: language), action: action, keyEquivalent: "")
+            let title = AppLanguage.format("{0} · {1}", AppLanguage.localizedName(for: language), AppLanguage.text("Ready"))
+            let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+            item.toolTip = title
             item.representedObject = language.id
             item.target = Self.shared
             item.state = language.id == selected ? .on : .off
@@ -418,6 +426,15 @@ final class TheaterMenuBarController: NSObject {
         tools?.title = pinned ? "Hide Overlay Tools" : "Show Overlay Tools"
         tools?.state = pinned ? .on : .off
         tools?.isEnabled = windowOpen && isOverlay && !settings.theaterMinimized
+
+        let locked = PresenterCaptionController.shared.overlayPlacementLocked
+        let placement = item(ItemTag.overlayPlacement, in: menu)
+        placement?.title = AppLanguage.text(locked ? "Unlock text area" : "Lock text area")
+        placement?.toolTip = locked ? TheaterChromeHelp.unlockOverlayText : TheaterChromeHelp.keepOverlayText
+        placement?.image = NSImage(systemSymbolName: locked ? "lock.open" : "lock.fill", accessibilityDescription: nil)
+        placement?.isEnabled = windowOpen && isOverlay && !settings.theaterMinimized
+            && (locked || PresenterCaptionController.shared.canLockOverlayPlacement)
+        item(ItemTag.position, in: menu)?.isEnabled = !locked
 
         let plate = item(ItemTag.captionPlate, in: menu)
         plate?.state = settings.theaterBackingBar ? .on : .off
@@ -452,12 +469,12 @@ final class TheaterMenuBarController: NSObject {
 
         applySubmenuState(
             in: menu,
-            title: "Caption Font",
+            title: AppLanguage.text("Caption Font"),
             selected: TheaterTypeface.resolved(settings.presenterFontFamily).rawValue
         )
         applySubmenuState(
             in: menu,
-            title: "Theme",
+            title: AppLanguage.text("Theme"),
             selected: TheaterAppearance.resolved(settings.theaterAppearance).rawValue
         )
         applySubmenuState(
@@ -480,12 +497,12 @@ final class TheaterMenuBarController: NSObject {
         )
         applySubmenuState(
             in: menu,
-            title: "Spoken Line",
+            title: AppLanguage.text("Spoken Line"),
             selected: settings.theaterSpokenLineMode.rawValue
         )
         applySubmenuState(
             in: menu,
-            title: "Position",
+            title: AppLanguage.text("Position"),
             selected: settings.theaterPositionPreset?.rawValue
         )
         if let parent = menu.items.first(where: { $0.title == "Position" }),
@@ -522,6 +539,11 @@ final class TheaterMenuBarController: NSObject {
 
     @objc private func toggleOverlayTools() {
         PresenterCaptionController.shared.toggleOverlayToolsPinned()
+        self.refresh()
+    }
+
+    @objc private func toggleOverlayPlacement() {
+        PresenterCaptionController.shared.toggleOverlayPlacementLock()
         self.refresh()
     }
 

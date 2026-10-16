@@ -10,6 +10,9 @@ struct LectureCaptionEntry: Codable, Equatable, Identifiable {
     var translated: String
     var wasPolished: Bool = false
     var committedAt: Date = Date()
+    var speechTiming: CaptionSpeechTiming?
+    var sourceLanguageID: String?
+    var targetLanguageID: String?
 
     private enum CodingKeys: String, CodingKey {
         case id
@@ -17,6 +20,7 @@ struct LectureCaptionEntry: Codable, Equatable, Identifiable {
         case translated
         case wasPolished
         case committedAt
+        case speechTiming, sourceLanguageID, targetLanguageID
     }
 
     init(
@@ -40,6 +44,9 @@ struct LectureCaptionEntry: Codable, Equatable, Identifiable {
         self.translated = try container.decode(String.self, forKey: .translated)
         self.wasPolished = try container.decodeIfPresent(Bool.self, forKey: .wasPolished) ?? false
         self.committedAt = try container.decodeIfPresent(Date.self, forKey: .committedAt) ?? .distantPast
+        self.speechTiming = try container.decodeIfPresent(CaptionSpeechTiming.self, forKey: .speechTiming)
+        self.sourceLanguageID = try container.decodeIfPresent(String.self, forKey: .sourceLanguageID)
+        self.targetLanguageID = try container.decodeIfPresent(String.self, forKey: .targetLanguageID)
     }
 }
 
@@ -74,16 +81,21 @@ struct LectureCaptionLog: Equatable {
     @discardableResult
     mutating func commit(
         source: String,
-        translated: String
+        translated: String,
+        speechTiming: CaptionSpeechTiming? = nil,
+        sourceLanguageID: String? = nil,
+        targetLanguageID: String? = nil
     ) -> (id: UInt64, overflow: [LectureCaptionEntry])? {
         let cleanedSource = source.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanedTranslation = translated.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanedSource.isEmpty, !cleanedTranslation.isEmpty else { return nil }
 
         let id = self.nextID
-        self.entries.append(
-            LectureCaptionEntry(id: id, source: cleanedSource, translated: cleanedTranslation)
-        )
+        var entry = LectureCaptionEntry(id: id, source: cleanedSource, translated: cleanedTranslation)
+        entry.speechTiming = speechTiming
+        entry.sourceLanguageID = sourceLanguageID
+        entry.targetLanguageID = targetLanguageID
+        self.entries.append(entry)
         self.nextID += 1
         return (id, self.trimIfNeeded())
     }
@@ -108,16 +120,20 @@ struct LectureCaptionLog: Equatable {
     /// data."). Source and Show-as change together, and the id stays put even
     /// when a later sentence is already the last row.
     @discardableResult
-    mutating func applyGrowth(id: UInt64, source: String, translated: String) -> Bool {
+    mutating func applyGrowth(id: UInt64, source: String, translated: String, speechTiming: CaptionSpeechTiming? = nil) -> Bool {
         let cleanedSource = source.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanedTranslation = translated.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanedSource.isEmpty,
               !cleanedTranslation.isEmpty,
               let index = self.entries.firstIndex(where: { $0.id == id })
         else { return false }
+        let wordingChanged = self.entries[index].source != cleanedSource
         self.entries[index].source = cleanedSource
         self.entries[index].translated = cleanedTranslation
         self.entries[index].wasPolished = false
+        // If a correction no longer aligns with timed recognizer segments, do
+        // not attach the old sentence's timestamps to the new wording.
+        if wordingChanged || speechTiming != nil { self.entries[index].speechTiming = speechTiming }
         return true
     }
 
@@ -137,6 +153,9 @@ struct LectureCaptionLog: Equatable {
 }
 
 enum LiveTranslationConfirm {
+    /// Live captions fall back to the preview promptly. Stop retains the
+    /// recognizer's fuller budget for its final transcript.
+    static let pauseReDecodeTimeoutNanoseconds: UInt64 = 1_000_000_000
     /// Korean, Japanese, and Thai preview ticks are weak. Pause and Stop still take the
     /// fuller 30-second decode for leftover speech. Mid-talk prints from the live stitch.
     static func requiresConfirmBeforePrint(languageID: String) -> Bool {

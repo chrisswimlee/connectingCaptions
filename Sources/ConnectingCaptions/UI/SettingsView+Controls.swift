@@ -17,7 +17,7 @@ struct FillerWordsEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Filler words to remove:")
+            AppText("Filler words to remove:")
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(.secondary)
 
@@ -34,7 +34,7 @@ struct FillerWordsEditor: View {
                                 .font(.caption2)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Remove \(word)")
+                        .accessibilityLabel(AppLanguage.format("Remove {0}", String(describing: word)))
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -47,20 +47,20 @@ struct FillerWordsEditor: View {
 
             // Add new word
             HStack(spacing: 8) {
-                TextField("Add word", text: self.$newWord)
+                TextField(AppLanguage.text("Add word"), text: self.$newWord)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 100)
                     .focused(self.$isAddWordFocused)
                     .onSubmit { self.addWord() }
 
-                Button("Add") { self.addWord() }
+                AppButton("Add") { self.addWord() }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     .disabled(self.newWord.trimmingCharacters(in: .whitespaces).isEmpty)
 
                 Spacer()
 
-                Button("Reset") {
+                AppButton("Reset") {
                     self.fillerWords = SettingsStore.defaultFillerWords
                     SettingsStore.shared.fillerWords = self.fillerWords
                 }
@@ -167,8 +167,8 @@ extension SettingsView {
     var spokenSendSettings: some View {
         Group {
             self.optionToggleRow(
-                title: "Spoken Send",
-                description: "Say a phrase at the end of dictation to send with your chosen Enter command.",
+                title: AppLanguage.text("Spoken Send"),
+                description: AppLanguage.text("Say a phrase at the end of dictation to send with your chosen Enter command."),
                 isOn: Binding(
                     get: { self.settings.spokenSendEnabled },
                     set: { self.settings.spokenSendEnabled = $0 }
@@ -178,8 +178,8 @@ extension SettingsView {
             if self.settings.spokenSendEnabled {
                 VStack(spacing: 10) {
                     self.optionToggleRow(
-                        title: "Send Immediately",
-                        description: "Stop listening and send as soon as the phrase is recognized. May not work with all voice models; Parakeet is recommended.",
+                        title: AppLanguage.text("Send Immediately"),
+                        description: AppLanguage.text("Stop listening and send as soon as the phrase is recognized. May not work with all voice models; Parakeet is recommended."),
                         isOn: Binding(
                             get: { self.settings.spokenSendImmediatelyEnabled },
                             set: { self.settings.spokenSendImmediatelyEnabled = $0 }
@@ -188,10 +188,10 @@ extension SettingsView {
 
                     HStack(alignment: .center) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Send Phrase")
+                            AppText("Send Phrase")
                                 .font(self.theme.typography.bodyStrong)
                                 .foregroundStyle(self.settingsTitleText)
-                            Text("Say it at the end. Say “literal \(self.settings.spokenSendPhrase)” to dictate it normally.")
+                            AppText("Say it at the end. Say “literal {0}” to dictate it normally.", arguments: [String(describing: self.settings.spokenSendPhrase)])
                                 .font(self.theme.typography.bodySmall)
                                 .foregroundStyle(self.settingsSecondaryText)
                         }
@@ -199,7 +199,7 @@ extension SettingsView {
                         Spacer()
 
                         TextField(
-                            "send it",
+                            AppLanguage.text("send it"),
                             text: Binding(
                                 get: { self.settings.spokenSendPhrase },
                                 set: { self.settings.spokenSendPhrase = $0 }
@@ -207,15 +207,15 @@ extension SettingsView {
                         )
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 170)
-                        .accessibilityLabel("Spoken Send phrase")
+                        .accessibilityLabel(AppLanguage.text("Spoken Send phrase"))
                     }
 
                     HStack(alignment: .center) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Send Command")
+                            AppText("Send Command")
                                 .font(self.theme.typography.bodyStrong)
                                 .foregroundStyle(self.settingsTitleText)
-                            Text("Choose the Enter behavior expected by the destination app.")
+                            AppText("Choose the Enter behavior expected by the destination app.")
                                 .font(self.theme.typography.bodySmall)
                                 .foregroundStyle(self.settingsSecondaryText)
                         }
@@ -227,12 +227,12 @@ extension SettingsView {
                             set: { self.settings.spokenSendKey = $0 }
                         )) {
                             ForEach(SettingsStore.SpokenSendKey.allCases) { key in
-                                Text(key.displayName).tag(key)
+                                AppText(key.displayName).tag(key)
                             }
                         }
                         .pickerStyle(.menu)
                         .frame(width: 170, alignment: .trailing)
-                        .accessibilityLabel("Spoken Send command")
+                        .accessibilityLabel(AppLanguage.text("Spoken Send command"))
                     }
                 }
                 .padding(.leading, 12)
@@ -248,19 +248,19 @@ struct DictionarySuggestionsSettingsRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Auto-Learn Corrections")
+                AppText("Auto-Learn Corrections")
                     .font(self.theme.typography.bodyStrong)
                     .foregroundStyle(self.theme.palette.primaryText)
-                Text("Suggest saving words after you correct dictated text.")
+                AppText("Suggest saving words after you correct dictated text.")
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.theme.palette.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Picker("Suggest after", selection: self.$settings.automaticDictionarySuggestionFrequency) {
+            Picker(AppLanguage.text("Suggest after"), selection: self.$settings.automaticDictionarySuggestionFrequency) {
                 ForEach(SettingsStore.AutomaticDictionarySuggestionFrequency.allCases) { frequency in
-                    Text(frequency.displayName).tag(frequency)
+                    AppText(frequency.displayName).tag(frequency)
                 }
             }
             .labelsHidden()

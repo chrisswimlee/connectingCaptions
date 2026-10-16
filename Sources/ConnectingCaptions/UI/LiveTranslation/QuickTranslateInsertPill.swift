@@ -165,7 +165,7 @@ private struct QuickTranslateInsertPill: View {
         HStack(alignment: .center, spacing: 14) {
             self.waveform
             VStack(alignment: .leading, spacing: 3) {
-                Text(chip.title)
+                AppText(chip.title)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.62))
                     .lineLimit(1)

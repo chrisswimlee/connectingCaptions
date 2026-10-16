@@ -2797,12 +2797,22 @@ extension TranslationClauseSegmenter {
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    fileprivate static func stripped(_ text: String) -> String {
-        let kept = text.lowercased().compactMap { character -> Character? in
+    fileprivate static func stripped(_ text: String, foldingDiacritics: Bool = false) -> String {
+        let source = foldingDiacritics
+            ? text.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: .current)
+            : text.lowercased()
+        let kept = source.compactMap { character -> Character? in
             if character.isLetter || character.isNumber { return character }
             if character.isWhitespace { return " " }
             return nil
         }
         return self.collapseWhitespace(String(kept))
+    }
+
+    /// Same letter/number/whitespace key as `normalizedKey`, but diacritic- and
+    /// width-insensitive, so echo detection matches a label across scripts
+    /// (e.g. "Übersetzung" and "ubersetzung").
+    static func foldedKey(_ text: String) -> String {
+        self.stripped(text, foldingDiacritics: true)
     }
 }

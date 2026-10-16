@@ -8,10 +8,11 @@ struct TheaterModeSection: View {
     @ObservedObject private var controller = LiveTranslationController.shared
 
     var accessibilityIdentifier: String?
-    var title = "Theater mode"
+    var title = "Caption language"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            TheaterSharedSettingsNotice()
             Text(AppLanguage.text(self.title))
                 .font(self.theme.typography.bodyStrong)
                 .foregroundStyle(self.theme.palette.primaryText)
@@ -53,6 +54,13 @@ struct TheaterEitherWaySection: View {
         SettingsStore.SpeechModel.eitherWayAddOn.isInstalled
     }
 
+    /// Flipping the toggle forces the Voice Engine to the add-on, so whether
+    /// it's worth tapping depends on what the add-on supports for this pair —
+    /// not on whichever engine happens to be selected before the flip.
+    private var pairSupported: Bool {
+        SpokenLanguageResolver.dynamicPairingSupportsCurrentPair(settings: self.settings)
+    }
+
     private var detail: String {
         SpokenLanguageResolver.dynamicPairingControlCopy(settings: self.settings)
     }
@@ -71,13 +79,20 @@ struct TheaterEitherWaySection: View {
     }
 
     var body: some View {
+        if SpokenLanguageResolver.showsEitherWayControl(settings: self.settings) {
+            self.control
+        }
+    }
+
+    @ViewBuilder
+    private var control: some View {
         if self.compact {
             Toggle(AppLanguage.text("Either way"), isOn: self.pairingBinding)
                 .toggleStyle(.switch)
                 .controlSize(.small)
-                .disabled(!self.addOnInstalled)
-                .help(TheaterChromeHelp.eitherWay)
-                .theaterTag(TheaterChromeHelp.eitherWay)
+                .disabled(!self.addOnInstalled || !self.pairSupported)
+                .help(self.detail)
+                .theaterTag(self.detail)
                 .accessibilityLabel(AppLanguage.text("Either way"))
                 .accessibilityHint(self.detail)
                 .accessibilityIdentifier(self.accessibilityIdentifier)
@@ -89,8 +104,8 @@ struct TheaterEitherWaySection: View {
                 Toggle(AppLanguage.text("Either way"), isOn: self.pairingBinding)
                     .toggleStyle(.switch)
                     .labelsHidden()
-                    .disabled(!self.addOnInstalled)
-                    .help(TheaterChromeHelp.eitherWay)
+                    .disabled(!self.addOnInstalled || !self.pairSupported)
+                    .help(self.detail)
                     .accessibilityLabel(AppLanguage.text("Either way"))
                     .accessibilityHint(self.detail)
                     .accessibilityIdentifier(self.accessibilityIdentifier)
@@ -131,11 +146,16 @@ struct TheaterReadinessChecklist: View {
 
     var openVoiceEngine: (() -> Void)?
     var openTranslationEngine: (() -> Void)?
+    var compact = false
 
-    private var asr: ASRService { self.appServices.asr }
+    private var asr: ASRService {
+        self.appServices.asr
+    }
 
     private var microphoneActionTitle: String {
-        if MicrophoneAccess.isOpenedFromDownload { return "Show in Finder" }
+        if MicrophoneAccess.isOpenedFromDownload {
+            return "Show in Finder"
+        }
         return self.asr.micStatus == .notDetermined ? "Allow" : "Open Settings"
     }
 
@@ -158,32 +178,78 @@ struct TheaterReadinessChecklist: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            FluidSectionHeader(title: "Before you Listen", systemImage: "checklist")
-            self.readyRow(TheaterEngineCopy.voiceTitle, done: self.snapshot.voiceEngineReady)
-            if self.settings.theaterSessionMode == .translation {
-                self.readyRow(TheaterEngineCopy.translationTitle, done: self.snapshot.languagePackReady)
+        Group {
+            if self.compact {
+                TheaterSideBySide(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        FluidSectionHeader(title: AppLanguage.text("Before you Listen"), systemImage: "exclamationmark.circle")
+                        self.guidance
+                    }
+                } trailing: {
+                    self.primaryAction
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    FluidSectionHeader(title: AppLanguage.text("Before you Listen"), systemImage: "checklist")
+                    self.readyRow(TheaterEngineCopy.voiceTitle, done: self.snapshot.voiceEngineReady)
+                    if self.settings.theaterSessionMode == .translation {
+                        self.readyRow(TheaterEngineCopy.translationTitle, done: self.snapshot.languagePackReady)
+                    }
+                    self.readyRow("Microphone", done: self.snapshot.microphoneAllowed)
+                    self.guidance
+                    self.allActions
+                }
             }
-            self.readyRow("Microphone", done: self.snapshot.microphoneAllowed)
-            Text(self.readinessGuidance)
-                .font(self.theme.typography.bodySmall)
-                .foregroundStyle(self.theme.palette.warning)
-                .fixedSize(horizontal: false, vertical: true)
+        }
+        .task(id: TranslationPairKey.current()) {
+            await self.controller.refreshPackAvailability()
+        }
+    }
+
+    private var guidance: some View {
+        Text(self.readinessGuidance)
+            .font(self.theme.typography.bodySmall)
+            .foregroundStyle(self.theme.palette.warning)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var primaryAction: some View {
+        if !self.snapshot.voiceEngineReady {
             if self.snapshot.voiceEngineNeedsRealign {
-                Button("Match I speak") {
+                AppButton("Match I speak") { self.controller.alignSpokenEngineWithTheater() }
+                    .buttonStyle(.theaterText)
+                    .accessibilityIdentifier("theater.readiness.matchISpeak")
+            } else if let openVoiceEngine {
+                AppButton("Open Voice Engine", action: openVoiceEngine)
+                    .buttonStyle(.theaterText)
+            }
+        } else if !self.snapshot.microphoneAllowed {
+            Button(self.microphoneActionTitle) { self.asr.requestMicAccess() }
+                .buttonStyle(.theaterText)
+        } else if !self.snapshot.languagePackReady, let openTranslationEngine {
+            AppButton("Language packs", action: openTranslationEngine)
+                .buttonStyle(.theaterText)
+        }
+    }
+
+    private var allActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if self.snapshot.voiceEngineNeedsRealign {
+                AppButton("Match I speak") {
                     self.controller.alignSpokenEngineWithTheater()
                 }
                 .buttonStyle(.theaterText)
                 .accessibilityIdentifier("theater.readiness.matchISpeak")
             } else if !self.snapshot.voiceEngineReady, let openVoiceEngine {
-                Button("Voice Engine", action: openVoiceEngine)
+                AppButton("Voice Engine", action: openVoiceEngine)
                     .buttonStyle(.theaterText)
             }
             if self.settings.theaterSessionMode == .translation,
                !self.snapshot.languagePackReady,
                let openTranslationEngine
             {
-                Button("Language packs", action: openTranslationEngine)
+                AppButton("Language packs", action: openTranslationEngine)
                     .buttonStyle(.theaterText)
             }
             if !self.snapshot.microphoneAllowed {
@@ -198,9 +264,6 @@ struct TheaterReadinessChecklist: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-        }
-        .task {
-            await self.controller.refreshPackAvailability()
         }
     }
 

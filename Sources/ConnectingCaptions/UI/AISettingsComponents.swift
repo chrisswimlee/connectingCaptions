@@ -150,7 +150,7 @@ struct LiquidBar: View {
             .frame(width: 48, height: 90)
 
             // Percentage (shows target, not animated)
-            Text("\(Int(self.fillPercent * 100))%")
+            AppText("{0}%", arguments: [String(describing: Int(self.fillPercent * 100))])
                 .font(self.theme.typography.metricTiny)
                 .foregroundStyle(self.fillPercent > 0 ? self.color : .secondary)
                 .contentTransition(.numericText())

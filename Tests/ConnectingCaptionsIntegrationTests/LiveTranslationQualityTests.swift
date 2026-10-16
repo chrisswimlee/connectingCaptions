@@ -4,6 +4,61 @@ import XCTest
 @testable import ConnectingCaptions_Debug
 
 final class LiveTranslationQualityTests: XCTestCase {
+    func testSpeechTimedExportsKeepLeadingSilenceAndIgnoreTranslationDelay() {
+        let now = Date()
+        var first = CaptionHistoryPair(source: "Hello.", translated: "안녕.", wasPolished: false, committedAt: now)
+        first.speechTiming = CaptionSpeechTiming(start: 4.25, end: 5.5)
+        var second = CaptionHistoryPair(source: "World.", translated: "세상.", wasPolished: false, committedAt: now.addingTimeInterval(20))
+        second.speechTiming = CaptionSpeechTiming(start: 7, end: 8.125)
+        let srt = TheaterCaptionExport.srt(pairs: [first, second])
+        XCTAssertTrue(srt.contains("00:00:04,250 --> 00:00:05,500"))
+        XCTAssertTrue(srt.contains("00:00:07,000 --> 00:00:08,125"))
+        XCTAssertTrue(TheaterCaptionExport.markdown(pairs: [first, second]).contains("microphone capture clock"))
+    }
+
+    func testQualityReviewHasBlankReferencesAndPreservesRecordedLanguageDirection() throws {
+        var pair = CaptionHistoryPair(source: "Hello.", translated: "안녕.", wasPolished: false)
+        pair.sourceLanguageID = "en"
+        pair.targetLanguageID = "ko"
+        let rows = try TheaterCaptionExport.qualityReview(pairs: [pair]).split(separator: "\n").map {
+            try XCTUnwrap(JSONSerialization.jsonObject(with: Data($0.utf8)) as? [String: Any])
+        }
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows[0]["kind"] as? String, "asr")
+        XCTAssertEqual(rows[1]["kind"] as? String, "translation")
+        XCTAssertEqual(rows[1]["languageID"] as? String, "ko")
+        XCTAssertEqual(rows[0]["reference"] as? String, "")
+        XCTAssertEqual(rows[1]["hypothesis"] as? String, "안녕.")
+    }
+
+    func testSpeechTimingSurvivesHistoryAndArchiveRoundTrips() throws {
+        var entry = LectureCaptionEntry(id: 1, source: "Hello.", translated: "안녕.")
+        entry.speechTiming = CaptionSpeechTiming(start: 2, end: 3)
+        entry.sourceLanguageID = "en"
+        entry.targetLanguageID = "ko"
+        let restored = try JSONDecoder().decode(LectureCaptionEntry.self, from: JSONEncoder().encode(entry))
+        let pair = try XCTUnwrap(TheaterCaptionExport.pairs(from: [restored]).first)
+        let history = try JSONDecoder().decode(CaptionHistoryPair.self, from: JSONEncoder().encode(pair))
+        XCTAssertEqual(history.speechTiming, entry.speechTiming)
+        XCTAssertEqual(history.targetLanguageID, "ko")
+    }
+
+    func testUnusableSpeechTimingFallsBackWithoutCrashing() {
+        var pair = CaptionHistoryPair(source: "Hello.", translated: "안녕.", wasPolished: false)
+        pair.speechTiming = CaptionSpeechTiming(start: 0, end: .infinity)
+        XCTAssertTrue(TheaterCaptionExport.srt(pairs: [pair]).contains("00:00:00,000 --> 00:00:04,000"))
+    }
+
+    func testTranslationRetryPreservesTimingButChangedWordingNeedsNewAlignment() throws {
+        var log = LectureCaptionLog()
+        let timing = CaptionSpeechTiming(start: 2, end: 3)
+        let id = try XCTUnwrap(log.commit(source: "Hello.", translated: "Failed.", speechTiming: timing)?.id)
+        XCTAssertTrue(log.applyGrowth(id: id, source: "Hello.", translated: "안녕."))
+        XCTAssertEqual(log.entries.first?.speechTiming, timing)
+        XCTAssertTrue(log.applyGrowth(id: id, source: "Hello everyone.", translated: "여러분 안녕."))
+        XCTAssertNil(log.entries.first?.speechTiming)
+    }
+
     func testBilingualTextInterleavesTranslationThenSource() {
         let start = Date(timeIntervalSince1970: 1_700_000_000)
         let later = start.addingTimeInterval(3.5)
@@ -158,7 +213,7 @@ final class LiveTranslationQualityTests: XCTestCase {
         XCTAssertEqual(AppleTranslationEngine.coverage(forRichStatus: .installed), .appleIntelligence)
         XCTAssertEqual(AppleTranslationEngine.coverage(forRichStatus: .unsupported), .unsupported)
         XCTAssertEqual(AppleTranslationEngine.coverage(forRichStatus: .supported), .needsDownload)
-        XCTAssertEqual(AppleTranslationEngine.coverage(forRichStatus: .unknown), .needsDownload)
+        XCTAssertEqual(AppleTranslationEngine.coverage(forRichStatus: .unknown), .checking)
     }
 
     @MainActor
@@ -277,7 +332,8 @@ final class LiveTranslationQualityTests: XCTestCase {
             VoiceEngineLanguageCatalog.nextFallbackModel(
                 after: .appleSpeechAnalyzer,
                 forLanguageID: "th",
-                availableModels: availableModels
+                availableModels: availableModels,
+                readiness: { _, _ in .ready }
             ),
             .appleSpeech,
             "Legacy Apple Speech is next in the Thai fallback order after Analyzer."
@@ -286,7 +342,8 @@ final class LiveTranslationQualityTests: XCTestCase {
             VoiceEngineLanguageCatalog.nextFallbackModel(
                 after: .appleSpeech,
                 forLanguageID: "th",
-                availableModels: availableModels
+                availableModels: availableModels,
+                readiness: { _, _ in .ready }
             ),
             "No more candidates in this restricted set after Legacy Apple Speech."
         )
@@ -294,7 +351,8 @@ final class LiveTranslationQualityTests: XCTestCase {
             VoiceEngineLanguageCatalog.nextFallbackModel(
                 after: .whisperLargeTurbo,
                 forLanguageID: "th",
-                availableModels: availableModels
+                availableModels: availableModels,
+                readiness: { _, _ in .ready }
             ),
             "A model not offered in availableModels should yield no fallback."
         )
@@ -555,10 +613,8 @@ final class LiveTranslationQualityTests: XCTestCase {
         XCTAssertTrue(TheaterEngineCopy.voiceEngineDetail(.whisperLarge).contains("when you stop"))
         XCTAssertTrue(TheaterEngineCopy.voiceEngineDetail(.whisperBase).contains("while you talk"))
         XCTAssertTrue(TheaterEngineCopy.voiceEngineDetail(.whisperBase).contains("~81.0 MiB"))
-        XCTAssertEqual(TheaterEngineCopy.translationName(), "Apple Translation")
+        XCTAssertEqual(TheaterEngineCopy.translationName, "Apple Translation")
         XCTAssertTrue(TheaterEngineCopy.translationPurpose.lowercased().contains("not a chat model"))
-        XCTAssertEqual(TheaterTranslationEngineKind.apple.displayName, "Apple Translation")
-        XCTAssertEqual(TheaterTranslationEngineKind.localLLM.displayName, "Local small LLM (experimental)")
         XCTAssertEqual(
             TheaterEngineCopy.translationRunningLine(
                 mode: .transcription,
@@ -591,28 +647,6 @@ final class LiveTranslationQualityTests: XCTestCase {
             ),
             "Apple Translation needs this language pack once."
         )
-        XCTAssertEqual(
-            TheaterEngineCopy.translationRunningLine(
-                mode: .translation,
-                sameLanguage: false,
-                pack: .installed,
-                engine: .localLLM
-            ),
-            "Experimental local LLM can sharpen the first print. Apple Translation stays the fallback."
-        )
-        let settings = SettingsStore.shared
-        let previous = settings.mlxRunnerEnabled
-        settings.theaterTranslationEngine = .localLLM
-        if TheaterTranslationEngineKind.appleTranslationOnly {
-            XCTAssertFalse(settings.mlxRunnerEnabled)
-            XCTAssertEqual(TheaterEngineCopy.translationName(settings: settings), "Apple Translation")
-        } else {
-            XCTAssertTrue(settings.mlxRunnerEnabled)
-            XCTAssertEqual(TheaterEngineCopy.translationName(settings: settings), "Local small LLM (experimental)")
-        }
-        settings.theaterTranslationEngine = .apple
-        XCTAssertFalse(settings.mlxRunnerEnabled)
-        settings.mlxRunnerEnabled = previous
     }
 
     func testTalkReportFlagsALineIWouldNotShow() {
@@ -676,6 +710,85 @@ final class LiveTranslationQualityTests: XCTestCase {
         )
     }
 
+    /// Thai stacks its vowels and tones as combining marks on a base consonant.
+    /// The character fold used to drop anything that was not a letter or a number,
+    /// which made every one of those marks invisible: these two lines are different
+    /// sentences and both folded to `ครบ`, scoring a perfect 0.0. Marks are units
+    /// now, so a missing tone has to move the number.
+    func testCharacterErrorRateSeesThaiCombiningMarks() {
+        XCTAssertEqual(
+            TheaterQualityScore.characterErrorRate(
+                reference: "ครับ",
+                hypothesis: "ครั๊บ"
+            ),
+            0.25,
+            accuracy: 0.0001
+        )
+    }
+
+    /// The user-visible consequence of the same defect. `isStageAcceptable` is how
+    /// the app decides a line was transcribed faithfully enough to print, so a
+    /// perfect score for a wrong sentence meant a bad caption sailed through.
+    /// 0.25 is above the 0.15 bar, so the pair has to be rejected now.
+    func testThaiLineWithADifferentToneIsNotAcceptedAsFaithful() {
+        XCTAssertFalse(
+            TheaterQualityScore.isStageAcceptable(
+                reference: "ครับ",
+                hypothesis: "ครั๊บ",
+                languageID: "th"
+            )
+        )
+    }
+
+    /// The unit definition is a contract with `scripts/score-theater-talk.py`, not an
+    /// implementation detail: the runtime scorer and the offline scorer have to count
+    /// the same units or a measured 4% and a runtime 4% stop meaning the same thing.
+    /// Both sides read `Fixtures/quality-vectors.jsonl`, so drift fails here instead
+    /// of quietly invalidating every number quoted from either scorer.
+    func testSwiftScorerReproducesEveryPinnedVector() throws {
+        struct Vector: Decodable {
+            let id: String
+            let languageID: String
+            let reference: String
+            let hypothesis: String
+            let expected: Double
+        }
+
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures/quality-vectors.jsonl")
+        let raw = try String(contentsOf: url, encoding: .utf8)
+        let decoder = JSONDecoder()
+        var checked = 0
+
+        for line in raw.split(separator: "\n", omittingEmptySubsequences: false) {
+            let data = Data(line.utf8)
+            guard !data.isEmpty,
+                  let vector = try? decoder.decode(Vector.self, from: data) else { continue }
+            checked += 1
+            let error: Double
+            if TheaterQualityScore.compactScripts.contains(vector.languageID) {
+                error = TheaterQualityScore.characterErrorRate(
+                    reference: vector.reference,
+                    hypothesis: vector.hypothesis
+                )
+            } else {
+                error = TheaterQualityScore.wordErrorRate(
+                    reference: vector.reference,
+                    hypothesis: vector.hypothesis
+                )
+            }
+            XCTAssertEqual(
+                error, vector.expected, accuracy: 0.000001,
+                "\(vector.id) moved away from its pinned value"
+            )
+        }
+        // A floor, not an exact count. The real risk is the fixture being gutted:
+        // with no lines left, the loop above checks nothing and still goes green.
+        // Adding a vector is legitimate work and must not break this test.
+        XCTAssertGreaterThanOrEqual(checked, 19, "pinned vector file looks gutted")
+    }
+
     func testReadyGateBlocksDeniedMicrophoneAndMissingPack() {
         let blocked = TheaterReadyGate.snapshot(
             engineSupportsSource: true,
@@ -712,7 +825,7 @@ final class LiveTranslationQualityTests: XCTestCase {
         XCTAssertTrue(voiceNeedsSpeech.canListen)
         XCTAssertTrue(voiceNeedsSpeech.nextAction.contains("Listen"))
 
-        let coldPackStillAllowsListen = TheaterReadyGate.snapshot(
+        let coldPackNeedsCheck = TheaterReadyGate.snapshot(
             engineSupportsSource: true,
             modelInstalled: true,
             sameLanguagePair: false,
@@ -720,181 +833,43 @@ final class LiveTranslationQualityTests: XCTestCase {
             microphone: .authorized,
             firstCaptionPrinted: true
         )
-        XCTAssertTrue(coldPackStillAllowsListen.canListen)
-        XCTAssertTrue(coldPackStillAllowsListen.languagePackReady)
+        XCTAssertFalse(coldPackNeedsCheck.canListen)
+        XCTAssertFalse(coldPackNeedsCheck.languagePackReady)
+        XCTAssertTrue(coldPackNeedsCheck.nextAction.contains("Checking"))
     }
 
     @MainActor
-    func testLocalCommitTranslationKeepsTargetScript() {
+    func testCaptionGateRejectsEngineErrorText() {
+        let source = "Today we trained the model."
+        XCTAssertNil(LiveTranslationCaptionGate.captionSafeForBoard("Error: quota exceeded", sourceText: source))
+        XCTAssertEqual(LiveTranslationCaptionGate.captionSafeForBoard(source, sourceText: source), source)
         XCTAssertEqual(
-            LLMTranslationEngine.acceptedCommitTranslation(
-                "오늘 모델을 학습했습니다.",
-                sourceText: "Today we trained the model.",
-                target: TranslationLanguageCatalog.korean
-            ),
+            LiveTranslationCaptionGate.captionSafeForBoard("오늘 모델을 학습했습니다.", sourceText: source),
             "오늘 모델을 학습했습니다."
         )
         XCTAssertNil(
-            LLMTranslationEngine.acceptedCommitTranslation(
-                "Today we trained the model.",
-                sourceText: "Today we trained the model.",
-                target: TranslationLanguageCatalog.korean
-            )
-        )
-        XCTAssertEqual(
-            LLMTranslationEngine.acceptedCommitTranslation(
-                "今日はモデルを学習しました。",
-                sourceText: "Today we trained the model.",
-                target: TranslationLanguageCatalog.japanese
-            ),
-            "今日はモデルを学習しました。"
-        )
-        XCTAssertNil(
-            LLMTranslationEngine.acceptedCommitTranslation(
-                "Today we trained the model.",
-                sourceText: "Today we trained the model.",
-                target: TranslationLanguageCatalog.japanese
-            )
-        )
-        let prompt = LLMTranslationPrompt.translateMessages(
-            sourceText: "Today we trained the model.",
-            priorSource: ["Hello."],
-            sourceLanguage: "English",
-            targetLanguage: "Korean"
-        )
-        XCTAssertTrue(prompt[0]["content"]?.contains("Translate") == true)
-        let withTerms = LLMTranslationPrompt.translateMessages(
-            sourceText: "Today we trained the model.",
-            priorSource: ["Hello."],
-            sourceLanguage: "English",
-            targetLanguage: "Korean",
-            terms: ["Nemotron", "connectingCaptions"]
-        )
-        XCTAssertTrue(withTerms[0]["content"]?.contains("Nemotron") == true)
-        XCTAssertTrue(withTerms[0]["content"]?.contains("connectingCaptions") == true)
-        XCTAssertTrue(
-            LLMTranslationPrompt.termGuidance([]).contains("Keep names and glossary tokens unchanged.")
-        )
-    }
-
-    @MainActor
-    func testLocalCommitRejectsPunctuationStrippedAndLabeledEchoes() {
-        let source = "Today we trained the model."
-        XCTAssertNil(
-            LLMTranslationEngine.acceptedCommitTranslation(
-                "Today we trained the model!",
-                sourceText: source,
-                target: TranslationLanguageCatalog.korean
-            )
-        )
-        XCTAssertNil(
-            LLMTranslationEngine.acceptedCommitTranslation(
-                "Original: Today we trained the model.",
-                sourceText: source,
-                target: TranslationLanguageCatalog.korean
-            )
-        )
-        XCTAssertNil(
-            LLMTranslationEngine.acceptedCommitTranslation(
-                "\"Today we trained the model.\"",
-                sourceText: source,
-                target: TranslationLanguageCatalog.korean
-            )
-        )
-        XCTAssertEqual(
-            LLMTranslationEngine.commitVerdict(
-                "Translation: 오늘 모델을 학습했습니다.",
-                sourceText: source,
-                target: TranslationLanguageCatalog.korean
-            ),
-            .accept("오늘 모델을 학습했습니다.")
-        )
-        XCTAssertEqual(
-            LLMTranslationEngine.commitVerdict(
-                "Ｔｏｄａｙ ｗｅ ｔｒａｉｎｅｄ ｔｈｅ ｍｏｄｅｌ．",
-                sourceText: source,
-                target: TranslationLanguageCatalog.korean
-            ),
-            .echo
-        )
-    }
-
-    @MainActor
-    func testLocalCommitRejectsEngineErrorText() {
-        let source = "Today we trained the model."
-        XCTAssertNil(
-            LLMTranslationEngine.acceptedCommitTranslation(
-                "Error: quota exceeded",
-                sourceText: source,
-                target: TranslationLanguageCatalog.korean
-            )
-        )
-        XCTAssertNil(LLMTranslationEngine.captionSafeForBoard("Error: quota exceeded", sourceText: source))
-        XCTAssertNil(LLMTranslationEngine.captionSafeForBoard(source, sourceText: source))
-        XCTAssertEqual(
-            LLMTranslationEngine.captionSafeForBoard("오늘 모델을 학습했습니다.", sourceText: source),
-            "오늘 모델을 학습했습니다."
-        )
-        XCTAssertNil(
-            LLMTranslationEngine.captionSafeForBoard(
+            LiveTranslationCaptionGate.captionSafeForBoard(
                 "\u{25B9} Tejun, hello. \u{25C3} Tejun",
                 sourceText: "안녕하세요."
             )
         )
         XCTAssertFalse(
-            LLMTranslationEngine.looksLikeEngineError("The API key is stored locally on this Mac.")
+            LiveTranslationCaptionGate.looksLikeEngineError("The API key is stored locally on this Mac.")
         )
     }
 
     @MainActor
-    func testLocalEngineIgnoresLegacyPolishFlag() {
-        let settings = SettingsStore.shared
-        let originalMLX = settings.mlxRunnerEnabled
-        let originalPolish = settings.llmTranslationPolishEnabled
-        defer {
-            settings.mlxRunnerEnabled = originalMLX
-            settings.llmTranslationPolishEnabled = originalPolish
-        }
-        settings.mlxRunnerEnabled = false
-        settings.llmTranslationPolishEnabled = true
-        XCTAssertFalse(LLMTranslationEngine().isAvailable(settings: settings))
-        XCTAssertFalse(LLMTranslationEngine().isReadyForCommitTranslation(settings: settings))
-    }
-
-    @MainActor
-    func testLocalFirstPrintStaysNilWhenLocalEngineIsOff() async {
-        let settings = SettingsStore.shared
-        let original = settings.mlxRunnerEnabled
-        defer { settings.mlxRunnerEnabled = original }
-        settings.mlxRunnerEnabled = false
-        let llm = LLMTranslationEngine()
-        let sharpened = await LiveTranslationMT.localFirstPrint(
-            "Today we trained the model.",
-            draft: "오늘 모델을 학습했습니다.",
-            prior: (sources: [], translations: []),
-            source: TranslationLanguageCatalog.english,
-            target: TranslationLanguageCatalog.korean,
-            terms: [],
-            llmEngine: llm
-        )
-        XCTAssertNil(sharpened)
-        XCTAssertFalse(llm.isReadyForCommitTranslation(settings: settings))
-    }
-
-    @MainActor
-    func testAppleClauseWinsWhenLocalIsNotReady() async throws {
+    func testTranslateClausePrintsTheEngineResult() async throws {
         let engine = FakeTranslationEngine()
         engine.result = .success("오늘 모델을 학습했습니다.")
-        let llm = LLMTranslationEngine()
-        let caption = try await LiveTranslationMT.translateClause(
+        let caption = try await LiveTranslationMT.appleClause(
             "Today we trained the model.",
             source: TranslationLanguageCatalog.english,
             target: TranslationLanguageCatalog.korean,
             terms: [],
             kind: .commit,
             prior: (sources: [], translations: []),
-            translator: engine,
-            llmEngine: llm
+            translator: engine
         )
         XCTAssertEqual(caption, "오늘 모델을 학습했습니다.")
         XCTAssertEqual(engine.calls, ["Today we trained the model."])
@@ -979,50 +954,6 @@ final class LiveTranslationQualityTests: XCTestCase {
         )
         XCTAssertEqual(result, "바로 성공")
         XCTAssertEqual(engine.calls.count, 1)
-    }
-
-    func testLocalEchoTallySkipsAfterMostLinesEcho() {
-        var tally = LocalTranslationEchoTally()
-        for _ in 0..<4 {
-            tally.record(echoed: true)
-            XCTAssertFalse(tally.shouldSkipLocal)
-        }
-        tally.record(echoed: false)
-        XCTAssertTrue(tally.shouldSkipLocal)
-        XCTAssertEqual(tally.attempts, LiveTranslationTiming.localEchoFailMinimumAttempts)
-        XCTAssertEqual(LiveTranslationTiming.localEchoFailRatio, 0.80, accuracy: 0.001)
-
-        var mixed = LocalTranslationEchoTally()
-        mixed.record(echoed: true)
-        mixed.record(echoed: true)
-        mixed.record(echoed: false)
-        mixed.record(echoed: false)
-        mixed.record(echoed: false)
-        XCTAssertFalse(mixed.shouldSkipLocal)
-    }
-
-    @MainActor
-    func testLocalEngineSkipsCommitAfterListenEchoes() {
-        let settings = SettingsStore.shared
-        let original = settings.mlxRunnerEnabled
-        defer { settings.mlxRunnerEnabled = original }
-        settings.mlxRunnerEnabled = true
-
-        let engine = LLMTranslationEngine()
-        for _ in 0..<4 {
-            engine.noteListenEcho(true)
-        }
-        engine.noteListenEcho(false)
-        XCTAssertTrue(engine.echoTally.shouldSkipLocal)
-        XCTAssertFalse(engine.isReadyForCommitTranslation(settings: settings))
-        engine.resetListenEchoTally()
-        XCTAssertFalse(engine.echoTally.shouldSkipLocal)
-
-        for _ in 0..<4 {
-            engine.noteListenFailure()
-        }
-        engine.noteListenEcho(false)
-        XCTAssertTrue(engine.echoTally.shouldSkipLocal)
     }
 
     private static func pairs(from entries: [LectureCaptionEntry]) -> [CaptionHistoryPair] {

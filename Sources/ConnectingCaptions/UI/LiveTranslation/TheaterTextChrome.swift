@@ -170,7 +170,7 @@ struct TheaterActionLabel: View {
                     .accessibilityHidden(true)
             }
             if self.showsTitle {
-                Text(self.title)
+                AppText(self.title)
                     .lineLimit(1)
             }
         }
@@ -276,7 +276,7 @@ struct TheaterMenuLabel: View {
                     .lineLimit(1)
                     .accessibilityHidden(true)
             }
-            Text(self.title)
+            AppText(self.title)
                 .lineLimit(1)
             Image(systemName: "chevron.down")
                 .font(.system(size: self.compact ? 8 : 9, weight: .bold))
@@ -421,6 +421,7 @@ struct TheaterLanguageMenu: View {
     /// menu so the gap surfaces while picking, not only after, in the mismatch banner
     /// below. `nil` means no known issue.
     var issueHint: ((TranslationLanguage) -> String?)? = nil
+    var status: ((TranslationLanguage) -> LanguageOptionStatus)? = nil
 
     @ObservedObject private var settings = SettingsStore.shared
 
@@ -440,6 +441,15 @@ struct TheaterLanguageMenu: View {
         return self.selection
     }
 
+    private var selectedStatus: LanguageOptionStatus? {
+        self.selectedLanguage.flatMap { self.status?($0) }
+    }
+
+    private var selectedAccessibilityValue: String {
+        guard let selectedStatus else { return self.selectedName }
+        return AppLanguage.format("{0} · {1}", self.selectedName, selectedStatus.title)
+    }
+
     var body: some View {
         self.labeledMenu
     }
@@ -448,7 +458,7 @@ struct TheaterLanguageMenu: View {
     private var labeledMenu: some View {
         let menu = self.styledMenu
             .accessibilityLabel(self.visibleTitle)
-            .accessibilityValue(self.selectedName)
+            .accessibilityValue(self.selectedAccessibilityValue)
         if let accessibilityIdentifier = self.accessibilityIdentifier {
             menu.accessibilityIdentifier(accessibilityIdentifier)
         } else {
@@ -458,6 +468,9 @@ struct TheaterLanguageMenu: View {
 
     private var menu: some View {
         Menu {
+            if self.languages.isEmpty {
+                Text(AppLanguage.text("No available languages. Check Voice Engine and Language Packs."))
+            }
             Picker(self.visibleTitle, selection: self.$selection) {
                 ForEach(self.languages) { language in
                     self.menuRow(for: language).tag(language.id)
@@ -474,7 +487,9 @@ struct TheaterLanguageMenu: View {
     private func menuRow(for language: TranslationLanguage) -> some View {
         let name = AppLanguage.localizedName(for: language, languageID: self.settings.appLanguageID)
         if let issue = self.issueHint?(language) {
-            Label("\(name) — \(issue)", systemImage: "exclamationmark.triangle")
+            AppLabel(AppLanguage.format("{0} — {1}", String(describing: name), String(describing: issue)), systemImage: "exclamationmark.triangle")
+        } else if let status = self.status?(language) {
+            Label(AppLanguage.format("{0} · {1}", name, status.title), systemImage: status.symbol)
         } else {
             Text(name)
         }
@@ -488,13 +503,14 @@ struct TheaterLanguageMenu: View {
         } else if self.compactChrome {
             menu
         } else {
-            menu.help("Languages this Voice Engine can't hear or Apple Translation can't pair are flagged in the list.")
+            menu.help(AppLanguage.text("Only supported languages are listed. Speech downloads are managed in Voice Engine; translation downloads are in Language Packs."))
         }
     }
 
     private var label: some View {
         TheaterMenuLabel(
             title: self.selectedName,
+            systemImage: self.selectedStatus?.symbol,
             role: self.visibleTitle,
             compact: self.compactChrome,
             minWidth: self.compactChrome ? nil : 168
@@ -528,7 +544,7 @@ struct TheaterSpokenLinePicker: View {
         Menu {
             Picker(TheaterReadiness.spokenLineTitle, selection: self.selection) {
                 ForEach(TheaterSpokenLineMode.allCases) { mode in
-                    Text(mode.displayName).tag(mode)
+                    AppText(mode.displayName).tag(mode)
                 }
             }
             .pickerStyle(.inline)
@@ -568,7 +584,7 @@ struct TheaterSettingRow<Control: View>: View {
 
     private var copy: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(self.title)
+            AppText(self.title)
                 .font(self.theme.typography.bodyStrong)
                 .foregroundStyle(self.theme.palette.primaryText)
             Text(self.detail)

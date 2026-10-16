@@ -12,6 +12,8 @@ import SwiftUI
 enum SettingsSearchTarget: Hashable {
     case liveTranslation
     case theaterAppearance
+    case theaterAdvanced
+    case theaterPlayback
     case translateInsertShortcut
     case captionListenShortcut
     case general
@@ -70,8 +72,9 @@ enum SettingsSearchTarget: Hashable {
 
     var section: SettingsSection {
         switch self {
-        case .liveTranslation, .theaterAppearance, .captionListenShortcut:
+        case .liveTranslation, .theaterAppearance, .theaterAdvanced, .theaterPlayback, .captionListenShortcut:
             return .translation
+
         case .translateInsertShortcut:
             return .speakAndType
 
@@ -181,18 +184,17 @@ enum SettingsSearchIndex {
     private static let entries: [Entry] = [
         .init(
             target: .liveTranslation,
-            title: "Theater",
+            title: AppLanguage.text("Theater"),
             terms: [
                 "translate theater captions language pair apple translation I speak show as",
                 "voice transcription translate mode",
                 "voice engine speech to text apple speech analyzer language packs apple translation download",
-                "save transcript markdown vtt session export when listen stops",
                 "translation engine language packs",
             ]
         ),
         .init(
             target: .theaterAppearance,
-            title: "Theater Window",
+            title: AppLanguage.text("Caption appearance"),
             terms: [
                 "caption font size spoken line source translation theater window captions only dark light appearance theme",
                 "original language spoken line under each delivered sentence",
@@ -200,51 +202,65 @@ enum SettingsSearchIndex {
                 "popup pop-up transparent overlay board slides keynote see-through caption bar caption plate",
                 "menu bar theater font size plate theme position overlay tools",
                 "screen share screenshots zoom meet slides window capture projector OBS",
-                "speak captions",
-                "clear captions board archive wipe reset high contrast",
+                "high contrast show original text window style",
                 "talk notes notes pdf pptx powerpoint deck rtf markdown json glossary names",
                 "pace cue teleprompter behind caught up last print",
                 "voice transcription translate mode",
             ]
         ),
         .init(
+            target: .theaterAdvanced,
+            title: AppLanguage.text("Advanced captions"),
+            terms: [
+                "either way whisper bidirectional two languages",
+                "caption animation timing line print print gap word letter fade",
+                "presenter shortcuts hotkeys control option",
+                "save transcript markdown vtt session export when listen stops",
+            ]
+        ),
+        .init(
+            target: .theaterPlayback,
+            title: AppLanguage.text("Playback and session"),
+            terms: ["speak captions speak on voice output", "clear captions board archive wipe reset"]
+        ),
+        .init(
             target: .captionListenShortcut,
-            title: "Listen Shortcut",
+            title: AppLanguage.text("Listen Shortcut"),
             terms: ["listen hotkey shortcut theater captions"]
         ),
         .init(
             target: .translateInsertShortcut,
-            title: "Speak and type",
+            title: AppLanguage.text("Speak and type"),
             terms: [
                 "speak and type insert section listen and type hotkey shortcut speak translate type into app quick bar release",
                 "accessibility permission system settings authorize typing",
             ]
         ),
-        .init(target: .general, title: "General", terms: ["app settings preferences startup menu bar dock"]),
+        .init(target: .general, title: AppLanguage.text("General"), terms: ["app settings preferences startup menu bar dock"]),
         .init(
             target: .launchAtStartup,
-            title: "Launch at startup",
+            title: AppLanguage.text("Launch at startup"),
             terms: ["Automatically start connectingCaptions when you log in", "login startup boot open"]
         ),
         .init(
             target: .showWindowAtLogin,
-            title: "Show window when launched at login",
+            title: AppLanguage.text("Show window when launched at login"),
             terms: ["starts silently in the menu bar", "login window visibility"]
         ),
         .init(
             target: .dockVisibility,
-            title: "Hide from Dock & App Switcher",
+            title: AppLanguage.text("Hide from Dock & App Switcher"),
             terms: ["menu bar only", "dock icon command tab cmd tab app switcher"]
         ),
-        .init(target: .accentColor, title: "Accent Color", terms: ["appearance theme tint colour color preset default caption gold"]),
+        .init(target: .accentColor, title: AppLanguage.text("Accent Color"), terms: ["appearance theme tint colour color preset default caption gold"]),
         .init(
             target: .automaticUpdates,
-            title: "Automatic Updates",
+            title: AppLanguage.text("Automatic Updates"),
             terms: ["beta releases check for updates release notes rollback previous builds version"]
         ),
         .init(
             target: .commercialLicense,
-            title: "Commercial License",
+            title: AppLanguage.text("Commercial License"),
             terms: [
                 "license commercial enterprise SLA IT legal procurement named organization",
                 "for work email to buy licensed to activation key air-gapped",
@@ -253,173 +269,173 @@ enum SettingsSearchIndex {
             ]
         ),
 
-        .init(target: .dictation, title: "Dictation", terms: ["typing transcription keyboard preferences"]),
+        .init(target: .dictation, title: AppLanguage.text("Dictation"), terms: ["typing transcription keyboard preferences"]),
         .init(
             target: .microphonePermission,
-            title: "Microphone Permission",
+            title: AppLanguage.text("Microphone Permission"),
             terms: ["mic access authorization privacy grant denied system settings"]
         ),
-        .init(target: .globalHotkey, title: "Global Hotkey", terms: ["keyboard shortcut activation accessibility"]),
+        .init(target: .globalHotkey, title: AppLanguage.text("Global Hotkey"), terms: ["keyboard shortcut activation accessibility"]),
         .init(
             target: .primaryDictationShortcuts,
-            title: "Primary Dictation Shortcuts",
+            title: AppLanguage.text("Primary Dictation Shortcuts"),
             terms: ["keyboard shortcut mouse button record hotkey"]
         ),
         .init(
             target: .cancelRecordingShortcut,
-            title: "Cancel Recording",
+            title: AppLanguage.text("Cancel Recording"),
             terms: ["dismiss overlay stop hotkey shortcut"]
         ),
         .init(
             target: .pasteLastTranscriptionShortcut,
-            title: "Paste Last Transcription",
+            title: AppLanguage.text("Paste Last Transcription"),
             terms: ["reinsert recent text hotkey shortcut clipboard"]
         ),
-        .init(target: .activationMode, title: "Activation Mode", terms: ["hold toggle hotkey behavior"]),
+        .init(target: .activationMode, title: AppLanguage.text("Activation Mode"), terms: ["hold toggle hotkey behavior"]),
         .init(
             target: .copyToClipboard,
-            title: "Copy to Clipboard",
+            title: AppLanguage.text("Copy to Clipboard"),
             terms: ["automatically copy transcribed text pasteboard backup"]
         ),
         .init(
             target: .textInsertionMode,
-            title: "Text Insertion Mode",
+            title: AppLanguage.text("Text Insertion Mode"),
             terms: ["type text copy paste clipboard reliable insertion delivery"]
         ),
         .init(
             target: .spokenSend,
-            title: "Spoken Send",
+            title: AppLanguage.text("Spoken Send"),
             terms: ["send immediately phrase command enter return submit voice"]
         ),
         .init(
             target: .transcriptionHistory,
-            title: "Save Transcription History",
+            title: AppLanguage.text("Save Transcription History"),
             terms: ["stats tracking privacy remember transcript"]
         ),
         .init(
             target: .historyRetention,
-            title: "Keep History",
+            title: AppLanguage.text("Keep History"),
             terms: ["retention days year forever prune sqlite history limit"]
         ),
         .init(
             target: .audioHistory,
-            title: "Save Audio With History",
+            title: AppLanguage.text("Save Audio With History"),
             terms: ["store microphone recording locally dictation audio"]
         ),
         .init(
             target: .usageStreak,
-            title: "Weekends Don't Break Streak",
+            title: AppLanguage.text("Weekends Don't Break Streak"),
             terms: ["Saturday Sunday stats usage streak weekday"]
         ),
         .init(
             target: .skipSilentRecordings,
-            title: "Skip Silent Recordings",
+            title: AppLanguage.text("Skip Silent Recordings"),
             terms: ["silence quiet speech avoid transcription"]
         ),
         .init(
             target: .dictionarySuggestions,
-            title: "Auto-Learn Corrections",
+            title: AppLanguage.text("Auto-Learn Corrections"),
             terms: ["automatic corrections learn words custom dictionary frequency ignore import lecture terms glossary pack"]
         ),
         .init(
             target: .accessibilityPermission,
-            title: "Accessibility Permission",
+            title: AppLanguage.text("Accessibility Permission"),
             terms: ["global hotkey access macOS system settings authorize"]
         ),
         .init(
             target: .textFormatting,
-            title: "Text Formatting",
+            title: AppLanguage.text("Text Formatting"),
             terms: [
                 "Lowercase First Letter Remove Trailing Period Slash Commands @ Formatting",
                 "Space Between Dictations Smart Capitalization punctuation uppercase symbols mentions",
             ]
         ),
 
-        .init(target: .notifications, title: "Notifications", terms: ["alerts warnings"]),
+        .init(target: .notifications, title: AppLanguage.text("Notifications"), terms: ["alerts warnings"]),
         .init(
             target: .aiEnhancementFailures,
-            title: "AI Enhancement Failures",
+            title: AppLanguage.text("AI Enhancement Failures"),
             terms: ["notify processing error raw transcription alert"]
         ),
         .init(
             target: .microphoneChanges,
-            title: "Microphone Changes",
+            title: AppLanguage.text("Microphone Changes"),
             terms: ["mic device lost changed alert notification"]
         ),
 
-        .init(target: .audio, title: "Audio", terms: ["sound devices microphone speaker"]),
+        .init(target: .audio, title: AppLanguage.text("Audio"), terms: ["sound devices microphone speaker"]),
         .init(
             target: .inputDevicePriority,
-            title: "Input Device Priority",
+            title: AppLanguage.text("Input Device Priority"),
             terms: ["microphone mic order drag reorder default restore removed unavailable active"]
         ),
         .init(
             target: .outputDevice,
-            title: "Output Device",
+            title: AppLanguage.text("Output Device"),
             terms: ["speaker headphones audio system default refresh loading"]
         ),
 
         .init(
             target: .aiProviders,
-            title: "AI Providers",
+            title: AppLanguage.text("AI Providers"),
             terms: ["ai providers local models api cleanup styles dictation polish"]
         ),
-        .init(target: .overlay, title: "Recording Overlay", terms: ["recording indicator notch pill visualizer overlay"]),
+        .init(target: .overlay, title: AppLanguage.text("Recording Overlay"), terms: ["recording indicator notch pill visualizer overlay"]),
         .init(
             target: .overlaySensitivity,
-            title: "Sensitivity",
+            title: AppLanguage.text("Sensitivity"),
             terms: ["audio visualizer sound input more less threshold"]
         ),
         .init(
             target: .overlayPosition,
-            title: "Overlay Position",
+            title: AppLanguage.text("Overlay Position"),
             terms: ["recording indicator screen notch pill bottom location"]
         ),
         .init(
             target: .transcriptionPreviewLength,
-            title: "Transcription Preview Length",
+            title: AppLanguage.text("Transcription Preview Length"),
             terms: ["recent characters notch pill preview size"]
         ),
         .init(
             target: .overlayStyle,
-            title: "Overlay Size & Notch Style",
+            title: AppLanguage.text("Overlay Size & Notch Style"),
             terms: ["large compact regular recording indicator presentation layout"]
         ),
         .init(
             target: .livePreview,
-            title: "Live Preview",
+            title: AppLanguage.text("Live Preview"),
             terms: ["streaming transcription text while speak overlay"]
         ),
-        .init(target: .bottomOffset, title: "Bottom Offset", terms: ["distance from bottom screen pixels position"]),
+        .init(target: .bottomOffset, title: AppLanguage.text("Bottom Offset"), terms: ["distance from bottom screen pixels position"]),
 
         .init(
             target: .dataAndDiagnostics,
-            title: "Data & Diagnostics",
+            title: AppLanguage.text("Data & Diagnostics"),
             terms: ["backup restore debug logs storage troubleshooting"]
         ),
         .init(
             target: .backupAndRestore,
-            title: "Backup & Restore",
+            title: AppLanguage.text("Backup & Restore"),
             terms: ["export import settings prompt profiles history stats API keys"]
         ),
         .init(
             target: .audioStorage,
-            title: "Audio Storage",
+            title: AppLanguage.text("Audio Storage"),
             terms: ["history budget GB export ZIP delete prune WAV manifest"]
         ),
         .init(
             target: .debugLogs,
-            title: "Debug Settings",
+            title: AppLanguage.text("Debug Settings"),
             terms: ["Show Debug Logs in App Reveal Log File crash diagnostics troubleshooting"]
         ),
         .init(
             target: .experimental,
-            title: "Experimental",
+            title: AppLanguage.text("Experimental"),
             terms: ["preview early access optional features"]
         ),
         .init(
             target: .historyPerformance,
-            title: "Show Performance in History",
+            title: AppLanguage.text("Show Performance in History"),
             terms: ["timing speed tokens per second ASR cleanup"]
         ),
     ]

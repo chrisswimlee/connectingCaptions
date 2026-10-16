@@ -51,21 +51,21 @@ struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 16) {
                 FluidPageHeader(
                     systemImage: "captions.bubble",
-                    title: "Getting Started",
+                    title: AppLanguage.text("Getting Started"),
                     subtitle: ConnectingCaptionsProduct.tagline
                 )
 
                 ThemedCard(style: .prominent) {
                     VStack(alignment: .leading, spacing: 12) {
-                        FluidSectionHeader(title: "Listen", systemImage: "captions.bubble")
+                        FluidSectionHeader(title: AppLanguage.text("Listen"), systemImage: "captions.bubble")
                             .foregroundStyle(self.theme.palette.accent)
 
-                        Text("Open Theater, pick Voice or Translate, then press Listen. Each sentence appears when it is ready.")
+                        AppText("Open Theater, pick Voice or Translate, then press Listen. Each sentence appears when it is ready.")
                             .font(self.theme.typography.body)
                             .foregroundStyle(self.theme.palette.primaryText)
                             .fixedSize(horizontal: false, vertical: true)
 
-                        Text("I speak and Show as are on the Theater card. The same language needs no download. Setup → Voice Engine switches newer or older Apple Speech.")
+                        AppText("I speak and Show as are on the Theater card. The same language needs no download. Setup → Voice Engine switches newer or older Apple Speech.")
                             .font(self.theme.typography.bodySmall)
                             .foregroundStyle(self.theme.palette.secondaryText)
                             .fixedSize(horizontal: false, vertical: true)
@@ -92,7 +92,7 @@ struct WelcomeView: View {
                                 .font(self.theme.typography.bodySmall)
                                 .foregroundStyle(self.theme.palette.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Button("Language packs") {
+                            AppButton("Language packs") {
                                 self.selectedSidebarItem = .languagePacks
                             }
                             .buttonStyle(.theaterText)
@@ -100,7 +100,7 @@ struct WelcomeView: View {
 
                         Divider().opacity(0.2)
 
-                        Button("Open Theater") {
+                        AppButton("Open Theater") {
                             self.selectedSidebarItem = .liveTranslation
                             PresenterCaptionController.shared.setVisible(true)
                         }
@@ -109,11 +109,11 @@ struct WelcomeView: View {
 
                         if !self.accessibilityEnabled {
                             Divider().opacity(0.2)
-                            Text("Typing a caption into another app is optional. Theater captions do not need it.")
+                            AppText("Typing a caption into another app is optional. Theater captions do not need it.")
                                 .font(self.theme.typography.bodySmall)
                                 .foregroundStyle(self.theme.palette.secondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Button("Allow typing into another app") {
+                            AppButton("Allow typing into another app") {
                                 self.openAccessibilitySettings()
                             }
                             .buttonStyle(.theaterText)
@@ -121,7 +121,7 @@ struct WelcomeView: View {
 
                         Divider().opacity(0.2)
 
-                        Text(TheaterReadiness.macOSNote)
+                        AppText(TheaterReadiness.macOSNote)
                             .font(self.theme.typography.caption)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)

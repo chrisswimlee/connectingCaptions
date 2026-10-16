@@ -45,7 +45,7 @@ final class SettingsStore: ObservableObject {
     }()
 
     nonisolated static var isRunningTests: Bool {
-        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        AppTestEnvironment.isRunning
     }
     let keychain = KeychainService.shared
     var launchAtStartupEnabled = false
@@ -66,10 +66,11 @@ final class SettingsStore: ObservableObject {
         self.purgeRetiredAppleIntelligenceState()
         self.repairForcedOnboardingResetIfNeeded()
         self.migrateCaptionAccentIfNeeded()
+        self.migrateUnsupportedTranslationLanguagesIfNeeded()
+        self.purgeRetiredMLXRunnerKeysIfNeeded()
         self.migrateOverlayBottomOffsetTo50IfNeeded()
         self.migratePrivateAIContextDefaultTo4KIfNeeded()
         self.pinSpeechModelToAppleIfNeeded()
-        self.pinTranslationEngineToAppleIfNeeded()
         self.refreshLaunchAtStartupStatus(clearError: true, logMismatch: false)
     }
 
@@ -143,8 +144,8 @@ final class SettingsStore: ObservableObject {
         var displayName: String {
             switch self {
             case .auto: return Self.systemDefault.displayName
-            case .llama: return "llama.cpp (Compatibility)"
-            case .mlx: return "MLX (Recommended)"
+            case .llama: return AppLanguage.text("llama.cpp (Compatibility)")
+            case .mlx: return AppLanguage.text("MLX (Recommended)")
             }
         }
 
@@ -157,7 +158,7 @@ final class SettingsStore: ObservableObject {
                     ? "Optional and slower than MLX. Replaces MLX after verification."
                     : "Recommended compatibility backend for Intel Macs."
             case .mlx:
-                return "Recommended and faster than llama.cpp. Replaces it after verification."
+                return AppLanguage.text("Recommended and faster than llama.cpp. Replaces it after verification.")
             }
         }
     }

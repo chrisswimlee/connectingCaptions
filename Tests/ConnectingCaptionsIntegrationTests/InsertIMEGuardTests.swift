@@ -92,3 +92,18 @@ final class InsertIMEGuardTests: XCTestCase {
         XCTAssertTrue(InsertIMEGuard.snapshotRequiresPaste(kotoeri))
     }
 }
+
+
+final class CapturedInsertTargetTests: XCTestCase {
+    func testCapturedAppWinsRegardlessOfLaterFocus() {
+        XCTAssertEqual(TheaterInsertDelivery.capturedTargetPID(recordedPID: 111, recordedBundleID: "original.app",
+                                                               runningBundleID: "original.app"), 111)
+    }
+
+    func testMissingOrReusedTargetNeverFallsBackToAnotherApp() {
+        XCTAssertNil(TheaterInsertDelivery.capturedTargetPID(recordedPID: nil, recordedBundleID: "original.app", runningBundleID: "other.app"))
+        XCTAssertNil(TheaterInsertDelivery.capturedTargetPID(recordedPID: 111, recordedBundleID: "original.app", runningBundleID: nil))
+        XCTAssertNil(TheaterInsertDelivery.capturedTargetPID(recordedPID: 111, recordedBundleID: "original.app", runningBundleID: "other.app"))
+        XCTAssertNil(TheaterInsertDelivery.capturedTargetPID(recordedPID: 111, recordedBundleID: nil, runningBundleID: "original.app"))
+    }
+}

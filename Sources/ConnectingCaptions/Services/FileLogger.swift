@@ -25,7 +25,8 @@ final nonisolated class FileLogger: @unchecked Sendable {
 
     private init() {
         let baseDirectory = self.fileManager.urls(for: .libraryDirectory, in: .userDomainMask).first ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        self.logDirectory = baseDirectory.appendingPathComponent("Logs/connectingCaptions", isDirectory: true)
+        self.logDirectory = AppTestEnvironment.supportDirectory?.appendingPathComponent("Logs", isDirectory: true)
+            ?? baseDirectory.appendingPathComponent("Logs/connectingCaptions", isDirectory: true)
         self.logFileURL = self.logDirectory.appendingPathComponent("connectingCaptions.log", isDirectory: false)
         self.backupLogURL = self.logDirectory.appendingPathComponent("connectingCaptions.log.1", isDirectory: false)
         self.legacyLogFileURL = self.logDirectory.appendingPathComponent("fluid.log", isDirectory: false)
@@ -56,6 +57,26 @@ final nonisolated class FileLogger: @unchecked Sendable {
 
     func currentLogFileURL() -> URL {
         return self.logFileURL
+    }
+
+    func clear() throws {
+        try self.queue.sync {
+            if Self.crashFileDescriptor >= 0 {
+                close(Self.crashFileDescriptor)
+                Self.crashFileDescriptor = -1
+            }
+            defer { self.prepareCrashLogging() }
+            try Self.removeDiagnosticFiles(in: self.logDirectory)
+            self.appendRunMetadata()
+        }
+    }
+
+    static func removeDiagnosticFiles(in directory: URL, fileManager: FileManager = .default) throws {
+        // Only our named log files; never remove neighboring user files.
+        for name in ["connectingCaptions.log", "connectingCaptions.log.1", "fluid.log", "fluid.log.1"] {
+            let file = directory.appendingPathComponent(name)
+            if fileManager.fileExists(atPath: file.path) { try fileManager.removeItem(at: file) }
+        }
     }
 
     // MARK: - Private helpers

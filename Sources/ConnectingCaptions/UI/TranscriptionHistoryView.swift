@@ -15,6 +15,7 @@ struct TranscriptionHistoryView: View {
     @State private var showReportConfirmation: Bool = false
     @State private var selectedReportEntry: TranscriptionHistoryEntry?
     @State private var selectedEntryID: UUID?
+    @State private var entryPendingDeletion: TranscriptionHistoryEntry?
 
     private var filteredEntries: [TranscriptionHistoryEntry] {
         self.historyStore.entries
@@ -41,7 +42,7 @@ struct TranscriptionHistoryView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(error)
                             .font(.caption)
-                        Button("Retry saving history") {
+                        AppButton("Retry saving history") {
                             self.historyStore.retryPersistence()
                         }
                     }
@@ -84,21 +85,43 @@ struct TranscriptionHistoryView: View {
         .onChange(of: self.searchQuery) { _, query in
             self.historyStore.applySearchQuery(query)
         }
-        .alert("Clear All History", isPresented: self.$showClearConfirmation) {
-            Button("Cancel", role: .cancel) {}
-            Button("Clear All", role: .destructive) {
+        .onChange(of: self.filteredEntries.map(\.id)) { _, ids in
+            self.selectedEntryID = HistorySelection.resolve(self.selectedEntryID, availableIDs: ids)
+        }
+        .alert(AppLanguage.text("Delete transcript?"), isPresented: Binding(
+            get: { self.entryPendingDeletion != nil },
+            set: {
+                if !$0 {
+                    self.entryPendingDeletion = nil
+                }
+            }
+        ), presenting: self.entryPendingDeletion) { entry in
+            AppButton("Cancel", role: .cancel) {}
+            AppButton("Delete", role: .destructive) {
+                self.historyStore.deleteEntry(id: entry.id)
+                self.selectedEntryID = HistorySelection.resolve(
+                    self.selectedEntryID,
+                    availableIDs: self.filteredEntries.map(\.id)
+                )
+            }
+        } message: { _ in
+            AppText("This permanently deletes this transcript and any saved audio. This cannot be undone.")
+        }
+        .alert(AppLanguage.text("Clear All History"), isPresented: self.$showClearConfirmation) {
+            AppButton("Cancel", role: .cancel) {}
+            AppButton("Clear All", role: .destructive) {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     self.historyStore.clearAllHistory()
                     self.selectedEntryID = nil
                 }
             }
         } message: {
-            Text("This will permanently delete all \(self.historyStore.totalEntryCount) transcription entries. This action cannot be undone.")
+            AppText("This will permanently delete all {0} transcription entries. This action cannot be undone.", arguments: [String(describing: self.historyStore.totalEntryCount)])
         }
-        .alert("Draft saved on this Mac", isPresented: self.$showReportConfirmation) {
-            Button("OK", role: .cancel) {}
+        .alert(AppLanguage.text("Draft saved on this Mac"), isPresented: self.$showReportConfirmation) {
+            AppButton("OK", role: .cancel) {}
         } message: {
-            Text("The example stays on this Mac. Nothing was sent.")
+            AppText("The example stays on this Mac. Nothing was sent.")
         }
         .sheet(item: self.$selectedReportEntry) { entry in
             TranscriptionFeedbackReportSheet(entry: entry) {
@@ -117,7 +140,7 @@ struct TranscriptionHistoryView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
 
-            TextField("Search captions...", text: self.$searchQuery)
+            TextField(AppLanguage.text("Search captions..."), text: self.$searchQuery)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
 
@@ -165,8 +188,12 @@ struct TranscriptionHistoryView: View {
 
     private func historyWindowName(_ entry: TranscriptionHistoryEntry) -> String {
         let window = entry.windowTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !window.isEmpty, window != "Unknown" { return window }
-        if self.historySourceName(entry) == "Theater" { return "Captions" }
+        if !window.isEmpty, window != "Unknown" {
+            return window
+        }
+        if self.historySourceName(entry) == "Theater" {
+            return "Captions"
+        }
         return window.isEmpty ? "Unknown" : window
     }
 
@@ -224,7 +251,7 @@ struct TranscriptionHistoryView: View {
                         Image(systemName: "waveform")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundStyle(isSelected ? .white.opacity(0.8) : self.theme.palette.accent)
-                            .help("Saved local dictation audio")
+                            .help(AppLanguage.text("Saved local dictation audio"))
                     }
 
                     if entry.aiProcessingError != nil {
@@ -269,13 +296,13 @@ struct TranscriptionHistoryView: View {
                 Button {
                     self.copyToClipboard(entry.rawText)
                 } label: {
-                    Label("Copy Raw Text", systemImage: "doc.on.doc.fill")
+                    AppLabel("Copy Raw Text", systemImage: "doc.on.doc.fill")
                 }
 
                 Button {
                     self.copyToClipboard(self.combinedText(for: entry))
                 } label: {
-                    Label("Copy Both", systemImage: "doc.on.doc")
+                    AppLabel("Copy Both", systemImage: "doc.on.doc")
                 }
             }
 
@@ -285,13 +312,13 @@ struct TranscriptionHistoryView: View {
                 Button {
                     self.exportPair(entry)
                 } label: {
-                    Label("Export Pair...", systemImage: "square.and.arrow.up")
+                    AppLabel("Export Pair...", systemImage: "square.and.arrow.up")
                 }
 
                 Button {
                     self.revealAudio(entry)
                 } label: {
-                    Label("Reveal Audio", systemImage: "waveform")
+                    AppLabel("Reveal Audio", systemImage: "waveform")
                 }
             }
 
@@ -300,20 +327,15 @@ struct TranscriptionHistoryView: View {
             Button {
                 self.openFeedbackReport(for: entry)
             } label: {
-                Label("Report Bad Result...", systemImage: "hand.thumbsup.slash")
+                AppLabel("Report Bad Result...", systemImage: "hand.thumbsup.slash")
             }
 
             Divider()
 
             Button(role: .destructive) {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    self.historyStore.deleteEntry(id: entry.id)
-                    if self.selectedEntryID == entry.id {
-                        self.selectedEntryID = self.filteredEntries.first(where: { $0.id != entry.id })?.id
-                    }
-                }
+                self.entryPendingDeletion = entry
             } label: {
-                Label("Delete", systemImage: "trash")
+                AppLabel("Delete", systemImage: "trash")
             }
         }
     }
@@ -363,7 +385,7 @@ struct TranscriptionHistoryView: View {
 
             HStack {
                 // Stats
-                Text("\(self.historyStore.totalEntryCount) entries")
+                AppText("{0} entries", arguments: [String(describing: self.historyStore.totalEntryCount)])
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.tertiary)
 
@@ -374,7 +396,7 @@ struct TranscriptionHistoryView: View {
                     Button {
                         self.showClearConfirmation = true
                     } label: {
-                        Text("Clear All")
+                        AppText("Clear All")
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
@@ -395,7 +417,7 @@ struct TranscriptionHistoryView: View {
                 // Header
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        Text("Transcription Details")
+                        AppText("Transcription Details")
                             .font(.system(size: 18, weight: .semibold))
 
                         Spacer()
@@ -413,7 +435,7 @@ struct TranscriptionHistoryView: View {
                             Button {
                                 self.exportPair(entry)
                             } label: {
-                                Label("Export Pair", systemImage: "square.and.arrow.up")
+                                AppLabel("Export Pair", systemImage: "square.and.arrow.up")
                                     .font(.system(size: 12, weight: .medium))
                             }
                             .buttonStyle(.bordered)
@@ -422,7 +444,7 @@ struct TranscriptionHistoryView: View {
                             Button {
                                 self.revealAudio(entry)
                             } label: {
-                                Label("Audio", systemImage: "waveform")
+                                AppLabel("Audio", systemImage: "waveform")
                                     .font(.system(size: 12, weight: .medium))
                             }
                             .buttonStyle(.bordered)
@@ -432,18 +454,18 @@ struct TranscriptionHistoryView: View {
                         Button {
                             self.openFeedbackReport(for: entry)
                         } label: {
-                            Label("Report", systemImage: "hand.thumbsup.slash")
+                            AppLabel("Report", systemImage: "hand.thumbsup.slash")
                                 .font(.system(size: 12, weight: .medium))
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
-                        .help("Review and send this example to \(ConnectingCaptionsProduct.displayName)")
+                        .help(AppLanguage.format("Review and send this example to {0}", String(describing: ConnectingCaptionsProduct.displayName)))
 
                         if entry.wasAIProcessed {
                             Button {
                                 self.copyToClipboard(entry.rawText)
                             } label: {
-                                Label("Raw", systemImage: "doc.on.doc.fill")
+                                AppLabel("Raw", systemImage: "doc.on.doc.fill")
                                     .font(.system(size: 12, weight: .medium))
                             }
                             .buttonStyle(.bordered)
@@ -452,7 +474,7 @@ struct TranscriptionHistoryView: View {
                             Button {
                                 self.copyToClipboard(self.combinedText(for: entry))
                             } label: {
-                                Label("Both", systemImage: "doc.on.doc")
+                                AppLabel("Both", systemImage: "doc.on.doc")
                                     .font(.system(size: 12, weight: .medium))
                             }
                             .buttonStyle(.bordered)
@@ -473,7 +495,7 @@ struct TranscriptionHistoryView: View {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(Color.orange)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("AI Enhancement failed - raw transcription was typed instead")
+                            AppText("AI Enhancement failed - raw transcription was typed instead")
                                 .font(.system(size: 12, weight: .semibold))
                             Text(aiError)
                                 .font(.system(size: 11))
@@ -496,19 +518,19 @@ struct TranscriptionHistoryView: View {
                 if let pairs = entry.captionPairs, !pairs.isEmpty {
                     self.captionPairsSection(pairs)
                     HStack(spacing: 8) {
-                        Button("Export bilingual") {
+                        AppButton("Export bilingual") {
                             self.exportCaptionPairs(pairs, format: .bilingualText)
                         }
-                        Button("Export SRT") {
+                        AppButton("Export SRT") {
                             self.exportCaptionPairs(pairs, format: .srt)
                         }
-                        Button("Export VTT") {
+                        AppButton("Export VTT") {
                             self.exportCaptionPairs(pairs, format: .vtt)
                         }
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
-                    Text(TheaterReadiness.timedExportHonesty)
+                    AppText(TheaterReadiness.timedExportHonesty)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -516,7 +538,7 @@ struct TranscriptionHistoryView: View {
 
                 // Final Text Section
                 self.detailSection(
-                    title: "Final Text",
+                    title: AppLanguage.text("Final Text"),
                     content: entry.processedText,
                     badge: entry.wasAIProcessed ? "AI Enhanced" : nil
                 )
@@ -524,7 +546,7 @@ struct TranscriptionHistoryView: View {
                 // Raw Text Section (only if different)
                 if entry.wasAIProcessed {
                     self.detailSection(
-                        title: "Original Transcription",
+                        title: AppLanguage.text("Original Transcription"),
                         content: entry.rawText,
                         badge: nil,
                         isSecondary: true
@@ -543,13 +565,9 @@ struct TranscriptionHistoryView: View {
                 HStack {
                     Spacer()
                     Button(role: .destructive) {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            let nextEntry = self.filteredEntries.first(where: { $0.id != entry.id })
-                            self.historyStore.deleteEntry(id: entry.id)
-                            self.selectedEntryID = nextEntry?.id
-                        }
+                        self.entryPendingDeletion = entry
                     } label: {
-                        Label("Delete Entry", systemImage: "trash")
+                        AppLabel("Delete Entry", systemImage: "trash")
                             .font(.system(size: 12, weight: .medium))
                     }
                     .buttonStyle(.bordered)
@@ -570,7 +588,7 @@ struct TranscriptionHistoryView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Text(title)
+                AppText(title)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .textCase(.uppercase)
@@ -604,7 +622,7 @@ struct TranscriptionHistoryView: View {
 
     private func metadataGrid(_ entry: TranscriptionHistoryEntry) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Details")
+            AppText("Details")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
@@ -658,7 +676,7 @@ struct TranscriptionHistoryView: View {
                 .frame(width: 20)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(label)
+                AppText(label)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.tertiary)
 
@@ -730,29 +748,33 @@ struct TranscriptionHistoryView: View {
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
 
+    /// Runs off the main thread: zipping a pair is a child process, and
+    /// doing it inline would beachball the window until `zip` returned.
     private func exportPair(_ entry: TranscriptionHistoryEntry) {
-        do {
-            guard self.hasAudio(entry) else { throw DictationAudioHistoryError.audioMissing }
-            let panel = NSSavePanel()
-            panel.canCreateDirectories = true
-            panel.allowedContentTypes = [.zip]
-            panel.nameFieldStringValue = DictationAudioHistoryStore.shared.suggestedPairExportFilename(for: entry)
+        Task { @MainActor in
+            do {
+                guard self.hasAudio(entry) else { throw DictationAudioHistoryError.audioMissing }
+                let panel = NSSavePanel()
+                panel.canCreateDirectories = true
+                panel.allowedContentTypes = [.zip]
+                panel.nameFieldStringValue = DictationAudioHistoryStore.shared.suggestedPairExportFilename(for: entry)
 
-            guard panel.runModal() == .OK, let url = panel.url else { return }
-            try DictationAudioHistoryStore.shared.exportPair(entry: entry, to: url)
-        } catch {
-            let alert = NSAlert()
-            alert.messageText = "Pair Export Failed"
-            alert.informativeText = error.localizedDescription
-            alert.alertStyle = .critical
-            alert.addButton(withTitle: "OK")
-            alert.runModal()
+                guard panel.runModal() == .OK, let url = panel.url else { return }
+                try await DictationAudioHistoryStore.shared.exportPair(entry: entry, to: url)
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = "Pair Export Failed"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .critical
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
         }
     }
 
     private func captionPairsSection(_ pairs: [CaptionHistoryPair]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Captions")
+            AppText("Captions")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)
@@ -788,10 +810,13 @@ struct TranscriptionHistoryView: View {
         case .vtt:
             text = TheaterCaptionExport.vtt(pairs: pairs)
             ext = "vtt"
+        case .qualityReview:
+            text = TheaterCaptionExport.qualityReview(pairs: pairs)
+            ext = "jsonl"
         }
         guard !text.isEmpty else { return }
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.plainText]
+        panel.allowedContentTypes = [UTType(filenameExtension: ext, conformingTo: .plainText) ?? .plainText]
         panel.nameFieldStringValue = TheaterCaptionExport.savePanelName(extension: ext)
         guard panel.runModal() == .OK, let url = panel.url else { return }
         try? text.write(to: url, atomically: true, encoding: .utf8)
@@ -805,7 +830,7 @@ struct TranscriptionHistoryView: View {
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(.tertiary)
 
-            Text("Select a transcription")
+            AppText("Select a transcription")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.secondary)
         }
@@ -838,20 +863,20 @@ private struct TranscriptionFeedbackReportSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Save a local example")
+                AppText("Save a local example")
                     .font(.system(size: 18, weight: .semibold))
-                Text("Speech stays on this Mac. A draft is copied so you can attach it to a GitHub issue.")
+                AppText("Speech stays on this Mac. A draft is copied so you can attach it to a GitHub issue.")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
 
-            self.feedbackField(title: "Raw Text", text: self.$inputText, height: 88)
-            self.feedbackField(title: "Processed Text", text: self.$outputText, height: 88)
-            self.feedbackField(title: "Processing Model", text: self.$processingModel, height: 40)
-            self.feedbackField(title: "Comment optional", text: self.$comment, height: 72)
+            self.feedbackField(title: AppLanguage.text("Raw Text"), text: self.$inputText, height: 88)
+            self.feedbackField(title: AppLanguage.text("Processed Text"), text: self.$outputText, height: 88)
+            self.feedbackField(title: AppLanguage.text("Processing Model"), text: self.$processingModel, height: 40)
+            self.feedbackField(title: AppLanguage.text("Comment optional"), text: self.$comment, height: 72)
 
             if let errorMessage {
-                Text(errorMessage)
+                AppText(errorMessage)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
@@ -859,7 +884,7 @@ private struct TranscriptionFeedbackReportSheet: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") {
+                AppButton("Cancel") {
                     self.dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
@@ -918,7 +943,7 @@ private struct TranscriptionFeedbackReportSheet: View {
 
     private func feedbackField(title: String, text: Binding<String>, height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title)
+            AppText(title)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.secondary)
                 .textCase(.uppercase)

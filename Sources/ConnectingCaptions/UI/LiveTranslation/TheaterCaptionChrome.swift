@@ -6,6 +6,7 @@ enum TheaterExportFormat {
     case bilingualText
     case srt
     case vtt
+    case qualityReview
 }
 
 @MainActor
@@ -33,7 +34,7 @@ final class PresenterCaptionModel: ObservableObject {
     @Published var overlayToolsPinned: Bool = false
     /// True while Overlay is waiting for a caption rectangle. Clicks stay on the window.
     @Published var isPlacingOverlay: Bool = false
-    /// The live frame would survive Overlay. Keep text here stays off until this is true.
+    /// The live frame would survive Overlay. Lock text area stays off until this is true.
     @Published var canConfirmOverlayPlacement: Bool = false
     /// Pointer is over the fading Overlay tool bar.
     @Published var overlayDockEngaged: Bool = false
@@ -124,8 +125,8 @@ enum TheaterPresentationStyle: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .popup: return "Pop-up"
-        case .transparent: return "Overlay"
+        case .popup: return AppLanguage.text("Pop-up")
+        case .transparent: return AppLanguage.text("Overlay")
         }
     }
 
@@ -161,8 +162,8 @@ enum TheaterAppearance: String, CaseIterable, Identifiable {
 
     var displayName: String {
         switch self {
-        case .dark: return "Dark"
-        case .light: return "Light"
+        case .dark: return AppLanguage.text("Dark")
+        case .light: return AppLanguage.text("Light")
         }
     }
 

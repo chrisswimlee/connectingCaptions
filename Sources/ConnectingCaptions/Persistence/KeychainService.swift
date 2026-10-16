@@ -41,7 +41,14 @@ final class KeychainService {
     private let testingBackend: TestingBackend?
 
     private init() {
-        self.testingBackend = nil
+        if SettingsStore.isRunningTests {
+            // Hosted app startup also reads this singleton before test methods run.
+            // Keep those reads and migrations away from the user's real credentials.
+            var keys: [String: String] = [:]
+            self.testingBackend = TestingBackend(load: { keys }, save: { keys = $0 })
+        } else {
+            self.testingBackend = nil
+        }
     }
 
     init(
@@ -103,6 +110,7 @@ final class KeychainService {
     }
 
     func legacyProviderEntries() throws -> [String: String] {
+        guard self.testingBackend == nil else { return [:] }
         self.ioLock.lock()
         defer { self.ioLock.unlock() }
         var result: [String: String] = [:]
@@ -160,6 +168,7 @@ final class KeychainService {
     }
 
     func removeLegacyEntries(providerIDs: [String] = []) throws {
+        guard self.testingBackend == nil else { return }
         self.ioLock.lock()
         defer { self.ioLock.unlock() }
         let targets: [String]

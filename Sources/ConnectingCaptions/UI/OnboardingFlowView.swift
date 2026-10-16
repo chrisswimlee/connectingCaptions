@@ -11,6 +11,7 @@ import SwiftUI
 
 struct OnboardingFlowView: View {
     @EnvironmentObject var appServices: AppServices
+    @ObservedObject private var languageCapabilities = LiveTranslationController.shared
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     var asr: ASRService {
         self.appServices.asr
@@ -96,15 +97,15 @@ struct OnboardingFlowView: View {
         var title: String {
             switch self {
             case .landing:
-                return "Welcome"
+                return AppLanguage.text("Welcome")
             case .language:
-                return "Choose Language"
+                return AppLanguage.text("Choose Language")
             case .voiceModel:
-                return "Choose Voice Engine"
+                return AppLanguage.text("Choose Voice Engine")
             case .permissions:
-                return "Enable Access"
+                return AppLanguage.text("Enable Access")
             case .playground:
-                return "Try Theater"
+                return AppLanguage.text("Try Theater")
             }
         }
 
@@ -113,11 +114,11 @@ struct OnboardingFlowView: View {
             case .landing:
                 return ConnectingCaptionsProduct.tagline
             case .language:
-                return "Pick the language you speak, then the one you want."
+                return AppLanguage.text("Pick the language you speak, then the one you want.")
             case .voiceModel:
-                return "Apple Speech is ready on this Mac. Nothing to download."
+                return AppLanguage.text("Apple Speech is ready on this Mac. Nothing to download.")
             case .permissions:
-                return "Theater captions need the microphone."
+                return AppLanguage.text("Theater captions need the microphone.")
             case .playground:
                 return TheaterReadiness.openTheaterPressListen
             }
@@ -154,7 +155,10 @@ struct OnboardingFlowView: View {
 
     var selectedLanguageRoutes: [VoiceEngineLanguageRoute] {
         VoiceEngineLanguageCatalog.routes(for: self.selectedOnboardingLanguage)
-            .filter { SettingsStore.SpeechModel.availableModels.contains($0.model) }
+            .filter {
+                SettingsStore.SpeechModel.availableModels.contains($0.model)
+                    && VoiceEngineLanguageCatalog.supports($0.model, languageID: self.selectedLanguageID)
+            }
     }
 
     func preferredRoute(in routes: [VoiceEngineLanguageRoute]) -> VoiceEngineLanguageRoute? {
@@ -433,12 +437,13 @@ struct OnboardingFlowView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             self.syncOnboardingSelectionFromSettings()
             self.refreshOnboardingMicrophoneAuthorization()
+            Task { await AppleSpeechLiveCapability.refreshAnalyzer() }
         }
     }
 
     var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Welcome to \(ConnectingCaptionsProduct.displayName)")
+            AppText("Welcome to {0}", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                 .font(self.theme.typography.title)
                 .foregroundStyle(self.theme.palette.primaryText)
 
@@ -451,11 +456,11 @@ struct OnboardingFlowView: View {
                 .foregroundStyle(self.theme.palette.secondaryText)
 
             HStack {
-                Text("Step \(self.visibleStepIndex + 1) of \(self.visibleSteps.count)")
+                AppText("Step {0} of {1}", arguments: [String(describing: self.visibleStepIndex + 1), String(describing: self.visibleSteps.count)])
                     .font(self.theme.typography.captionStrong)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(self.step.title)
+                AppText(self.step.title)
                     .font(self.theme.typography.captionStrong)
                     .foregroundStyle(self.theme.palette.accent)
             }
@@ -600,6 +605,8 @@ struct OnboardingFlowView: View {
     }
 
     func refreshOnboardingLanguagePack() async {
+        await AppleSpeechLiveCapability.refreshAnalyzer()
+        await LiveTranslationController.shared.refreshPackAvailability()
         await self.refreshLanguagePackAvailability()
     }
 
@@ -851,19 +858,19 @@ struct OnboardingMicrophoneSetupPanel: View {
 
         VStack(spacing: 0) {
             HStack(spacing: 14) {
-                Text("Select your microphone")
+                AppText("Select your microphone")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.58))
 
                 Spacer(minLength: 12)
 
                 if self.devices.isEmpty {
-                    Text("No microphone available")
+                    AppText("No microphone available")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(Color.orange.opacity(0.9))
                 } else {
                     Picker(
-                        "Input microphone",
+                        AppLanguage.text("Input microphone"),
                         selection: Binding(
                             get: { self.selectedUID },
                             set: self.onSelect
@@ -877,7 +884,7 @@ struct OnboardingMicrophoneSetupPanel: View {
                     .pickerStyle(.menu)
                     .frame(width: 248)
                     .tint(.white)
-                    .accessibilityHint("Moves the selected microphone to first in \(ConnectingCaptionsProduct.displayName) priority")
+                    .accessibilityHint(AppLanguage.format("Moves the selected microphone to first in {0} priority", String(describing: ConnectingCaptionsProduct.displayName)))
                 }
             }
             .padding(.horizontal, 18)
@@ -916,7 +923,7 @@ struct OnboardingMicrophoneSetupPanel: View {
                 }
                 .frame(width: 248)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Microphone input level")
+                .accessibilityLabel(AppLanguage.text("Microphone input level"))
                 .accessibilityValue("\(Int((self.level * 100).rounded())) percent")
             }
             .padding(.horizontal, 18)

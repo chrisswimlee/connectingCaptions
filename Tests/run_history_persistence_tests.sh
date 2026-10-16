@@ -11,6 +11,7 @@ trap 'rm -rf "$task_test_dir"' EXIT
 sdk_path=$(xcrun --sdk macosx --show-sdk-path)
 xcrun swiftc -O -sdk "$sdk_path" -framework AppKit -framework Foundation \
     "$task_repo_dir/Sources/ConnectingCaptions/Persistence/AppSupportDirectory.swift" \
+    "$task_repo_dir/Sources/ConnectingCaptions/Services/LiveTranslation/CaptionSpeechTiming.swift" \
     "$task_repo_dir/Sources/ConnectingCaptions/Persistence/TranscriptionHistoryDatabase.swift" \
     "$task_repo_dir/Sources/ConnectingCaptions/Persistence/TranscriptionHistoryStore.swift" \
     "$task_repo_dir/Tests/HistoryPersistenceBoundaryTests.swift" \

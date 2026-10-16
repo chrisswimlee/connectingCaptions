@@ -668,7 +668,7 @@ struct BottomOverlayView: View {
     private var modeSelectorTrigger: some View {
         HStack(spacing: 5) {
             if !self.isCompactControls {
-                Text("Mode:")
+                AppText("Mode:")
                     .font(.system(size: self.promptSelectorFontSize, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
                     .lineLimit(1)
@@ -733,7 +733,7 @@ struct BottomOverlayView: View {
                     alignment: .leading
                 )
             if self.isAppPromptOverrideActive {
-                Text("App")
+                AppText("App")
                     .font(.system(size: max(self.promptSelectorFontSize - 2, 8), weight: .semibold))
                     .foregroundStyle(.white.opacity(0.9))
                     .padding(.horizontal, 5)
@@ -759,7 +759,7 @@ struct BottomOverlayView: View {
         )
         .overlay(alignment: .top) {
             if self.isHoveringPromptChip, self.isPromptSelectableMode, !self.contentState.isProcessing {
-                Text("Select cleanup mode")
+                AppText("Select cleanup mode")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.9))
                     .padding(.horizontal, 8)
@@ -776,7 +776,7 @@ struct BottomOverlayView: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Select cleanup mode")
+        .accessibilityLabel(AppLanguage.text("Select cleanup mode"))
     }
 
     private var promptSelectorView: some View {
@@ -829,7 +829,7 @@ struct BottomOverlayView: View {
         )
         .overlay(alignment: .top) {
             if self.isHoveringActionsChip, !actionsDisabled {
-                Text("Actions")
+                AppText("Actions")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.9))
                     .padding(.horizontal, 8)
@@ -846,7 +846,7 @@ struct BottomOverlayView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Actions")
+        .accessibilityLabel(AppLanguage.text("Actions"))
     }
 
     private var actionsSelectorView: some View {
@@ -903,7 +903,7 @@ struct BottomOverlayView: View {
             self.closeActionsMenu()
             self.contentState.onOpenPreferencesRequested?()
         }
-        .help("Open Preferences")
+        .help(AppLanguage.text("Open Preferences"))
     }
 
     private func failureIconButton(systemName: String, help: String, action: @escaping () -> Void) -> some View {
@@ -1204,7 +1204,7 @@ struct BottomOverlayView: View {
                                 (self.appServices.asr.isLoadingModel || self.appServices.asr.isDownloadingModel)
                                 && self.settings.overlaySize != .small
                             {
-                                Text("Loading model…")
+                                AppText("Loading model…")
                                     .font(.system(size: max(self.layout.modeFontSize - 2, 9), weight: .medium))
                                     .foregroundStyle(.orange.opacity(0.85))
                                     .lineLimit(1)

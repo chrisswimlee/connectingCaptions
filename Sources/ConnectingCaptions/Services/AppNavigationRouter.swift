@@ -3,6 +3,9 @@ import Foundation
 enum AppNavigationDestination {
     case aiEnhancements
     case history
+    case audioSettings
+    case voiceEngine
+    case languagePacks
 }
 
 @MainActor

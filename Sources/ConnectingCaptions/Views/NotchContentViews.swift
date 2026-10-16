@@ -648,7 +648,7 @@ struct NotchExpandedView: View {
             guard isEnabled else { return }
             action()
         }) {
-            Text(title)
+            AppText(title)
                 .font(.system(size: 9, weight: isSelected ? .semibold : .medium))
                 .foregroundStyle(.white.opacity(isSelected ? 0.96 : 0.84))
                 .lineLimit(1)
@@ -670,7 +670,7 @@ struct NotchExpandedView: View {
         let promptMode = self.activePromptMode ?? .dictate
         let activeDictationSlot = self.activeDictationShortcutSlot
         return VStack(alignment: .leading, spacing: 2) {
-            Text("AI Prompt")
+            AppText("AI Prompt")
                 .font(.system(size: 8, weight: .semibold))
                 .foregroundStyle(Color.white.opacity(0.42))
                 .padding(.horizontal, 6)
@@ -772,7 +772,7 @@ struct NotchExpandedView: View {
                     .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(self.isHoveringPromptChip ? .white.opacity(0.78) : .white.opacity(0.62))
                 if self.isAppPromptOverrideActive {
-                    Text("App")
+                    AppText("App")
                         .font(.system(size: 8, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.82))
                         .padding(.horizontal, 3)
@@ -905,7 +905,7 @@ struct NotchExpandedView: View {
                                 .frame(width: 16, height: 16)
                         }
                         .buttonStyle(.plain)
-                        .help("Try again")
+                        .help(AppLanguage.text("Try again"))
                     }
 
                     Button {
@@ -917,7 +917,7 @@ struct NotchExpandedView: View {
                             .frame(width: 16, height: 16)
                     }
                     .buttonStyle(.plain)
-                    .help("Dismiss")
+                    .help(AppLanguage.text("Dismiss"))
                 }
                 .foregroundStyle(.white.opacity(0.9))
                 .frame(width: self.previewMaxWidth, alignment: .leading)

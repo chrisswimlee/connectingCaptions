@@ -40,7 +40,7 @@ struct TheaterTalkPackCard: View {
 
     private var talkCopy: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Talk notes")
+            AppText("Talk notes")
                 .font(self.theme.typography.bodyStrong)
             Text(self.statusLine)
                 .font(self.theme.typography.bodySmall)
@@ -64,7 +64,7 @@ struct TheaterTalkPackCard: View {
             .buttonStyle(.theaterText)
             .accessibilityIdentifier("theater.talkPack.import")
             if self.settings.hasTheaterTalkPack {
-                Button("Remove") {
+                AppButton("Remove") {
                     self.settings.clearTheaterTalkPack()
                     self.loadError = nil
                 }
@@ -101,7 +101,7 @@ struct TheaterTalkPackCard: View {
                                     }
                                     .buttonStyle(.plain)
                                     .foregroundStyle(Color(nsColor: .systemRed))
-                                    .accessibilityLabel("Remove \(term)")
+                                    .accessibilityLabel(AppLanguage.format("Remove {0}", String(describing: term)))
                                 }
                             }
                         }
@@ -112,11 +112,11 @@ struct TheaterTalkPackCard: View {
                 .accessibilityIdentifier("theater.talkPack.allNames")
             }
             HStack(spacing: 8) {
-                TextField("Add a name", text: self.$newTerm)
+                TextField(AppLanguage.text("Add a name"), text: self.$newTerm)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { self.addTerm() }
                     .accessibilityIdentifier("theater.talkPack.addField")
-                Button("Add") { self.addTerm() }
+                AppButton("Add") { self.addTerm() }
                     .buttonStyle(.theaterText)
                     .disabled(
                         self.newTerm.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -125,7 +125,7 @@ struct TheaterTalkPackCard: View {
                     .accessibilityIdentifier("theater.talkPack.add")
             }
             if self.settings.hasTheaterTalkPack {
-                Text(TheaterReadiness.talkPackCarryOver)
+                AppText(TheaterReadiness.talkPackCarryOver)
                     .font(self.theme.typography.caption)
                     .foregroundStyle(self.theme.palette.secondaryText)
             }

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 #if canImport(Speech)
 import Speech
@@ -55,15 +56,29 @@ struct VoiceEngineLanguageRoute: Identifiable, Equatable {
     }
 }
 
-/// What Apple Speech Analyzer actually supports on this Mac, refreshed asynchronously
-/// from `SpeechTranscriber.supportedLocales`. The static maps in
-/// `VoiceEngineLanguageCatalog` are a hopeful per-OS-version guess (e.g. Thai); this
-/// cache is the live, per-machine truth `supports(_:languageID:)` intersects against.
-/// `nil` means "not refreshed yet" — callers should trust the static catalog until a
-/// refresh completes, not treat it as "nothing is supported."
+/// Per-Mac speech capabilities, independent of built-in engine installation.
+/// Legacy support requires offline recognition; Analyzer also tracks downloaded assets.
+/// The catalog can describe prospective routes before refresh, while readiness and
+/// visible choices require confirmed support from this cache.
 enum AppleSpeechLiveCapability {
     private static let lock = NSLock()
     private static var _analyzerLanguagePrefixes: Set<String>?
+    private static var _installedAnalyzerLanguagePrefixes: Set<String>?
+    private static var _legacyLanguagePrefixes: Set<String>?
+
+    static let didRefresh = Notification.Name("VoiceEngineLanguageSupportDidRefresh")
+
+    static var installedAnalyzerLanguagePrefixes: Set<String>? {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        return self._installedAnalyzerLanguagePrefixes
+    }
+
+    static var legacyLanguagePrefixes: Set<String>? {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        return self._legacyLanguagePrefixes
+    }
 
     static var analyzerLanguagePrefixes: Set<String>? {
         self.lock.lock()
@@ -71,19 +86,64 @@ enum AppleSpeechLiveCapability {
         return self._analyzerLanguagePrefixes
     }
 
+    @MainActor
+    static func requestLegacyAccess() {
+        if SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+            SFSpeechRecognizer.requestAuthorization { _ in
+                Task { @MainActor in await self.refreshAnalyzer() }
+            }
+        } else if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_SpeechRecognition") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
     /// Safe to call repeatedly (app launch, Voice Engine settings appearing) — each
     /// call replaces the cache with a fresh read rather than accumulating state.
+    @MainActor
     static func refreshAnalyzer() async {
         #if canImport(Speech)
+        let legacy: Set<String>? = SFSpeechRecognizer.authorizationStatus() == .authorized
+            ? Set(TranslationLanguageCatalog.all.compactMap { language in
+                guard let identifier = VoiceEngineLanguageCatalog.appleSpeechLegacyLocaleIdentifier(for: language.id),
+                      SFSpeechRecognizer(locale: Locale(identifier: identifier))?.supportsOnDeviceRecognition == true
+                else { return nil }
+                return language.id
+            }) : nil
+        self.storeLegacy(legacy)
+        defer { NotificationCenter.default.post(name: self.didRefresh, object: nil) }
         guard #available(macOS 26.0, *) else { return }
         let supported = await SpeechTranscriber.supportedLocales
+        let installed = await SpeechTranscriber.installedLocales
         let prefixes = Set(supported.map {
             VoiceEngineLanguageCatalog.languagePrefix($0.identifier(.bcp47))
         })
-        self.lock.lock()
-        self._analyzerLanguagePrefixes = prefixes
-        self.lock.unlock()
+        self.storeAnalyzer(supported: prefixes, installed: Set(installed.map {
+            VoiceEngineLanguageCatalog.languagePrefix($0.identifier(.bcp47))
+        }))
         #endif
+    }
+
+    private static func storeAnalyzer(supported: Set<String>, installed: Set<String>) {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        self._analyzerLanguagePrefixes = supported
+        self._installedAnalyzerLanguagePrefixes = installed
+    }
+
+    private static func storeLegacy(_ prefixes: Set<String>?) {
+        self.lock.lock()
+        self._legacyLanguagePrefixes = prefixes
+        self.lock.unlock()
+    }
+
+    static func setLegacyLanguagePrefixesForTesting(_ prefixes: Set<String>?) {
+        self.storeLegacy(prefixes)
+    }
+
+    static func setInstalledAnalyzerLanguagePrefixesForTesting(_ prefixes: Set<String>?) {
+        self.lock.lock()
+        self._installedAnalyzerLanguagePrefixes = prefixes
+        self.lock.unlock()
     }
 
     static func setAnalyzerLanguagePrefixesForTesting(_ prefixes: Set<String>?) {
@@ -249,12 +309,49 @@ enum VoiceEngineLanguageCatalog {
         return nil
     }
 
+    /// `model`'s live-capability cache, one place so a new live-tracked engine
+    /// is wired up here instead of in every switch that cared before.
+    /// Outer `nil`: this model has no live cache, the static route table is
+    /// the only answer. Inner `nil`: tracked, but the cache has not loaded yet.
+    private static func liveLanguagePrefixes(for model: SettingsStore.SpeechModel) -> Set<String>?? {
+        switch model {
+        case .appleSpeech: return .some(AppleSpeechLiveCapability.legacyLanguagePrefixes)
+        case .appleSpeechAnalyzer: return .some(AppleSpeechLiveCapability.analyzerLanguagePrefixes)
+        default: return .none
+        }
+    }
+
+    /// Whether `model`'s language pack for `languageID` (already prefix-normalized
+    /// by callers) is installed on this Mac. `nil` while that is not yet known.
+    static func isLanguageInstalled(_ model: SettingsStore.SpeechModel, languageID: String) -> Bool? {
+        switch model {
+        case .appleSpeech: return true
+        case .appleSpeechAnalyzer: return AppleSpeechLiveCapability.installedAnalyzerLanguagePrefixes?.contains(languageID)
+        default: return model.isInstalled
+        }
+    }
+
+    /// The one answer menus, readiness and Voice Engine cards share.
+    /// `true` confirmed on this Mac, `false` cannot hear it, `nil` not known yet
+    /// (Apple engines before their capability check, or before Speech permission).
+    /// Unknown is offered as "Checking", never hidden and never treated as ready.
+    static func supportStatus(_ model: SettingsStore.SpeechModel, languageID: String) -> Bool? {
+        let prefix = Self.languagePrefix(languageID)
+        guard case let .some(live) = Self.liveLanguagePrefixes(for: model) else {
+            return Self.supports(model, languageID: languageID)
+        }
+        guard let live else {
+            // `supports` falls back to the static route table while the cache is empty.
+            return Self.supports(model, languageID: languageID) ? nil : false
+        }
+        return live.contains(prefix)
+    }
+
     /// True when this Voice Engine can hear the product language, not merely
     /// when its leftover locale string happens to match.
     static func supports(_ model: SettingsStore.SpeechModel, languageID: String) -> Bool {
-        if model == .appleSpeechAnalyzer,
-           let liveSupported = AppleSpeechLiveCapability.analyzerLanguagePrefixes,
-           !liveSupported.contains(Self.languagePrefix(languageID))
+        if case let .some(.some(live)) = Self.liveLanguagePrefixes(for: model),
+           !live.contains(Self.languagePrefix(languageID))
         {
             return false
         }
@@ -276,14 +373,14 @@ enum VoiceEngineLanguageCatalog {
     static func nextFallbackModel(
         after failing: SettingsStore.SpeechModel,
         forLanguageID languageID: String,
-        availableModels: [SettingsStore.SpeechModel] = SettingsStore.SpeechModel.availableModels
+        availableModels: [SettingsStore.SpeechModel] = SettingsStore.SpeechModel.availableModels,
+        readiness: (SettingsStore.SpeechModel, String) -> VoiceEngineLanguageReadiness = VoiceEngineLanguageReadiness.current
     ) -> SettingsStore.SpeechModel? {
         let order = Self.preferredModelOrder(forLanguageID: languageID)
         guard let failingIndex = order.firstIndex(of: failing) else { return nil }
         return order[(failingIndex + 1)...].first { candidate in
             availableModels.contains(candidate)
-                && candidate.isInstalled
-                && Self.supports(candidate, languageID: languageID)
+                && readiness(candidate, languageID) == .ready
         }
     }
 
@@ -294,7 +391,8 @@ enum VoiceEngineLanguageCatalog {
         forLanguageID languageID: String,
         settings: SettingsStore = .shared
     ) -> VoiceEngineLanguageRoute? {
-        guard let language = Self.language(id: languageID) else { return nil }
+        guard let language = Self.language(id: languageID),
+              Self.supports(settings.selectedSpeechModel, languageID: languageID) else { return nil }
         return Self.routes(for: language).first { $0.model == settings.selectedSpeechModel }
     }
 
@@ -302,12 +400,12 @@ enum VoiceEngineLanguageCatalog {
         guard let languageID = routes.first?.language.id else { return nil }
         let order = Self.preferredModelOrder(forLanguageID: languageID)
         for model in order {
-            if let route = routes.first(where: { $0.model == model && model.isInstalled }) {
+            if let route = routes.first(where: { $0.model == model && model.isInstalled && Self.supports(model, languageID: languageID) }) {
                 return route
             }
         }
         for model in order {
-            if let route = routes.first(where: { $0.model == model }) {
+            if let route = routes.first(where: { $0.model == model && Self.supports(model, languageID: languageID) }) {
                 return route
             }
         }
@@ -548,7 +646,7 @@ enum VoiceEngineLanguageCatalog {
         return supported.first { self.languagePrefix($0) == prefix }
     }
 
-    private static func appleSpeechLegacyLocaleIdentifier(for languageID: String) -> String? {
+    static func appleSpeechLegacyLocaleIdentifier(for languageID: String) -> String? {
         guard let preferredLocales = self.appleSpeechLegacyLocalePreferences[languageID] else {
             return nil
         }

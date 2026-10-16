@@ -1,9 +1,8 @@
 import Foundation
 
-/// Drops Whisper YouTube boilerplate and clause-level loops before a line prints.
-/// Single-grapheme emphasis (ㅋㅋㅋㅋ, ㅎㅎ) and short acknowledgements stay.
-/// A short credit is junk only when it is the whole line, so a talk about
-/// subscribing is kept.
+/// Text patterns are evidence of hallucination only with confirmed silent audio.
+/// Real speech and unknown audio evidence preserve quotes, outros, and emphasis.
+/// The capture pipeline separately gates silent chunks before recognition.
 enum CaptionJunkGate {
     /// Long credits. A line that contains one of these is not a caption.
     private static let boilerplate: [String] = [
@@ -37,7 +36,8 @@ enum CaptionJunkGate {
         "yes", "yeah", "yep", "ok", "okay",
     ]
 
-    static func shouldDrop(_ text: String) -> Bool {
+    static func shouldDrop(_ text: String, audioContainsSpeech: Bool? = nil) -> Bool {
+        guard audioContainsSpeech == false else { return false }
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return false }
         if self.isAcknowledgement(trimmed) { return false }

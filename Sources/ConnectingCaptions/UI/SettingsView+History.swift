@@ -5,12 +5,12 @@ extension SettingsView {
     var historySettingsCard: some View {
         ThemedCard(style: .standard) {
             VStack(alignment: .leading, spacing: 14) {
-                FluidSectionHeader(title: "History", systemImage: "clock.arrow.circlepath")
+                FluidSectionHeader(title: AppLanguage.text("History"), systemImage: "clock.arrow.circlepath")
 
                 VStack(spacing: 12) {
                     self.optionToggleRow(
-                        title: "Save Transcription History",
-                        description: "Save transcriptions for stats tracking. Disable for privacy.",
+                        title: AppLanguage.text("Save Transcription History"),
+                        description: AppLanguage.text("Save transcriptions for stats tracking. Disable for privacy."),
                         isOn: Binding(
                             get: { SettingsStore.shared.saveTranscriptionHistory },
                             set: {
@@ -29,8 +29,8 @@ extension SettingsView {
                     Divider().opacity(0.2)
 
                     self.optionToggleRow(
-                        title: "Save Audio With History",
-                        description: "Store actual microphone audio locally with dictation history. Disabled by default.",
+                        title: AppLanguage.text("Save Audio With History"),
+                        description: AppLanguage.text("Store actual microphone audio locally with dictation history. Disabled by default."),
                         isOn: Binding(
                             get: { SettingsStore.shared.saveAudioWithTranscriptionHistory },
                             set: {

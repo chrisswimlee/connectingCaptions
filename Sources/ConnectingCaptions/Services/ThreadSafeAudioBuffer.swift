@@ -22,6 +22,7 @@ nonisolated enum LiveAudioRetention {
 final nonisolated class ThreadSafeAudioBuffer {
     private var buffer: [Float] = []
     private var droppedSampleCount = 0
+    private var captureTimeline = CaptureAudioTimeline()
     private let lock = NSLock()
     private let maximumRetainedSamples: Int
 
@@ -30,12 +31,14 @@ final nonisolated class ThreadSafeAudioBuffer {
     }
 
     /// Appends new samples and drops anything older than the retention cap.
-    func append(_ newSamples: [Float]) {
+    func append(_ newSamples: [Float], hostTime: UInt64 = 0) {
         guard !newSamples.isEmpty else { return }
         self.lock.lock()
         defer { self.lock.unlock() }
+        self.captureTimeline.append(start: self.droppedSampleCount + self.buffer.count, count: newSamples.count, hostTime: hostTime)
         self.buffer.append(contentsOf: newSamples)
         self.dropOverflowLocked()
+        self.captureTimeline.trim(before: self.droppedSampleCount)
     }
 
     func clear(keepingCapacity: Bool = false) {
@@ -43,6 +46,11 @@ final nonisolated class ThreadSafeAudioBuffer {
         defer { self.lock.unlock() }
         self.buffer.removeAll(keepingCapacity: keepingCapacity)
         self.droppedSampleCount = 0
+        self.captureTimeline = CaptureAudioTimeline()
+    }
+
+    var timingSnapshot: CaptureAudioTimeline {
+        self.lock.withLock { self.captureTimeline }
     }
 
     /// Logical samples captured this session, including already-dropped audio.
@@ -73,6 +81,7 @@ final nonisolated class ThreadSafeAudioBuffer {
         guard removeCount > 0 else { return }
         self.buffer.removeFirst(removeCount)
         self.droppedSampleCount += removeCount
+        self.captureTimeline.trim(before: self.droppedSampleCount)
     }
 
     /// First `length` retained samples. Never returns dropped audio.
@@ -115,5 +124,58 @@ final nonisolated class ThreadSafeAudioBuffer {
         let overflow = self.buffer.count - self.maximumRetainedSamples
         self.buffer.removeFirst(overflow)
         self.droppedSampleCount += overflow
+    }
+}
+
+/// Packet anchors preserve real pauses, device discontinuities and Resume's
+/// synthetic silence wall. Only anchors for retained PCM stay in memory.
+nonisolated struct CaptureAudioTimeline {
+    private struct Anchor {
+        var start: Int
+        var count: Int
+        var hostTime: UInt64
+    }
+    private var anchors: [Anchor] = []
+    private var origin: UInt64?
+
+    mutating func append(start: Int, count: Int, hostTime: UInt64) {
+        guard hostTime > 0 else { return }
+        if self.origin == nil { self.origin = hostTime }
+        self.anchors.append(Anchor(start: start, count: count, hostTime: hostTime))
+    }
+
+    mutating func trim(before sample: Int) {
+        self.anchors.removeAll { $0.start + $0.count < sample }
+    }
+
+    func seconds(at sample: Int, isEnd: Bool = false) -> TimeInterval? {
+        guard let origin = self.origin,
+              let anchor = (isEnd
+                ? self.anchors.first(where: { $0.start < sample && sample <= $0.start + $0.count })
+                : self.anchors.last(where: { $0.start <= sample && sample < $0.start + $0.count })),
+              anchor.hostTime >= origin
+        else { return nil }
+        return Double(anchor.hostTime - origin) / LiveTranslationHostClock.ticksPerSecond
+            + Double(sample - anchor.start) / 16_000
+    }
+
+    func map(
+        _ segments: [ASRTimedSegment],
+        sourceStart: Int,
+        removedSilence: PauseIntervalAudio.Prepared? = nil
+    ) -> [ASRTimedSegment] {
+        segments.compactMap { segment in
+            guard segment.start.isFinite, segment.end.isFinite,
+                  segment.start >= 0, segment.end > segment.start,
+                  segment.end < Double(Int.max / 16_000) else { return nil }
+            let decodedStart = Int((segment.start * 16_000).rounded())
+            let decodedEnd = Int((segment.end * 16_000).rounded())
+            let start = removedSilence.map { $0.sourceSample(at: decodedStart) } ?? decodedStart
+            let end = removedSilence.map { $0.sourceSample(at: decodedEnd, isEnd: true) } ?? decodedEnd
+            guard let start, let end,
+                  let from = self.seconds(at: sourceStart + start),
+                  let to = self.seconds(at: sourceStart + end, isEnd: true), to > from else { return nil }
+            return ASRTimedSegment(text: segment.text, start: from, end: to)
+        }
     }
 }

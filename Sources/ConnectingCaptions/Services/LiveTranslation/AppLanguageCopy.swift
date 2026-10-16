@@ -41,7 +41,7 @@ enum AppLanguageCopy {
         case "Share slides": return "shareSlides"
         case "Step %d of %d · %@": return "stepFormat"
         case "Same language": return "sameLanguage"
-        case "Theater mode": return "theaterMode"
+        case "Theater mode", "Caption language": return "theaterMode"
         case "Swap languages": return "swapLanguages"
         case "Either way": return "eitherWay"
         case TheaterReadiness.screenShare: return "screenShare"

@@ -5,217 +5,217 @@ import SwiftUI
 enum TheaterChromeHelp {
     static func tag(_ name: String, does: String, shortcut: String? = nil) -> String {
         if let shortcut {
-            return "\(name) — \(does) \(shortcut)."
+            return AppLanguage.format("{0} — {1} {2}.", AppLanguage.text(name), AppLanguage.text(does), shortcut)
         }
-        return "\(name) — \(does)"
+        return AppLanguage.format("{0} — {1}", AppLanguage.text(name), AppLanguage.text(does))
     }
 
-    static let listen = tag(
+    static var listen: String { tag(
         "Listen",
-        does: "Start the microphone. Each sentence appears when it is ready.",
+        does: AppLanguage.text("Start the microphone. Each sentence appears when it is ready."),
         shortcut: "Control-Option-L"
-    )
-    static let stop = tag(
+    ) }
+    static var stop: String { tag(
         "Stop",
         does: TheaterReadiness.stopHelp,
         shortcut: "Control-Option-L"
-    )
-    static let pause = tag(
+    ) }
+    static var pause: String { tag(
         "Pause",
         does: TheaterReadiness.pauseHelp,
         shortcut: "Control-Option-P"
-    )
-    static let resume = tag(
+    ) }
+    static var resume: String { tag(
         "Resume",
         does: TheaterReadiness.resumeHelp,
         shortcut: "Control-Option-P"
-    )
-    static let iSpeak = tag(
+    ) }
+    static var iSpeak: String { tag(
         "I speak",
-        does: "Language you talk in. Voice Engine follows this."
-    )
-    static let showAs = tag(
+        does: AppLanguage.text("Language you talk in. Voice Engine follows this.")
+    ) }
+    static var showAs: String { tag(
         "Show as",
-        does: "Language printed as the caption title."
-    )
-    static let swapLanguages = tag(
+        does: AppLanguage.text("Language printed as the caption title.")
+    ) }
+    static var swapLanguages: String { tag(
         "Swap languages",
-        does: "Swap I speak and Show as. Stops Listen."
-    )
-    static let eitherWay = tag(
-        "Either way",
-        does: "Speak either language of this pair. Downloads Whisper Small once. Apple Speech stays for one speaker. Stops Listen when changed."
-    )
-    static let mode = tag(
+        does: AppLanguage.text("Swap I speak and Show as. Stops Listen.")
+    ) }
+    static var mode: String { tag(
         "Theater mode",
-        does: "Voice writes what you say. Translate captions into a supported language. Switching stops Listen."
-    )
-    static let retry = tag(
+        does: AppLanguage.text("Voice writes what you say. Translate captions into a supported language. Switching stops Listen.")
+    ) }
+    static var retry: String { tag(
         "Retry",
-        does: "Retry the last failed translation.",
+        does: AppLanguage.text("Retry the last failed translation."),
         shortcut: "Control-Option-R"
-    )
-    static let downloadPack = tag(
+    ) }
+    static var downloadPack: String { tag(
         "Download pack",
-        does: "Download the Apple Translation pack for this pair."
-    )
-    static let captionsOnly = tag(
+        does: AppLanguage.text("Download the Apple Translation pack for this pair.")
+    ) }
+    static var captionsOnly: String { tag(
         "Captions only",
-        does: "Hide the tool bar and the window bar. Move the pointer to show Listen and the other controls."
-    )
-    static let showAllControls = tag(
+        does: AppLanguage.text("Hide the tool bar and the window bar. Move the pointer to show Listen and the other controls.")
+    ) }
+    static var showAllControls: String { tag(
         "Show all controls",
-        does: "Show the tool bar again."
-    )
-    static let minimize = tag(
+        does: AppLanguage.text("Show the tool bar again.")
+    ) }
+    static var minimize: String { tag(
         "Minimize Theater",
         does: TheaterReadiness.minimizeHelp,
         shortcut: "Control-Option-H"
-    )
-    static let expand = tag(
+    ) }
+    static var expand: String { tag(
         "Expand Theater",
-        does: "Show the caption board again.",
+        does: AppLanguage.text("Show the caption board again."),
         shortcut: "Control-Option-H"
-    )
-    static let paceCue = tag(
+    ) }
+    static var paceCue: String { tag(
         "Pace cue",
-        does: "Behind means talk slower. Caught up means the last sentence is on screen."
-    )
-    static let latency = tag(
+        does: AppLanguage.text("Behind means talk slower. Caught up means the last sentence is on screen.")
+    ) }
+    static var latency: String { tag(
         "Latency",
-        does: "Time until the caption. mic is Listen to first audio. e2e is speech-start to the printed caption. ASR is the speech engine. MT is Apple Translation."
-    )
-    static let theme = tag(
+        does: AppLanguage.text("Time until the caption. mic is Listen to first audio. e2e is speech-start to the printed caption. ASR is the speech engine. MT is Apple Translation.")
+    ) }
+    static var theme: String { tag(
         "Theater theme",
-        does: "Dark or Light for this window, independent of the main window."
-    )
-    static let captionFont = tag(
+        does: AppLanguage.text("Dark or Light for this window, independent of the main window.")
+    ) }
+    static var captionFont: String { tag(
         "Caption font",
-        does: "Typeface for spoken and Show-as."
-    )
-    static let smaller = tag(
+        does: AppLanguage.text("Typeface for spoken and Show-as.")
+    ) }
+    static var smaller: String { tag(
         "Smaller captions",
-        does: "Shrink spoken and Show-as.",
+        does: AppLanguage.text("Shrink spoken and Show-as."),
         shortcut: "Control-Option-Minus"
-    )
-    static let larger = tag(
+    ) }
+    static var larger: String { tag(
         "Larger captions",
-        does: "Grow spoken and Show-as.",
+        does: AppLanguage.text("Grow spoken and Show-as."),
         shortcut: "Control-Option-Equals"
-    )
-    static let captionSize = tag(
+    ) }
+    static var captionSize: String { tag(
         "Size",
-        does: "Caption size. Type a point size, or use smaller and larger. Both change spoken and Show-as."
-    )
-    static let copyAll = tag(
+        does: AppLanguage.text("Caption size. Type a point size, or use smaller and larger. Both change spoken and Show-as.")
+    ) }
+    static var copyAll: String { tag(
         "Copy all",
-        does: "Copy every caption on the board.",
+        does: AppLanguage.text("Copy every caption on the board."),
         shortcut: "Control-Option-C"
-    )
-    static let insert = tag(
+    ) }
+    static var insert: String { tag(
         "Type the board",
         does: TheaterReadiness.insertHelp
-    )
-    static let undo = tag(
+    ) }
+    static var undo: String { tag(
         "Undo last caption",
-        does: "Remove the last printed line. Listen can keep going.",
+        does: AppLanguage.text("Remove the last printed line. Listen can keep going."),
         shortcut: "Control-Option-Z"
-    )
-    static let clear = tag(
+    ) }
+    static var clear: String { tag(
         "Clear captions",
         does: TheaterReadiness.clearCaptions,
         shortcut: "Control-Option-K"
-    )
-    static let board = tag(
+    ) }
+    static var board: String { tag(
         "Settings",
-        does: "Copy, type, undo, minimize, theme, Overlay or Pop-up, how lines print, position, export, and close. If Listen is on, Close asks before it stops."
-    )
-    static let popup = tag(
+        does: AppLanguage.text("Copy, type, undo, minimize, theme, Overlay or Pop-up, how lines print, position, export, and close. If Listen is on, Close asks before it stops.")
+    ) }
+    static var popup: String { tag(
         "Pop-up",
-        does: "Solid floating box you can place over slides or a second display."
-    )
-    static let overlay = tag(
+        does: AppLanguage.text("Solid floating box you can place over slides or a second display.")
+    ) }
+    static var overlay: String { tag(
         "Overlay",
-        does: "Only the caption text, in the rectangle you keep. Hover the Tools bar for Listen and the other controls. It fades when you move away. Slides stay clickable.",
+        does: AppLanguage.text("Only the caption text, in the rectangle you keep. Hover the Tools bar for Listen and the other controls. It fades when you move away. Slides stay clickable."),
         shortcut: "Control-Option-T pins the tools"
-    )
-    static let screenShare = tag(
+    ) }
+    static var screenShare: String { tag(
         TheaterReadiness.screenShareTitle,
         does: TheaterReadiness.screenShare
-    )
-    static let captionPlate = tag(
+    ) }
+    static var captionPlate: String { tag(
         "Caption plate",
-        does: "Dark box behind each Overlay line so white slides stay readable."
-    )
-    static let highContrast = tag(
+        does: AppLanguage.text("Dark box behind each Overlay line so white slides stay readable.")
+    ) }
+    static var highContrast: String { tag(
         "High contrast",
-        does: "Stronger board fill and a halo on caption text."
-    )
-    static let spokenLine = tag(
+        does: AppLanguage.text("Stronger board fill and a halo on caption text.")
+    ) }
+    static var spokenLine: String { tag(
         "Spoken line",
         does: TheaterReadiness.spokenLineTranslate
-    )
-    static let exportBilingual = tag(
+    ) }
+    static var exportBilingual: String { tag(
         "Bilingual text",
-        does: "Save spoken and translated lines as a text file."
-    )
-    static let exportSRT = tag(
+        does: AppLanguage.text("Save spoken and translated lines as a text file.")
+    ) }
+    static var exportSRT: String { tag(
         "SRT",
-        does: "Save captions with commit times, not spoken-word times."
-    )
-    static let exportVTT = tag(
+        does: AppLanguage.text("Save captions with speech timestamps when available; older or unmatched captions use estimated timing.")
+    ) }
+    static var exportVTT: String { tag(
         "VTT",
-        does: "Save captions with commit times, not spoken-word times."
-    )
-    static let closeTheater = tag(
+        does: AppLanguage.text("Save captions with speech timestamps when available; older or unmatched captions use estimated timing.")
+    ) }
+    static var closeTheater: String { tag(
         "Close Theater",
-        does: "Hides Theater. If the microphone is on, this asks before it stops. Printed lines come back when you open it again. Talk notes stay."
-    )
-    static let talkNotes = tag(
+        does: AppLanguage.text("Hides Theater. If the microphone is on, this asks before it stops. Printed lines come back when you open it again. Talk notes stay.")
+    ) }
+    static var talkNotes: String { tag(
         "Talk notes",
-        does: "Names locked from notes or a deck. They stay on this Mac."
-    )
-    static let clearTalkNotes = tag(
+        does: AppLanguage.text("Names locked from notes or a deck. They stay on this Mac.")
+    ) }
+    static var clearTalkNotes: String { tag(
         "Clear talk notes",
-        does: "Remove these names so they do not carry into the next talk."
-    )
-    static let status = tag(
+        does: AppLanguage.text("Remove these names so they do not carry into the next talk.")
+    ) }
+    static var status: String { tag(
         "Status",
-        does: "Listen, pack, or engine messages for this board."
-    )
-    static let inbox = tag(
+        does: AppLanguage.text("Listen, pack, or engine messages for this board.")
+    ) }
+    static var inbox: String { tag(
         "Incoming",
-        does: "The last few things you said. Each line leaves this bar when it prints on the board once."
-    )
-    static let overlayTools = tag(
+        does: AppLanguage.text("The last few things you said. Each line leaves this bar when it prints on the board once.")
+    ) }
+    static var overlayTools: String { tag(
         "Overlay tools",
-        does: "Show Overlay Listen and board tools.",
+        does: AppLanguage.text("Show Overlay Listen and board tools."),
         shortcut: "Control-Option-T"
-    )
-    static let keepOverlayText = tag(
-        "Keep text here",
-        does: "Save this rectangle. The Tools bar fades until you hover the top, and slides stay clickable."
-    )
-    static let fillScreen = tag(
+    ) }
+    static var keepOverlayText: String { tag(
+        "Lock text area",
+        does: AppLanguage.text("Save this position and size. Captions stay inside this area, and dragging or resizing is disabled until you unlock it.")
+    ) }
+    static var unlockOverlayText: String { tag(
+        "Unlock text area",
+        does: AppLanguage.text("Drag the text area to move it and drag its edges or corners to resize it. Lock text area when it fits.")
+    ) }
+    static var fillScreen: String { tag(
         "Fill screen",
-        does: "Cover this display so captions have the whole board."
-    )
-    static let lowerThird = tag(
+        does: AppLanguage.text("Cover this display so captions have the whole board.")
+    ) }
+    static var lowerThird: String { tag(
         "Lower third",
-        does: "Place the board on the bottom third of this display."
-    )
-    static let topBand = tag(
+        does: AppLanguage.text("Place the board on the bottom third of this display.")
+    ) }
+    static var topBand: String { tag(
         "Top band",
-        does: "Place the board on the top third of this display."
-    )
-    static let sideColumn = tag(
+        does: AppLanguage.text("Place the board on the top third of this display.")
+    ) }
+    static var sideColumn: String { tag(
         "Side column",
-        does: "Place the board as a column on the right of this display."
-    )
-    static let captionBar = tag(
+        does: AppLanguage.text("Place the board as a column on the right of this display.")
+    ) }
+    static var captionBar: String { tag(
         "Caption bar",
-        does: "Last few lines along the bottom, like TV captions. Drag the bar to put it somewhere else."
-    )
+        does: AppLanguage.text("Last few lines along the bottom, like TV captions. Drag the bar to put it somewhere else.")
+    ) }
 
     static func position(_ preset: TheaterPositionPreset) -> String {
         switch preset {
@@ -227,14 +227,14 @@ enum TheaterChromeHelp {
         }
     }
 
-    static let linePrint = tag(
+    static var linePrint: String { tag(
         "Line print",
-        does: "How a finished caption arrives. At once, by word, by letter, or fade."
-    )
-    static let printGap = tag(
+        does: AppLanguage.text("How a finished caption arrives. At once, by word, by letter, or fade.")
+    ) }
+    static var printGap: String { tag(
         "Print gap",
-        does: "The pause between each word or letter. Fade uses this as how long the line takes to arrive. At once has no gap."
-    )
+        does: AppLanguage.text("The pause between each word or letter. Fade uses this as how long the line takes to arrive. At once has no gap.")
+    ) }
 
     static func captionFont(current: String) -> String {
         tag("Caption font", does: "Typeface for spoken and Show-as. Now \(current).")

@@ -816,13 +816,6 @@ extension ASRService {
             }
         }
 
-        if LiveTranslationModelGate.shouldDeferSpeechTick(
-            translationRunning: LiveTranslationModelGate.isTranslationRunning
-        ) {
-            self.benchmarkLog("chunk_skip index=\(chunkIndex) reason=translation ageMs=\(chunkAgeMs)")
-            return
-        }
-
         if LiveTranslationSilenceGate.shouldSkipASRTick(
             hadFirstTick: self.didRunStreamingTickThisListen,
             lastVoicedUptime: self.lastVoicedUptime,
@@ -878,14 +871,7 @@ extension ASRService {
         }
 
         let logicalStart = self.audioBuffer.logicalStart
-        #if arch(arm64)
-        let incrementalProvider = self.transcriptionProvider as? FluidAudioProvider
-        let incrementalDeltaStart = incrementalProvider?.incrementalPreviewDeltaStart(
-            totalSampleCount: currentSampleCount
-        )
-        #else
-        let incrementalDeltaStart: Int? = nil
-        #endif
+        let incrementalDeltaStart = self.transcriptionProvider.acceptedStreamingSampleCount
         let preview = self.previewChunk(
             logicalSampleCount: currentSampleCount,
             logicalStart: logicalStart,
@@ -952,6 +938,7 @@ extension ASRService {
 
         self.isProcessingChunk = true
         self.didRunStreamingTickThisListen = true
+        let captureTimeline = self.audioBuffer.timingSnapshot
 
         let startTime = Date()
         let startedAt = startTime.timeIntervalSince1970
@@ -963,11 +950,8 @@ extension ASRService {
                 "inputSamples=\(decodeSamples.count) newSamples=\(newSamples) audioMs=\(audioMilliseconds) " +
                 "provider=\(self.transcriptionProvider.name)"
         )
-        // Parakeet Flash and Nemotron append whatever array they are given, and
-        // the ring keeps the last second after each tick. `overlapSamples` is
-        // that second when it is larger than the audio that actually arrived.
-        // A listen log decides whether that re-feed is real; this tick does not
-        // change it.
+        // Incremental feeds follow the provider's accepted cursor. This diagnostic
+        // catches any retained overlap accidentally sent as newly captured PCM.
         if self.transcriptionProvider.streamingPreviewMode == .incrementalDelta {
             let overlapSamples = max(0, decodeSamples.count - newSamples)
             self.benchmarkLog(
@@ -983,7 +967,9 @@ extension ASRService {
                 || self.transcriptionProvider.streamingPreviewMode == .incrementalDelta
             if useDelta {
                 do {
-                    result = try await self.transcriptionExecutor.run { [provider = self.transcriptionProvider] in
+                    result = try await self.transcriptionExecutor.run(
+                        timeoutNanoseconds: Self.streamingPreviewDecodeTimeoutNanoseconds
+                    ) { [provider = self.transcriptionProvider] in
                         let result = try await provider.transcribeStreamingDelta(
                             decodeSamples,
                             totalSampleCount: currentSampleCount
@@ -1014,7 +1000,13 @@ extension ASRService {
                     // accepted. A trimmed copy would point that index at the
                     // wrong audio.
                     let retainedWindow = self.theaterBoundedWindow(self.audioBuffer.getRetained())
-                    result = try await self.transcriptionExecutor.run { [provider = self.transcriptionProvider] in
+                    // The same budget again. A delta call that used its whole
+                    // budget leaves the chain wedged, and the executor refuses
+                    // this call immediately instead of spending a second budget on
+                    // a provider that may not return.
+                    result = try await self.transcriptionExecutor.run(
+                        timeoutNanoseconds: Self.streamingPreviewDecodeTimeoutNanoseconds
+                    ) { [provider = self.transcriptionProvider] in
                         let result = try await provider.transcribeStreaming(retainedWindow)
                         logStreamingProviderOperationReturn(
                             sessionID: sessionID,
@@ -1025,7 +1017,9 @@ extension ASRService {
                     }
                 }
             } else {
-                result = try await self.transcriptionExecutor.run { [provider = self.transcriptionProvider] in
+                result = try await self.transcriptionExecutor.run(
+                    timeoutNanoseconds: Self.streamingPreviewDecodeTimeoutNanoseconds
+                ) { [provider = self.transcriptionProvider] in
                     let result = try await provider.transcribeStreaming(decodeSamples)
                     logStreamingProviderOperationReturn(
                         sessionID: sessionID,
@@ -1076,6 +1070,15 @@ extension ASRService {
             }
 
             if !newText.isEmpty {
+                let removedSilence = theaterListen && !keepsSampleCursor && !warmUpTick ? preparedPause : nil
+                self.speechCapturePolicy?.noteTimedSegments(captureTimeline.map(
+                    result.timedSegments,
+                    sourceStart: preview.logicalStart,
+                    removedSilence: removedSilence
+                ))
+                // A single noisy 1-second health window must not condemn a real caption —
+                // only a sustained run of silent windows counts as confirmed silence.
+                self.speechCapturePolicy?.noteAudioContainsSpeech(self.consecutiveSilentCaptureWindows < 2)
                 self.consecutiveVoicedSilentChunks = 0
                 if self.transcriptionProvider.streamingPreviewMode == .trailingWindow {
                     self.committedStreamingText = StreamingTranscriptStitcher.stitch(
@@ -1187,6 +1190,7 @@ extension ASRService {
         textReadyAt: TimeInterval? = nil,
         tracksDictionaryCorrections: Bool = false,
         preferPaste: Bool = false,
+        requiredTargetBundleID: String? = nil,
         completion: (@MainActor (TypingService.DeliveryOutcome) -> Void)? = nil
     ) {
         let requestedAt = ProcessInfo.processInfo.systemUptime
@@ -1203,6 +1207,7 @@ extension ASRService {
             textReadyAt: textReadyAt,
             tracksDictionaryCorrections: tracksDictionaryCorrections,
             preferPaste: preferPaste,
+            requiredTargetBundleID: requiredTargetBundleID,
             completion: completion
         )
         let dispatchedAt = ProcessInfo.processInfo.systemUptime

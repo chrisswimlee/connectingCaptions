@@ -97,6 +97,14 @@ extension ASRService {
         self.lastProcessedSampleCount = 0
         self.isProcessingChunk = false
         self.skipNextChunk = false
+        do {
+            try await self.prepareTranscriptionSession()
+        } catch {
+            self.abortStreamingWavWriter()
+            DebugLogger.shared.error("Could not prepare a fresh speech session: \(error)", source: "ASRService")
+            return .failed
+        }
+        guard startGeneration == self.audioCaptureStartGeneration, !self.isTerminating else { return .failed }
         self.benchmarkSessionID += 1
         self.streamingWorkState.beginSession(self.benchmarkSessionID)
         self.streamingHealthCheckCount = 0
@@ -113,7 +121,6 @@ extension ASRService {
         self.benchmarkStreamingChunkIndex = 0
         self.benchmarkCompletedStreamingChunks = 0
         self.benchmarkLastChunkSampleCount = 0
-        (self.transcriptionProvider as? FluidAudioProvider)?.resetStreamingPreviewCache()
         if !forDictionaryTraining {
             self.beginStreamingWavWriterIfNeeded()
         }
@@ -652,14 +659,15 @@ extension ASRService {
     /// Callers should handle the returned text as needed.
     ///
     /// ## Errors
-    /// Returns empty string if:
-    /// - No recording was in progress
-    /// - ASR models are not available
-    /// - Transcription process fails
+    /// Returns the preview text unchanged when there is nothing better to report:
+    /// no recording in progress, too little audio retained, or the decode failed.
+    /// Returns an empty string when the re-decode ran out of budget, so the caller
+    /// reads that as "nothing new heard" rather than as a longer candidate.
     /// Check debug logs for detailed error information.
     /// Re-decode the retained window for Theater. Streaming deltas are a preview;
-    /// presentation captions should wait for this fuller pass.
-    func confirmStreamingTranscript() async -> String {
+    /// presentation captions wait for this fuller pass, but only up to
+    /// `confirmReDecodeTimeoutNanoseconds`.
+    func confirmStreamingTranscript(timeoutNanoseconds: UInt64? = nil) async -> String {
         let fallback = self.partialTranscription.trimmingCharacters(in: .whitespacesAndNewlines)
         guard self.isRunning else { return fallback }
         let retained = self.audioBuffer.getRetained()
@@ -682,7 +690,9 @@ extension ASRService {
         }
 
         do {
-            let result = try await self.transcriptionExecutor.run { [provider] in
+            let result = try await self.transcriptionExecutor.run(
+                timeoutNanoseconds: min(timeoutNanoseconds ?? self.confirmReDecodeTimeoutNanoseconds, self.confirmReDecodeTimeoutNanoseconds)
+            ) { [provider] in
                 try await provider.transcribeStreaming(samples)
             }
             let newText = self.cleanedLiveTranscript(result.text)
@@ -696,6 +706,16 @@ extension ASRService {
                 ).trimmingCharacters(in: .whitespacesAndNewlines)
             }
             return newText
+        } catch TranscriptionExecutorError.timedOut {
+            // Running out of budget means the re-decode is missing, not that it
+            // disagreed. `partialTranscription` is the whole listen so far and is
+            // not stitched, so handing it back would let the board paint the
+            // accumulated transcript as one line. Keep the clause already in hand.
+            DebugLogger.shared.debug(
+                "Theater confirmation re-decode timed out; keeping the preview wording",
+                source: "ASRService"
+            )
+            return ""
         } catch {
             DebugLogger.shared.debug(
                 "Theater confirmation transcription skipped: \(error.localizedDescription)",

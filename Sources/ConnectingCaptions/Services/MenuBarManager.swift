@@ -32,6 +32,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
     // References to app state
     private weak var asrService: ASRService?
     private var cancellables = Set<AnyCancellable>()
+    private var menuLanguageRevision = ""
     private var hasDeferredStopMenuRefresh = false
     private var hasDeferredStoppedRecordingState = false
     private var configuredASRIdentifier: ObjectIdentifier?
@@ -513,7 +514,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         }
 
         let copyLastTranscriptItem = NSMenuItem(
-            title: "Copy Last Transcript",
+            title: AppLanguage.text("Copy Last Transcript"),
             action: #selector(copyLastTranscript(_:)),
             keyEquivalent: ""
         )
@@ -524,13 +525,13 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         // Open Main Window
-        let openItem = NSMenuItem(title: "Open \(ConnectingCaptionsProduct.displayName)", action: #selector(openMainWindow), keyEquivalent: "")
+        let openItem = NSMenuItem(title: AppLanguage.format("Open {0}", String(describing: ConnectingCaptionsProduct.displayName)), action: #selector(openMainWindow), keyEquivalent: "")
         openItem.target = self
         menu.addItem(openItem)
 
-        let theaterMenu = NSMenu(title: "Theater")
+        let theaterMenu = NSMenu(title: AppLanguage.text("Theater"))
         let openHomeItem = NSMenuItem(
-            title: "Theater Home",
+            title: AppLanguage.text("Theater Home"),
             action: #selector(openLiveTranslation),
             keyEquivalent: ""
         )
@@ -559,18 +560,18 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         self.listenMenuItem = listenItem
         TheaterMenuBarController.shared.install(into: theaterMenu)
 
-        let theaterGroup = NSMenuItem(title: "Theater", action: nil, keyEquivalent: "")
+        let theaterGroup = NSMenuItem(title: AppLanguage.text("Theater"), action: nil, keyEquivalent: "")
         theaterGroup.submenu = theaterMenu
         menu.addItem(theaterGroup)
 
         // Preferences
-        let preferencesItem = NSMenuItem(title: "Settings...", action: #selector(openPreferences), keyEquivalent: ",")
+        let preferencesItem = NSMenuItem(title: AppLanguage.text("Settings..."), action: #selector(openPreferences), keyEquivalent: ",")
         preferencesItem.target = self
         preferencesItem.keyEquivalentModifierMask = [.command]
         menu.addItem(preferencesItem)
 
-        let microphoneSubmenu = NSMenu(title: "Microphone")
-        let microphoneMenuItem = NSMenuItem(title: "Microphone", action: nil, keyEquivalent: "")
+        let microphoneSubmenu = NSMenu(title: AppLanguage.text("Microphone"))
+        let microphoneMenuItem = NSMenuItem(title: AppLanguage.text("Microphone"), action: nil, keyEquivalent: "")
         microphoneMenuItem.submenu = microphoneSubmenu
         menu.addItem(microphoneMenuItem)
         self.microphoneMenuItem = microphoneMenuItem
@@ -578,7 +579,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
 
         // Check for Updates
         let updateItem = NSMenuItem(
-            title: "Check for Updates...",
+            title: AppLanguage.text("Check for Updates..."),
             action: #selector(checkForUpdates(_:)),
             keyEquivalent: ""
         )
@@ -588,7 +589,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         menu.addItem(.separator())
 
         let rollbackMenuItem = NSMenuItem(
-            title: "Rollback to Previous Version...",
+            title: AppLanguage.text("Rollback to Previous Version..."),
             action: #selector(rollbackToPreviousVersion(_:)),
             keyEquivalent: ""
         )
@@ -601,7 +602,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
 
         // Quit
         let quitItem = NSMenuItem(
-            title: "Quit \(ConnectingCaptionsProduct.displayName)",
+            title: AppLanguage.format("Quit {0}", String(describing: ConnectingCaptionsProduct.displayName)),
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
@@ -610,6 +611,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
 
         // Now update the text content
         self.updateMenuItemsText()
+        self.menuLanguageRevision = "\(SettingsStore.shared.appLanguageID)-\(AppInterfaceTranslation.shared.revision)"
     }
 
     private func updateMenu() {
@@ -639,15 +641,15 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         if !TheaterAvailability.isSupported {
             statusTitle = TheaterAvailability.unsupportedCopy
         } else if isCaptionListening {
-            statusTitle = "Listening…\(hotkeyInfo)"
+            statusTitle = AppLanguage.format("Listening…{0}", hotkeyInfo)
         } else {
-            statusTitle = "\(ready.nextAction)\(hotkeyInfo)"
+            statusTitle = AppLanguage.format("{0}{1}", AppLanguage.text(ready.nextAction), hotkeyInfo)
         }
         self.statusMenuItem?.title = statusTitle
-        self.theaterMenuItem?.title = SettingsStore.shared.theaterWindowEnabled ? "Close Theater" : "Open Theater"
+        self.theaterMenuItem?.title = AppLanguage.text(SettingsStore.shared.theaterWindowEnabled ? "Close Theater" : "Open Theater")
         self.theaterMenuItem?.isEnabled = TheaterAvailability.isSupported
         let isStopping = LiveTranslationController.shared.isFinishingSession
-        self.listenMenuItem?.title = isStopping ? "Stopping…" : (isCaptionListening ? "Stop" : "Listen")
+        self.listenMenuItem?.title = AppLanguage.text(isStopping ? "Stopping…" : (isCaptionListening ? "Stop" : "Listen"))
         let dictationBusy = AppServices.shared.asr.isRunningOrStarting && !isCaptionListening
         self.listenMenuItem?.isEnabled = !isStopping
             && TheaterAvailability.isSupported
@@ -662,7 +664,12 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) {
         if menu === self.menu {
-            self.updateMenuItemsText()
+            let languageRevision = "\(SettingsStore.shared.appLanguageID)-\(AppInterfaceTranslation.shared.revision)"
+            if languageRevision != self.menuLanguageRevision {
+                self.buildMenuStructure()
+            } else {
+                self.updateMenuItemsText()
+            }
             self.refreshMicrophoneMenu()
             TheaterMenuBarController.shared.refresh()
         }
@@ -672,7 +679,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         guard let submenu = self.microphoneSubmenu else { return }
 
         submenu.removeAllItems()
-        let loadingItem = NSMenuItem(title: "Loading...", action: nil, keyEquivalent: "")
+        let loadingItem = NSMenuItem(title: AppLanguage.text("Loading..."), action: nil, keyEquivalent: "")
         loadingItem.isEnabled = false
         submenu.addItem(loadingItem)
 
@@ -696,7 +703,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         submenu.removeAllItems()
 
         guard !inputDevices.isEmpty else {
-            let emptyItem = NSMenuItem(title: "No microphones found", action: nil, keyEquivalent: "")
+            let emptyItem = NSMenuItem(title: AppLanguage.text("No microphones found"), action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false
             submenu.addItem(emptyItem)
             return
@@ -709,7 +716,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         )?.uid
 
         guard SettingsStore.shared.microphonePriority.isEmpty == false else {
-            let emptyItem = NSMenuItem(title: "No microphones in priority", action: nil, keyEquivalent: "")
+            let emptyItem = NSMenuItem(title: AppLanguage.text("No microphones in priority"), action: nil, keyEquivalent: "")
             emptyItem.isEnabled = false
             submenu.addItem(emptyItem)
             return
@@ -724,7 +731,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
                   microphonePreferenceCoordinator.isInputDeviceAvailable(device)
             else {
                 let item = NSMenuItem(
-                    title: "\(index + 1). \(entry.name) (Unavailable)",
+                    title: AppLanguage.format("{0}. {1} (Unavailable)", String(describing: index + 1), String(describing: entry.name)),
                     action: nil,
                     keyEquivalent: ""
                 )
@@ -743,7 +750,7 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
 
         if self.isRecording {
             submenu.addItem(.separator())
-            let recordingItem = NSMenuItem(title: "Unavailable while recording", action: nil, keyEquivalent: "")
+            let recordingItem = NSMenuItem(title: AppLanguage.text("Unavailable while recording"), action: nil, keyEquivalent: "")
             recordingItem.isEnabled = false
             submenu.addItem(recordingItem)
         }
@@ -803,8 +810,8 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
                         ? "You're already running the latest build available in the beta channel."
                         : "You're already running the latest version of \(ConnectingCaptionsProduct.displayName)."
                 } else {
-                    msg.messageText = "Update Check Failed"
-                    msg.informativeText = "Unable to check for updates. Please try again later.\n\nError: \(error.localizedDescription)"
+                    msg.messageText = AppLanguage.text("Update Check Failed")
+                    msg.informativeText = AppLanguage.format("Unable to check for updates. Please try again later.\n\nError: {0}", String(describing: error.localizedDescription))
                 }
                 msg.alertStyle = .informational
                 msg.runModal()
@@ -816,11 +823,11 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         let availableVersion = SimpleUpdater.shared.latestRollbackVersion() ?? ""
         guard !availableVersion.isEmpty else {
             let msg = NSAlert()
-            msg.messageText = "No rollback backup found"
-            msg.informativeText = "No previous version backup is available on this device."
+            msg.messageText = AppLanguage.text("No rollback backup found")
+            msg.informativeText = AppLanguage.text("No previous version backup is available on this device.")
             msg.alertStyle = .informational
-            msg.addButton(withTitle: "Get Previous Builds")
-            msg.addButton(withTitle: "Cancel")
+            msg.addButton(withTitle: AppLanguage.text("Get Previous Builds"))
+            msg.addButton(withTitle: AppLanguage.text("Cancel"))
             if msg.runModal() == .alertFirstButtonReturn {
                 self.openPreviousBuildPicker()
             }
@@ -828,11 +835,11 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         }
 
         let confirm = NSAlert()
-        confirm.messageText = "Rollback to \(availableVersion)?"
-        confirm.informativeText = "This will restore the backup and relaunch \(ConnectingCaptionsProduct.displayName)."
+        confirm.messageText = AppLanguage.format("Rollback to {0}?", String(describing: availableVersion))
+        confirm.informativeText = AppLanguage.format("This will restore the backup and relaunch {0}.", String(describing: ConnectingCaptionsProduct.displayName))
         confirm.alertStyle = .warning
-        confirm.addButton(withTitle: "Rollback")
-        confirm.addButton(withTitle: "Cancel")
+        confirm.addButton(withTitle: AppLanguage.text("Rollback"))
+        confirm.addButton(withTitle: AppLanguage.text("Cancel"))
 
         guard confirm.runModal() == .alertFirstButtonReturn else { return }
 
@@ -840,21 +847,21 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
             do {
                 try await SimpleUpdater.shared.rollbackToLatestBackup()
                 let success = NSAlert()
-                success.messageText = "Rollback Successful"
-                success.informativeText = "Rolled back to \(availableVersion). \(ConnectingCaptionsProduct.displayName) will relaunch shortly."
+                success.messageText = AppLanguage.text("Rollback Successful")
+                success.informativeText = AppLanguage.format("Rolled back to {0}. {1} will relaunch shortly.", String(describing: availableVersion), String(describing: ConnectingCaptionsProduct.displayName))
                 success.alertStyle = .informational
-                success.addButton(withTitle: "Report Bug")
-                success.addButton(withTitle: "OK")
+                success.addButton(withTitle: AppLanguage.text("Report Bug"))
+                success.addButton(withTitle: AppLanguage.text("OK"))
                 let response = success.runModal()
                 if response == .alertFirstButtonReturn {
                     self.openIssueReportingPage()
                 }
             } catch {
                 let fail = NSAlert()
-                fail.messageText = "Rollback Failed"
+                fail.messageText = AppLanguage.text("Rollback Failed")
                 fail.informativeText = error.localizedDescription
                 fail.alertStyle = .critical
-                fail.addButton(withTitle: "OK")
+                fail.addButton(withTitle: AppLanguage.text("OK"))
                 fail.runModal()
             }
         }
@@ -889,15 +896,15 @@ final class MenuBarManager: NSObject, ObservableObject, NSMenuDelegate {
         }
 
         let picker = NSAlert()
-        picker.messageText = "Download Previous Build"
-        picker.informativeText = "Choose one of the latest release builds to install manually."
+        picker.messageText = AppLanguage.text("Download Previous Build")
+        picker.informativeText = AppLanguage.text("Choose one of the latest release builds to install manually.")
         picker.alertStyle = .informational
 
         for option in options {
             picker.addButton(withTitle: option.version)
         }
-        picker.addButton(withTitle: "All Releases")
-        picker.addButton(withTitle: "Cancel")
+        picker.addButton(withTitle: AppLanguage.text("All Releases"))
+        picker.addButton(withTitle: AppLanguage.text("Cancel"))
 
         let response = picker.runModal()
         let first = NSApplication.ModalResponse.alertFirstButtonReturn.rawValue

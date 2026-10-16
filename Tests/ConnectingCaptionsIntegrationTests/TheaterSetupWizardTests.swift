@@ -3,6 +3,50 @@ import XCTest
 
 @MainActor
 final class TheaterSetupWizardTests: XCTestCase {
+    func testTestHostUsesTemporaryApplicationSupport() {
+        XCTAssertTrue(AppTestEnvironment.isRunning)
+        XCTAssertTrue(AppSupportDirectory.url().lastPathComponent.hasPrefix("connectingCaptions-tests-"))
+        XCTAssertTrue(FileLogger.shared.currentLogFileURL().path.hasPrefix(AppSupportDirectory.url().path + "/"))
+        XCTAssertNotEqual(AppSupportDirectory.url(), FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first)
+    }
+    func testInterfaceCacheSupportsEveryOfferedLanguageAndKeepsUserContentOut() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let url = folder.appendingPathComponent("interface.json")
+        let cache = AppInterfaceTranslation(cacheURL: url, loadsCache: false)
+        XCTAssertGreaterThan(AppInterfaceCatalog.strings.count, 800)
+        for language in TranslationLanguageCatalog.all where language.id != "en" {
+            cache.accept(["Keep History": "\(language.id):history", "User's private caption": "private"], languageID: language.id)
+            XCTAssertEqual(cache.text("Keep History", languageID: language.id), "\(language.id):history")
+            XCTAssertNil(cache.text("User's private caption", languageID: language.id))
+        }
+        let restored = AppInterfaceTranslation(cacheURL: url)
+        XCTAssertEqual(restored.text("Keep History", languageID: "ko"), "ko:history")
+        XCTAssertFalse(try String(contentsOf: url).contains("private caption"))
+    }
+
+    func testInterfaceTranslationRejectsChangedPlaceholderSets() {
+        XCTAssertTrue(AppInterfaceTranslation.isUsable("{1} / {0}", for: "{0} / {1}"))
+        XCTAssertFalse(AppInterfaceTranslation.isUsable("{0}", for: "{0} / {1}"))
+        XCTAssertFalse(AppInterfaceTranslation.isUsable("{0}{0}", for: "{0}"))
+        XCTAssertFalse(AppInterfaceTranslation.isUsable(" ", for: "History"))
+        XCTAssertEqual(AppLanguage.format("{0} / {1}", "A{1}", "B{0}"), "A{1} / B{0}")
+    }
+
+    func testInterfaceCacheValidatesSavedPlaceholdersBeforeUse() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("interface-cache-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try JSONEncoder().encode([
+            "ko": ["Current version: {0}": "Version", "Keep History": "기록 보관", "Private caption": "private"],
+            "zz": ["Keep History": "unknown language"],
+        ]).write(to: url)
+        let cache = AppInterfaceTranslation(cacheURL: url)
+        XCTAssertNil(cache.text("Current version: {0}", languageID: "ko"))
+        XCTAssertNil(cache.text("Private caption", languageID: "ko"))
+        XCTAssertNil(cache.text("Keep History", languageID: "zz"))
+        XCTAssertEqual(cache.text("Keep History", languageID: "ko"), "기록 보관")
+    }
+
     func testWizardStepsWalkInOrder() {
         XCTAssertEqual(
             TheaterSetupWizard.Step.allCases.map(\.title),

@@ -16,6 +16,15 @@ final class ASRService: ObservableObject {
     static let finalTranscriptionStatusDelayNanoseconds: UInt64 = 100_000_000
     static let streamingDrainTimeoutNanoseconds: UInt64 = 30_000_000_000
 
+    // Ceilings for a provider call that is not coming back, not latency targets.
+    // The only measured preview tick on Apple Silicon needed 383 ms
+    // (docs/samples/LastListenLatency.json), so these expire on a wedged call
+    // rather than on a slow-but-healthy one. They bound the *wait*: a decode
+    // abandoned at its ceiling may still be running, and the chain refuses later
+    // bounded decodes for the rest of the listen (see `TranscriptionExecutor`).
+    static let streamingPreviewDecodeTimeoutNanoseconds: UInt64 = 10_000_000_000
+    static let finalDecodeTimeoutNanoseconds: UInt64 = 30_000_000_000
+
     nonisolated static func shouldAssessShortAudioSilence(
         isEnabled: Bool,
         useDictionaryTrainingPath: Bool,
@@ -157,6 +166,11 @@ final class ASRService: ObservableObject {
 
     let audioCaptureReadinessGate = AudioCaptureReadinessGate()
     let firstPCMTimeoutNanoseconds: UInt64 = 2_000_000_000
+    /// Ceiling on the Theater confirm re-decode, not a tuned budget: nothing has
+    /// been measured here, so it only bounds a wait that would otherwise be
+    /// unbounded. Past it the caption prints the preview it already heard rather
+    /// than holding the board on a decode that may never return.
+    let confirmReDecodeTimeoutNanoseconds: UInt64 = 7_000_000_000
     var audioCaptureStartGeneration: UInt64 = 0
     var audioCaptureAttemptID: UInt64 = 0
     var isTerminating = false
@@ -225,6 +239,10 @@ final class ASRService: ObservableObject {
     /// only the latter should count toward `consecutiveVoicedSilentChunks`. Defaults
     /// to silent so a chunk before the first health reading never counts.
     var lastCaptureWasSilent: Bool = true
+    /// `onCaptureHealth` readings in a row that measured silent. One noisy 1-second
+    /// window (a quiet consonant, a mic dip) must not by itself tell the caption-honesty
+    /// gate real speech was silence — only a sustained run counts as confirmed silent.
+    var consecutiveSilentCaptureWindows: Int = 0
     /// Streaming chunks in a row that produced no text while the mic was picking up
     /// real (non-silent) audio. Reset on any non-empty result or provider switch.
     var consecutiveVoicedSilentChunks: Int = 0
@@ -640,7 +658,7 @@ final class ASRService: ObservableObject {
         }
         let resetDrainID = UUID()
         let executor = self.transcriptionExecutor
-        let resetDrainTask = Task { await executor.cancelAndAwaitPending() }
+        let resetDrainTask = Task { _ = await executor.cancelAndAwaitPending() }
         self.providerResetDrain = (resetDrainID, resetDrainTask)
         // Keep the task handle until its provider has stopped and cancellation cleanup has
         // completed. The next ensureAsrReady call waits for it before touching the same cache.
@@ -649,13 +667,7 @@ final class ASRService: ObservableObject {
         self.lastBoostHitTerm = nil
         self.wordBoostStatusText = "Word boost: off"
 
-        // Reset cached providers to force re-initialization with new settings
-        self.fluidAudioProvider = nil
-        self.parakeetRealtimeProvider = nil
-        self.externalCoreMLProvider = nil
-        self.whisperProvider = nil
-        self.appleSpeechProvider = nil
-        self._appleSpeechAnalyzerProvider = nil
+        self.discardCachedTranscriptionProviders()
 
         // CRITICAL FIX: Check if the NEW model's files exist on disk
         // This prevents UI from showing "Download" when model is already downloaded
@@ -1218,8 +1230,48 @@ final class ASRService: ObservableObject {
         self.streamingWavWriter?.abort()
         self.streamingWavWriter = nil
         if let metadata = self.lastCompletedAudioFile {
-            DictationAudioHistoryStore.shared.deleteAudio(fileName: metadata.fileName)
+            DictationAudioHistoryStore.shared.discardPendingAudio(fileName: metadata.fileName)
             self.lastCompletedAudioFile = nil
+        }
+    }
+
+    private func discardCachedTranscriptionProviders() {
+        self.fluidAudioProvider = nil
+        self.parakeetRealtimeProvider = nil
+        self.nemotronProviders.removeAll()
+        self.externalCoreMLProvider = nil
+        self.whisperProvider = nil
+        self.appleSpeechProvider = nil
+        self._appleSpeechAnalyzerProvider = nil
+    }
+
+    func quarantineTranscriptionProvider() {
+        self.streamingWorkState.invalidateProvider()
+        self.discardCachedTranscriptionProviders()
+        self.isAsrReady = false
+    }
+
+    /// A timed-out operation still owns its provider. Retire that instance before
+    /// allowing another listen to decode, then reset healthy per-listen state.
+    func prepareTranscriptionSession() async throws {
+        let drained = await self.transcriptionExecutor.cancelAndAwaitPending()
+        if !drained {
+            self.quarantineTranscriptionProvider()
+            try await self.ensureAsrReady()
+        }
+        let provider = self.transcriptionProvider
+        do {
+            try await self.transcriptionExecutor.run(
+                timeoutNanoseconds: Self.streamingPreviewDecodeTimeoutNanoseconds
+            ) {
+                await provider.resetStreamingSession()
+            }
+        } catch {
+            // Reset itself may wedge too. Its task retains the retired instance;
+            // a new instance owns the next listen and cannot be reset by old work.
+            _ = await self.transcriptionExecutor.cancelAndAwaitPending(timeout: .zero)
+            self.quarantineTranscriptionProvider()
+            try await self.ensureAsrReady()
         }
     }
 
@@ -1229,19 +1281,19 @@ final class ASRService: ObservableObject {
         logicalSampleCount: Int,
         logicalStart: Int,
         incrementalDeltaStart: Int?
-    ) -> (samples: [Float], kind: StreamingTranscriptStitcher.Kind) {
+    ) -> (samples: [Float], kind: StreamingTranscriptStitcher.Kind, logicalStart: Int) {
         if let incrementalDeltaStart {
             let start = max(incrementalDeltaStart, logicalStart)
-            let available = logicalSampleCount - start
-            if available > 0 {
-                let delta = self.audioBuffer.getRange(startingAt: start, count: available)
-                if delta.count == available {
-                    return (delta, .incrementalDelta)
-                }
-            }
+            let available = max(0, logicalSampleCount - start)
+            // An empty tail stays empty. Falling back to retained PCM would feed
+            // an already-consumed window to a stateful incremental decoder.
+            return (self.audioBuffer.getRange(startingAt: start, count: available), .incrementalDelta, start)
         }
-        let retained = self.theaterBoundedWindow(self.audioBuffer.getRetained())
-        return (retained, .retainedWindow)
+        let limit = self.speechCapturePolicy?.isSessionActive == true
+            ? LiveAudioRetention.theaterPreviewSamples : LiveAudioRetention.maximumRetainedSamples
+        let start = max(logicalStart, logicalSampleCount - limit)
+        let retained = self.audioBuffer.getRange(startingAt: start, count: max(0, logicalSampleCount - start))
+        return (retained, .retainedWindow, start)
     }
 
     /// Whisper re-reads this slice. The 30 s ring stays for dictation; a Theater
@@ -1255,12 +1307,7 @@ final class ASRService: ObservableObject {
 
     func dropRetainedAudioAfterPreview(currentSampleCount: Int, usedIncrementalDelta: Bool) {
         if usedIncrementalDelta {
-            #if arch(arm64)
-            let accepted = (self.transcriptionProvider as? FluidAudioProvider)?.acceptedIncrementalSampleCount
-                ?? currentSampleCount
-            #else
-            let accepted = currentSampleCount
-            #endif
+            let accepted = self.transcriptionProvider.acceptedStreamingSampleCount ?? currentSampleCount
             let dropBefore = max(0, accepted - LiveAudioRetention.incrementalOverlapSamples)
             self.audioBuffer.dropSamples(before: dropBefore)
             return
@@ -1360,6 +1407,7 @@ final class ASRService: ObservableObject {
                     else { return }
                     let silent = rms < 0.002 && peak < 0.01
                     self.lastCaptureWasSilent = silent
+                    self.consecutiveSilentCaptureWindows = silent ? self.consecutiveSilentCaptureWindows + 1 : 0
                     self.benchmarkLog(
                         "capture_health attempt=\(attemptID) audioMs=\(audioMs) " +
                             "samples=\(sampleCount) rms=\(String(format: "%.6f", rms)) " +

@@ -31,35 +31,6 @@ enum LiveTranslationHostClock {
     }
 }
 
-/// Keeps an Apple Translation forward pass off the speech tick.
-/// The in-flight tick is allowed to finish. A new tick waits.
-enum LiveTranslationModelGate {
-    private static let lock = NSLock()
-    private static var translationDepth = 0
-
-    static var isTranslationRunning: Bool {
-        self.lock.lock()
-        defer { self.lock.unlock() }
-        return self.translationDepth > 0
-    }
-
-    static func beginTranslation() {
-        self.lock.lock()
-        self.translationDepth += 1
-        self.lock.unlock()
-    }
-
-    static func endTranslation() {
-        self.lock.lock()
-        self.translationDepth = max(0, self.translationDepth - 1)
-        self.lock.unlock()
-    }
-
-    static func shouldDeferSpeechTick(translationRunning: Bool) -> Bool {
-        translationRunning
-    }
-}
-
 enum LiveTranslationSilenceGate {
     static func isPastHold(
         lastVoicedUptime: TimeInterval?,
@@ -119,11 +90,14 @@ enum LiveTranslationThermalEngine {
         isAppleSpeechAnalyzerAvailable ? .appleSpeechAnalyzer : .appleSpeech
     }
 
-    static func fallbackModel() -> SettingsStore.SpeechModel {
-        if #available(macOS 26.0, *) {
-            return self.fallbackModel(isAppleSpeechAnalyzerAvailable: true)
+    static func readyFallback(
+        languageID: String,
+        availableModels: [SettingsStore.SpeechModel] = SettingsStore.SpeechModel.availableModels,
+        readiness: (SettingsStore.SpeechModel, String) -> VoiceEngineLanguageReadiness = VoiceEngineLanguageReadiness.current
+    ) -> SettingsStore.SpeechModel? {
+        [.appleSpeechAnalyzer, .appleSpeech].first {
+            availableModels.contains($0) && readiness($0, languageID) == .ready
         }
-        return self.fallbackModel(isAppleSpeechAnalyzerAvailable: false)
     }
 
     static func shouldApply(

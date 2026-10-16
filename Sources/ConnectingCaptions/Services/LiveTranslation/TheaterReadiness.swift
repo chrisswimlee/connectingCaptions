@@ -100,7 +100,7 @@ enum TheaterReadiness {
         "A caption appeared. Open Theater anytime from the sidebar."
 
     static let gettingStartedOpenDetail =
-        "Voice Engine sharpens speech into text. Translation Engine is Apple Translation on this Mac. Both use the microphone. Open Theater, pick Voice or Translate, then press Listen."
+        "Voice Engine sharpens speech into text. Translation Engine is Apple Translation on this Mac. Both use the input device you pick — built-in, USB, line-in, Bluetooth, or a loopback input. Open Theater, pick Voice or Translate, then press Listen."
 
     static let gettingStartedMicrophone =
         "Theater needs the microphone to hear you."
@@ -174,11 +174,11 @@ enum TheaterReadiness {
     static let closeWhileListeningButton = "Stop and Close"
 
     static let modeStopsListen =
-        "Voice writes what you say. Translate turns each sentence into a supported language with Apple Translation. Switching stops Listen."
+        "Original language shows what you say. Translate turns each sentence into a supported language with Apple Translation. Switching stops Listen."
 
-    static let spokenLineTitle = "Spoken line"
-    static let linePrintTitle = "Line print"
-    static let printGapTitle = "Print gap"
+    static let spokenLineTitle = "Show original text"
+    static let linePrintTitle = "Caption animation"
+    static let printGapTitle = "Animation timing"
 
     static let spokenLineSameLanguage =
         "Same-language captions already show the spoken line."
@@ -196,7 +196,7 @@ enum TheaterReadiness {
         "Captions only is for Pop-up. Overlay fades its tool bar until you hover the top. Control-Option-T pins those tools."
 
     static let overlayPlacementHint =
-        "Drag a corner or pick a spot. Keep text here, then slides stay clickable."
+        "Text area unlocked. Drag to move, resize an edge or corner, or pick a position. Lock text area when it fits."
 
     static let captionSize =
         "Caption size — the number shown. A wide window grows this further; a short Overlay bar can shrink it to fit."
@@ -216,7 +216,7 @@ enum TheaterReadiness {
         "mic is Listen to first audio. e2e is speech-start to the printed caption. ASR is the speech engine. MT is Apple Translation."
 
     static let timedExportHonesty =
-        "SRT/VTT times are when the caption committed, not the spoken word."
+        "SRT/VTT use speech timestamps when available. Older or unmatched captions use estimated times from when each caption committed."
 
     static let backingBar =
         "Caption plate puts a dark box behind each Overlay line so the text stays readable on white slides."
@@ -226,14 +226,14 @@ enum TheaterReadiness {
 
     static let presenterHotkeys =
         "Control-Option-H hides or shows Theater, P pauses, K clears, T pins Overlay tools, L starts or stops Listen, R retries a failed translation, = and - change caption size. "
-        + "Hover the Overlay Tools bar for the same controls. The menu-bar Theater item changes font, size, plate, and position. Your slides keep focus. A custom Listen shortcut with the same chord wins."
+            + "Hover the Overlay Tools bar for the same controls. The menu-bar Theater item changes font, size, plate, and position. Your slides keep focus. A custom Listen shortcut with the same chord wins."
 
     static let popupStyle =
         "Pop-up opens as a lower third so the slides stay visible. Drag a corner to resize, or choose Fill screen."
 
     static let transparentStyle =
         "Overlay opens along the bottom and shows the last few lines, like TV captions. Drag it, or pick another spot. "
-        + "A Tools label at the top fades until you hover it, and slides stay clickable."
+            + "A Tools label at the top fades until you hover it, and slides stay clickable."
 
     static let presentationStyle =
         "Choose Pop-up or Overlay. Open Theater to show it; Close Theater to hide it."
@@ -270,7 +270,9 @@ enum TheaterReadiness {
 
 enum TheaterAvailability {
     /// Voice, Translate, and I speak / Show as. Apple Speech Analyzer stays macOS 26+.
-    static var isSupported: Bool { true }
+    static var isSupported: Bool {
+        true
+    }
 
     static let unsupportedCopy =
         "Theater is not available on this Mac."
@@ -292,6 +294,7 @@ enum TheaterReadyGate {
         /// This engine hears I speak but is set to another language. One press
         /// of Match I speak fixes it; no other engine is needed.
         var voiceEngineNeedsRealign = false
+        var languagePackAdvice: String? = nil
 
         var canListen: Bool {
             self.osSupported && self.voiceEngineReady && self.languagePackReady && self.captureAllowed
@@ -321,7 +324,7 @@ enum TheaterReadyGate {
                 return TheaterReadiness.allowMicrophone
             }
             if !self.languagePackReady {
-                return "Download the language pack for this pair."
+                return self.languagePackAdvice ?? AppLanguage.text("Download the language pack for this pair.")
             }
             if !self.firstCaptionPrinted {
                 return self.mode == .transcription
@@ -346,7 +349,7 @@ enum TheaterReadyGate {
     ) -> Snapshot {
         let canPromptMic = microphone != .denied && microphone != .restricted
         let packOK = mode == .transcription || sameLanguagePair
-            || pack == .installed || pack == .unknown
+            || pack == .installed
         return Snapshot(
             osSupported: osSupported,
             voiceEngineReady: engineSupportsSource && modelInstalled,
@@ -355,9 +358,19 @@ enum TheaterReadyGate {
             captureAllowed: canPromptMic,
             firstCaptionPrinted: firstCaptionPrinted,
             mode: mode,
-            voiceEngineAdvice: voiceEngineAdvice,
-            voiceEngineNeedsRealign: voiceEngineNeedsRealign
+            voiceEngineAdvice: voiceEngineAdvice ?? (modelInstalled ? nil : "Download the selected Voice Engine, or choose Apple Speech without a download."),
+            voiceEngineNeedsRealign: voiceEngineNeedsRealign,
+            languagePackAdvice: self.packAdvice(pack)
         )
+    }
+
+    private static func packAdvice(_ pack: TranslationPackAvailability) -> String? {
+        switch pack {
+        case .installed: return nil
+        case .supported: return AppLanguage.text("Download the language pack for this pair.")
+        case .unknown: return AppLanguage.text("Checking translation availability. Open Language Packs to check again if this does not finish.")
+        case .unsupported: return AppLanguage.text(TheaterReadiness.packUnsupported)
+        }
     }
 
     @MainActor
@@ -368,7 +381,8 @@ enum TheaterReadyGate {
     ) -> Snapshot {
         let settings = SettingsStore.shared
         let source = SpokenLanguageResolver.sourceLanguage(settings: settings)
-        let engineSupportsSource = SpokenLanguageResolver.voiceEngineSupportsSource()
+        let languageReady = VoiceEngineLanguageReadiness.current(model: settings.selectedSpeechModel, languageID: source.id)
+        let engineSupportsSource = SpokenLanguageResolver.voiceEngineSupportsSource() && languageReady == .ready
         return self.snapshot(
             engineSupportsSource: engineSupportsSource,
             modelInstalled: settings.selectedSpeechModel.isInstalled,
@@ -378,12 +392,15 @@ enum TheaterReadyGate {
             firstCaptionPrinted: firstCaptionPrinted,
             mode: settings.theaterSessionMode,
             osSupported: TheaterAvailability.isSupported,
-            voiceEngineAdvice: self.voiceEngineAdvice(
+            voiceEngineAdvice: languageReady != .ready
+                ? languageReady.message(model: settings.selectedSpeechModel, language: source)
+                : self.voiceEngineAdvice(
                 model: settings.selectedSpeechModel,
                 source: source,
-                heard: SpokenLanguageResolver.heardLanguage(settings: settings)
+                heard: SpokenLanguageResolver.heardLanguage(settings: settings),
+                modelInstalled: settings.selectedSpeechModel.isInstalled
             ),
-            voiceEngineNeedsRealign: !engineSupportsSource
+            voiceEngineNeedsRealign: languageReady == .ready && !engineSupportsSource
                 && VoiceEngineLanguageCatalog.supports(settings.selectedSpeechModel, languageID: source.id)
         )
     }
@@ -394,9 +411,16 @@ enum TheaterReadyGate {
     static func voiceEngineAdvice(
         model: SettingsStore.SpeechModel,
         source: TranslationLanguage,
-        heard: TranslationLanguage?
+        heard: TranslationLanguage?,
+        modelInstalled: Bool = true
     ) -> String {
+        if !modelInstalled {
+            return "Download \(TheaterEngineCopy.voiceEngineName(model)) in Voice Engine, or choose Apple Speech without a download."
+        }
         if VoiceEngineLanguageCatalog.supports(model, languageID: source.id) {
+            if heard?.id == source.id {
+                return "Voice Engine is ready."
+            }
             let heardName = heard?.displayName ?? "another language"
             return "Voice Engine is set to hear \(heardName), not \(source.displayName). Press Match I speak."
         }
@@ -405,7 +429,7 @@ enum TheaterReadyGate {
         {
             return "Apple Speech Analyzer does not hear \(source.displayName). Open Voice Engine and pick the older Apple Speech."
         }
-        return "Apple Speech on this Mac does not hear \(source.displayName). Pick another I speak."
+        return "\(TheaterEngineCopy.voiceEngineName(model)) does not hear \(source.displayName). Choose another Voice Engine or I speak language."
     }
 
     static func microphoneAllowed(_ status: AVAuthorizationStatus) -> Bool {

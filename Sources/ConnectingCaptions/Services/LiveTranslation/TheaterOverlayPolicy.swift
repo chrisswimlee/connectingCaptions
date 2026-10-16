@@ -117,8 +117,16 @@ enum TheaterOverlayPolicy {
         placing: Bool = false
     ) -> Bool {
         if minimized { return false }
-        if placing || presentation == .popup { return true }
-        return toolsPinned
+        return placing || presentation == .popup
+    }
+
+    /// Showing controls does not unlock the caption rectangle.
+    static func geometryLocked(presentation: TheaterPresentationStyle, placing: Bool) -> Bool {
+        presentation == .transparent && !placing
+    }
+
+    static func canResize(presentation: TheaterPresentationStyle, placing: Bool, minimized: Bool) -> Bool {
+        !minimized && !Self.geometryLocked(presentation: presentation, placing: placing)
     }
 
     static func minSize(for presentation: TheaterPresentationStyle) -> NSSize {

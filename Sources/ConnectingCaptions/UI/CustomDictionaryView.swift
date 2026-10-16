@@ -330,18 +330,18 @@ struct CustomDictionaryView: View {
     private var pageHeader: some View {
         FluidPageHeader(
             systemImage: "text.book.closed.fill",
-            title: "Custom Dictionary",
-            subtitle: "Fix names and terms. Theater keeps these words unchanged while translating."
+            title: AppLanguage.text("Custom Dictionary"),
+            subtitle: AppLanguage.text("Fix names and terms. Theater keeps these words unchanged while translating.")
         ) {
             HStack(spacing: self.theme.metrics.spacing.sm) {
                 Button(action: self.importDictionary) {
-                    Label("Import", systemImage: "square.and.arrow.down")
+                    AppLabel("Import", systemImage: "square.and.arrow.down")
                 }
                 .fluidButton(.compact, size: .compact)
-                .help("JSON dictionary or lecture terms pack")
+                .help(AppLanguage.text("JSON dictionary or lecture terms pack"))
 
                 Button(action: self.exportDictionary) {
-                    Label("Export", systemImage: "square.and.arrow.up")
+                    AppLabel("Export", systemImage: "square.and.arrow.up")
                 }
                 .fluidButton(.compact, size: .compact)
             }
@@ -357,9 +357,9 @@ struct CustomDictionaryView: View {
                     SettingsIconTile(systemName: "mic.fill")
 
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Teach Words")
+                        AppText("Teach Words")
                             .font(self.theme.typography.sectionTitle)
-                        Text("Show \(ConnectingCaptionsProduct.displayName) the right spelling, by voice or by typing. Works for Theater listen and dictation.")
+                        AppText("Show {0} the right spelling, by voice or by typing. Works for Theater listen and dictation.", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                             .font(self.theme.typography.caption)
                             .foregroundStyle(self.theme.palette.secondaryText)
                     }
@@ -417,7 +417,7 @@ struct CustomDictionaryView: View {
 
     private var trainReplacementComposer: some View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
-            TextField("Type the correct text, e.g. \(ConnectingCaptionsProduct.displayName)", text: self.$trainingReplacement)
+            TextField(AppLanguage.format("Type the correct text, e.g. {0}", String(describing: ConnectingCaptionsProduct.displayName)), text: self.$trainingReplacement)
                 .dictionaryInputChrome()
                 .disabled(self.isTrainingRecording || self.isTrainingProcessing)
                 .onChange(of: self.trainingReplacement) { oldValue, newValue in
@@ -500,7 +500,7 @@ struct CustomDictionaryView: View {
             }
 
             if !self.manualDuplicateTriggers.isEmpty {
-                Label("Already used: \(self.manualDuplicateTriggers.joined(separator: ", "))", systemImage: "exclamationmark.triangle.fill")
+                AppLabel(AppLanguage.format("Already used: {0}", String(describing: self.manualDuplicateTriggers.joined(separator: ", "))), systemImage: "exclamationmark.triangle.fill")
                     .font(self.theme.typography.caption)
                     .foregroundStyle(self.theme.palette.warning)
             }
@@ -526,7 +526,7 @@ struct CustomDictionaryView: View {
             Button {
                 self.addManualReplacementIfValid()
             } label: {
-                Label("Add Replacement", systemImage: "plus")
+                AppLabel("Add Replacement", systemImage: "plus")
                     .frame(maxWidth: .infinity)
                     .frame(height: 38)
             }
@@ -538,14 +538,14 @@ struct CustomDictionaryView: View {
 
     private var manualTriggerField: some View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
-            Text("When \(ConnectingCaptionsProduct.displayName) hears")
+            AppText("When {0} hears", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                 .font(self.theme.typography.captionStrong)
 
-            TextField("fluid subtitles, fluid subtitle", text: self.$manualTriggerDraft)
+            TextField(AppLanguage.text("fluid subtitles, fluid subtitle"), text: self.$manualTriggerDraft)
                 .dictionaryInputChrome()
                 .onSubmit { self.addManualReplacementIfValid() }
 
-            Text("Separate different versions with commas. Enter only commas to replace comma punctuation.")
+            AppText("Separate different versions with commas. Enter only commas to replace comma punctuation.")
                 .font(self.theme.typography.caption)
                 .foregroundStyle(self.theme.palette.secondaryText)
         }
@@ -553,12 +553,12 @@ struct CustomDictionaryView: View {
 
     private var manualReplacementField: some View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
-            Text("Change it to")
+            AppText("Change it to")
                 .font(self.theme.typography.captionStrong)
-            TextField("\(ConnectingCaptionsProduct.displayName)", text: self.$manualReplacement)
+            TextField(AppLanguage.format("{0}", String(describing: ConnectingCaptionsProduct.displayName)), text: self.$manualReplacement)
                 .dictionaryInputChrome()
                 .onSubmit { self.addManualReplacementIfValid() }
-            Text("This is what appears in your transcription.")
+            AppText("This is what appears in your transcription.")
                 .font(self.theme.typography.caption)
                 .foregroundStyle(self.theme.palette.secondaryText)
         }
@@ -575,11 +575,11 @@ struct CustomDictionaryView: View {
 
     private var trainingRecorderPanel: some View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.md) {
-            Text("Teach \(ConnectingCaptionsProduct.displayName) your pronunciation")
+            AppText("Teach {0} your pronunciation", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                 .font(self.theme.typography.bodySmallStrong)
 
             if self.trainingAlreadyCorrectWithoutReplacement {
-                Label("\(self.trainingTargetReference) is already recognized correctly.", systemImage: "checkmark.circle.fill")
+                AppLabel(AppLanguage.format("{0} is already recognized correctly.", String(describing: self.trainingTargetReference)), systemImage: "checkmark.circle.fill")
                     .font(self.theme.typography.captionStrong)
                     .foregroundStyle(self.theme.palette.accent)
             } else if self.trainingFinalOutputIsReady {
@@ -672,7 +672,7 @@ struct CustomDictionaryView: View {
 
     private var trainingHeardSection: some View {
         HStack(spacing: self.theme.metrics.spacing.sm) {
-            Text("Captured")
+            AppText("Captured")
                 .font(self.theme.typography.captionStrong)
                 .foregroundStyle(self.theme.palette.secondaryText)
 
@@ -684,7 +684,7 @@ struct CustomDictionaryView: View {
                 }
 
                 if self.trainingVariants.count > 5 {
-                    Text("+\(self.trainingVariants.count - 5)")
+                    AppText("+{0}", arguments: [String(describing: self.trainingVariants.count - 5)])
                         .font(self.theme.typography.captionStrong)
                         .foregroundStyle(self.theme.palette.tertiaryText)
                         .padding(.horizontal, 7)
@@ -713,7 +713,7 @@ struct CustomDictionaryView: View {
     private var trainingFinalOutputPanel: some View {
         HStack(alignment: .center, spacing: self.theme.metrics.spacing.md) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("Final output")
+                AppText("Final output")
                     .font(self.theme.typography.captionStrong)
                     .foregroundStyle(self.theme.palette.secondaryText)
 
@@ -723,7 +723,7 @@ struct CustomDictionaryView: View {
                     .lineLimit(1)
 
                 if !self.lastTrainingOutput.isEmpty, self.lastTrainingOutput.caseInsensitiveCompare(self.trainingFinalOutputText) != .orderedSame {
-                    Text("Heard: \(self.lastTrainingOutput)")
+                    AppText("Heard: {0}", arguments: [String(describing: self.lastTrainingOutput)])
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.tertiaryText)
                         .lineLimit(1)
@@ -760,7 +760,7 @@ struct CustomDictionaryView: View {
                 if self.isTrainingActive || !self.trainingVariants.isEmpty || !self.normalizedTrainingReplacement.isEmpty {
                     Spacer()
 
-                    Button("Clear") {
+                    AppButton("Clear") {
                         self.resetTraining()
                     }
                     .fluidButton(.compact, size: .compact)
@@ -782,15 +782,15 @@ struct CustomDictionaryView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text("Your Dictionary")
+                        AppText("Your Dictionary")
                             .font(self.theme.typography.sectionTitle)
                         if !self.entries.isEmpty {
-                            Text("(\(self.entries.count))")
+                            AppText("({0})", arguments: [String(describing: self.entries.count)])
                                 .font(self.theme.typography.captionSmall)
                                 .foregroundStyle(self.theme.palette.tertiaryText)
                         }
                     }
-                    Text("Words and phrases \(ConnectingCaptionsProduct.displayName) will correct automatically.")
+                    AppText("Words and phrases {0} will correct automatically.", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
@@ -807,12 +807,12 @@ struct CustomDictionaryView: View {
             Button {
                 self.presentYourDictionary()
             } label: {
-                Label("Modify", systemImage: "slider.horizontal.3")
+                AppLabel("Modify", systemImage: "slider.horizontal.3")
                     .frame(width: Self.DictionaryHeaderControlLayout.actionButtonLabelWidth)
             }
             .frame(width: Self.DictionaryHeaderControlLayout.actionButtonWidth)
             .fluidButton(.compact, size: .medium)
-            .help("Modify dictionary replacements")
+            .help(AppLanguage.text("Modify dictionary replacements"))
             .popover(isPresented: self.$isYourDictionaryPresented, arrowEdge: .top) {
                 self.yourDictionaryPopover
             }
@@ -831,13 +831,13 @@ struct CustomDictionaryView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text("Spoken Formatting")
+                        AppText("Spoken Formatting")
                             .font(self.theme.typography.sectionTitle)
-                        Text("\(SettingsStore.SpokenFormattingAction.allCases.count) actions · \(self.punctuationRules.count) punctuation")
+                        AppText("{0} actions · {1} punctuation", arguments: [String(describing: SettingsStore.SpokenFormattingAction.allCases.count), String(describing: self.punctuationRules.count)])
                             .font(self.theme.typography.captionSmall)
                             .foregroundStyle(self.theme.palette.tertiaryText)
                     }
-                    Text("Use a start word to safely insert formatting actions, punctuation, and symbols.")
+                    AppText("Use a start word to safely insert formatting actions, punctuation, and symbols.")
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
@@ -854,12 +854,12 @@ struct CustomDictionaryView: View {
             Button {
                 self.presentPunctuationDictionary()
             } label: {
-                Label("Modify", systemImage: "slider.horizontal.3")
+                AppLabel("Modify", systemImage: "slider.horizontal.3")
                     .frame(width: Self.DictionaryHeaderControlLayout.actionButtonLabelWidth)
             }
             .frame(width: Self.DictionaryHeaderControlLayout.actionButtonWidth)
             .fluidButton(.compact, size: .medium)
-            .help("Modify spoken formatting")
+            .help(AppLanguage.text("Modify spoken formatting"))
             .popover(isPresented: self.$isPunctuationDictionaryPresented, arrowEdge: .top) {
                 self.punctuationDictionaryPopover
             }
@@ -870,14 +870,14 @@ struct CustomDictionaryView: View {
     }
 
     private var punctuationDictionaryToggle: some View {
-        Toggle("Spoken Formatting", isOn: self.$punctuationAutoConvertEnabled)
+        AppToggle("Spoken Formatting", isOn: self.$punctuationAutoConvertEnabled)
             .labelsHidden()
             .toggleStyle(.switch)
             .onChange(of: self.punctuationAutoConvertEnabled) { _, newValue in
                 SettingsStore.shared.autoConvertPunctuationEnabled = newValue
             }
             .frame(width: Self.DictionaryHeaderControlLayout.toggleColumnWidth, alignment: .trailing)
-            .help("Turn Spoken Formatting on or off.")
+            .help(AppLanguage.text("Turn Spoken Formatting on or off."))
     }
 
     private var entriesListView: some View {
@@ -901,10 +901,10 @@ struct CustomDictionaryView: View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.lg) {
             HStack(alignment: .top, spacing: self.theme.metrics.spacing.md) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Your Dictionary")
+                    AppText("Your Dictionary")
                         .font(self.theme.typography.sectionTitle)
 
-                    Text("\(ConnectingCaptionsProduct.displayName) automatically corrects these words and phrases.")
+                    AppText("{0} automatically corrects these words and phrases.", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
@@ -919,24 +919,24 @@ struct CustomDictionaryView: View {
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(SquareIconButtonStyle())
-                .help("Close")
+                .help(AppLanguage.text("Close"))
             }
 
             self.yourDictionaryHelpNote
 
             VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Saved Replacements")
+                    AppText("Saved Replacements")
                         .font(self.theme.typography.captionStrong)
-                    Text("Used when Theater or dictation hears this word.")
+                    AppText("Used when Theater or dictation hears this word.")
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
 
                 if self.entries.isEmpty {
                     self.dictionaryEmptyState(
-                        title: "No replacements yet",
-                        detail: "Use Teach Words above to create your first one."
+                        title: AppLanguage.text("No replacements yet"),
+                        detail: AppLanguage.text("Use Teach Words above to create your first one.")
                     )
                 } else {
                     ScrollView(.vertical, showsIndicators: true) {
@@ -952,7 +952,7 @@ struct CustomDictionaryView: View {
 
     private var yourDictionaryHelpNote: some View {
         Label {
-            Text("Use the Teach Words area above to add dictionary entries by voice or manually.")
+            AppText("Use the Teach Words area above to add dictionary entries by voice or manually.")
                 .font(self.theme.typography.caption)
                 .foregroundStyle(self.theme.palette.secondaryText)
         } icon: {
@@ -981,15 +981,15 @@ struct CustomDictionaryView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text("Custom Words")
+                        AppText("Custom Words")
                             .font(self.theme.typography.sectionTitle)
                         if !self.boostTerms.isEmpty {
-                            Text("(\(self.boostTerms.count))")
+                            AppText("({0})", arguments: [String(describing: self.boostTerms.count)])
                                 .font(self.theme.typography.captionSmall)
                                 .foregroundStyle(self.theme.palette.tertiaryText)
                         }
                     }
-                    Text("Help the Parakeet voice engine recognize names, products, and uncommon terms.")
+                    AppText("Help the Parakeet voice engine recognize names, products, and uncommon terms.")
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
@@ -1006,7 +1006,7 @@ struct CustomDictionaryView: View {
             Button {
                 self.presentCustomWords()
             } label: {
-                Label("Modify", systemImage: "slider.horizontal.3")
+                AppLabel("Modify", systemImage: "slider.horizontal.3")
                     .frame(width: Self.DictionaryHeaderControlLayout.actionButtonLabelWidth)
             }
             .frame(width: Self.DictionaryHeaderControlLayout.actionButtonWidth)
@@ -1024,24 +1024,24 @@ struct CustomDictionaryView: View {
     }
 
     private var customWordsBoostingToggle: some View {
-        Toggle("Custom Words Boosting", isOn: self.$vocabBoostingEnabled)
+        AppToggle("Custom Words Boosting", isOn: self.$vocabBoostingEnabled)
             .labelsHidden()
             .toggleStyle(.switch)
             .onChange(of: self.vocabBoostingEnabled) { _, newValue in
                 SettingsStore.shared.vocabularyBoostingEnabled = newValue
             }
             .frame(width: Self.DictionaryHeaderControlLayout.toggleColumnWidth, alignment: .trailing)
-            .help("Improve recognition of your custom words when using Parakeet.")
+            .help(AppLanguage.text("Improve recognition of your custom words when using Parakeet."))
     }
 
     private var customWordsPopover: some View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.lg) {
             HStack(alignment: .top, spacing: self.theme.metrics.spacing.md) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Custom Words")
+                    AppText("Custom Words")
                         .font(self.theme.typography.sectionTitle)
 
-                    Text("Add names, products, and uncommon terms for Parakeet to recognize.")
+                    AppText("Add names, products, and uncommon terms for Parakeet to recognize.")
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
@@ -1056,7 +1056,7 @@ struct CustomDictionaryView: View {
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(SquareIconButtonStyle())
-                .help("Close")
+                .help(AppLanguage.text("Close"))
             }
 
             if self.isBoostWordEditorPresented {
@@ -1066,7 +1066,7 @@ struct CustomDictionaryView: View {
                     Button {
                         self.startAddingBoostTerm()
                     } label: {
-                        Label("Add Word", systemImage: "plus")
+                        AppLabel("Add Word", systemImage: "plus")
                     }
                     .fluidButton(.accent, size: .small)
 
@@ -1076,17 +1076,17 @@ struct CustomDictionaryView: View {
 
             VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Saved Words")
+                    AppText("Saved Words")
                         .font(self.theme.typography.captionStrong)
-                    Text("These words get extra recognition help while Boosting is enabled.")
+                    AppText("These words get extra recognition help while Boosting is enabled.")
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
 
                 if self.boostTerms.isEmpty {
                     self.dictionaryEmptyState(
-                        title: "No custom words yet",
-                        detail: "Add a name or term that needs a little extra recognition help."
+                        title: AppLanguage.text("No custom words yet"),
+                        detail: AppLanguage.text("Add a name or term that needs a little extra recognition help.")
                     )
                 } else {
                     ScrollView(.vertical, showsIndicators: true) {
@@ -1127,18 +1127,18 @@ struct CustomDictionaryView: View {
                 .font(self.theme.typography.captionStrong)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Word or Phrase")
+                AppText("Word or Phrase")
                     .font(self.theme.typography.captionStrong)
-                TextField("\(ConnectingCaptionsProduct.displayName)", text: self.$boostTermText)
+                TextField(AppLanguage.format("{0}", String(describing: ConnectingCaptionsProduct.displayName)), text: self.$boostTermText)
                     .font(self.theme.typography.bodySmall)
                     .dictionaryInputChrome()
                     .onSubmit { self.saveBoostTermIfValid() }
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Word Priority")
+                AppText("Word Priority")
                     .font(self.theme.typography.captionStrong)
-                Picker("Word Priority", selection: self.$boostTermStrength) {
+                Picker(AppLanguage.text("Word Priority"), selection: self.$boostTermStrength) {
                     ForEach(BoostStrengthPreset.allCases) { preset in
                         Text(preset.rawValue).tag(preset)
                     }
@@ -1150,7 +1150,7 @@ struct CustomDictionaryView: View {
             }
 
             if self.isBoostTermDuplicate {
-                Text("This word already exists.")
+                AppText("This word already exists.")
                     .font(self.theme.typography.caption)
                     .foregroundStyle(self.theme.palette.warning)
             }
@@ -1158,19 +1158,19 @@ struct CustomDictionaryView: View {
             HStack {
                 Spacer()
 
-                Button("Clear") {
+                AppButton("Clear") {
                     self.clearBoostTermFields()
                 }
                 .fluidButton(.compact, size: .compact)
 
                 Spacer()
 
-                Button("Cancel") {
+                AppButton("Cancel") {
                     self.dismissBoostTermEditor()
                 }
                 .fluidButton(.compact, size: .compact)
 
-                Button("Save Word") {
+                AppButton("Save Word") {
                     self.saveBoostTermIfValid()
                 }
                 .fluidButton(.accent, size: .small)
@@ -1194,7 +1194,7 @@ struct CustomDictionaryView: View {
             HStack(alignment: .top, spacing: self.theme.metrics.spacing.md) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        Text("Spoken Formatting")
+                        AppText("Spoken Formatting")
                             .font(self.theme.typography.sectionTitle)
 
                         Button {
@@ -1207,11 +1207,11 @@ struct CustomDictionaryView: View {
                                 .frame(width: 28, height: 28)
                         }
                         .buttonStyle(SquareIconButtonStyle())
-                        .help("About spoken formatting")
-                        .accessibilityLabel("About spoken formatting")
+                        .help(AppLanguage.text("About spoken formatting"))
+                        .accessibilityLabel(AppLanguage.text("About spoken formatting"))
                     }
 
-                    Text("Use one start word for formatting actions, punctuation, and symbols.")
+                    AppText("Use one start word for formatting actions, punctuation, and symbols.")
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
@@ -1226,7 +1226,7 @@ struct CustomDictionaryView: View {
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(SquareIconButtonStyle())
-                .help("Close")
+                .help(AppLanguage.text("Close"))
             }
             .padding(.horizontal, self.theme.metrics.spacing.lg)
             .padding(.top, self.theme.metrics.spacing.lg)
@@ -1242,21 +1242,21 @@ struct CustomDictionaryView: View {
 
                     HStack(alignment: .top, spacing: self.theme.metrics.spacing.md) {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Start Word")
+                            AppText("Start Word")
                                 .font(self.theme.typography.captionStrong)
-                            Text("Say this first so normal words do not change.")
+                            AppText("Say this first so normal words do not change.")
                                 .font(self.theme.typography.caption)
                                 .foregroundStyle(self.theme.palette.secondaryText)
-                            TextField("literal", text: self.$punctuationPrefix)
+                            TextField(AppLanguage.text("literal"), text: self.$punctuationPrefix)
                                 .dictionaryInputChrome()
                                 .onSubmit { self.savePunctuationDictionaryPrefix() }
                         }
                         .frame(maxWidth: .infinity, alignment: .topLeading)
 
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Try Saying")
+                            AppText("Try Saying")
                                 .font(self.theme.typography.captionStrong)
-                            Text("Examples of what \(ConnectingCaptionsProduct.displayName) will type.")
+                            AppText("Examples of what {0} will type.", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                                 .font(self.theme.typography.caption)
                                 .foregroundStyle(self.theme.palette.secondaryText)
                             self.punctuationTrySayingPreview
@@ -1269,7 +1269,7 @@ struct CustomDictionaryView: View {
 
                     HStack {
                         Spacer()
-                        Button("Reset All Defaults") {
+                        AppButton("Reset All Defaults") {
                             self.isFormattingResetAlertPresented = true
                         }
                         .fluidButton(.compact, size: .compact)
@@ -1285,15 +1285,15 @@ struct CustomDictionaryView: View {
             self.savePunctuationDictionaryPrefix()
         }
         .alert(
-            "Reset Spoken Formatting?",
+            AppLanguage.text("Reset Spoken Formatting?"),
             isPresented: self.$isFormattingResetAlertPresented
         ) {
-            Button("Reset All Defaults", role: .destructive) {
+            AppButton("Reset All Defaults", role: .destructive) {
                 self.resetPunctuationDictionary()
             }
-            Button("Cancel", role: .cancel) {}
+            AppButton("Cancel", role: .cancel) {}
         } message: {
-            Text("This replaces the start word, formatting action phrases and enabled states, and every punctuation rule with their defaults.")
+            AppText("This replaces the start word, formatting action phrases and enabled states, and every punctuation rule with their defaults.")
         }
     }
 
@@ -1320,11 +1320,11 @@ struct CustomDictionaryView: View {
 
             Spacer()
 
-            Toggle("Spoken Formatting", isOn: self.$punctuationAutoConvertEnabled)
+            AppToggle("Spoken Formatting", isOn: self.$punctuationAutoConvertEnabled)
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .tint(self.theme.palette.accent)
-                .accessibilityLabel("Spoken Formatting")
+                .accessibilityLabel(AppLanguage.text("Spoken Formatting"))
                 .onChange(of: self.punctuationAutoConvertEnabled) { _, newValue in
                     SettingsStore.shared.autoConvertPunctuationEnabled = newValue
                 }
@@ -1343,9 +1343,9 @@ struct CustomDictionaryView: View {
     private var formattingActionsSection: some View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Formatting Actions")
+                AppText("Formatting Actions")
                     .font(self.theme.typography.bodySmallStrong)
-                Text("Fixed invisible actions with spoken phrases you can personalize.")
+                AppText("Fixed invisible actions with spoken phrases you can personalize.")
                     .font(self.theme.typography.caption)
                     .foregroundStyle(self.theme.palette.secondaryText)
             }
@@ -1366,9 +1366,9 @@ struct CustomDictionaryView: View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Punctuation")
+                    AppText("Punctuation")
                         .font(self.theme.typography.bodySmallStrong)
-                    Text("Spoken names that type punctuation or symbols after the start word.")
+                    AppText("Spoken names that type punctuation or symbols after the start word.")
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                 }
@@ -1379,7 +1379,7 @@ struct CustomDictionaryView: View {
                     Button {
                         self.startAddingPunctuationRule()
                     } label: {
-                        Label("Add Rule", systemImage: "plus")
+                        AppLabel("Add Rule", systemImage: "plus")
                     }
                     .fluidButton(.accent, size: .small)
                 }
@@ -1391,8 +1391,8 @@ struct CustomDictionaryView: View {
 
             if self.punctuationRules.isEmpty {
                 self.dictionaryEmptyState(
-                    title: "No punctuation rules",
-                    detail: "Add what you say and what \(ConnectingCaptionsProduct.displayName) should type."
+                    title: AppLanguage.text("No punctuation rules"),
+                    detail: AppLanguage.format("Add what you say and what {0} should type.", String(describing: ConnectingCaptionsProduct.displayName))
                 )
             } else {
                 LazyVStack(spacing: self.theme.metrics.spacing.sm) {
@@ -1421,7 +1421,7 @@ struct CustomDictionaryView: View {
                 )
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(action.title)
+                AppText(action.title)
                     .font(self.theme.typography.bodySmallStrong)
                 Text(rule.aliases.isEmpty ? "No spoken phrases set" : rule.aliases.joined(separator: ", "))
                     .font(self.theme.typography.caption)
@@ -1431,7 +1431,7 @@ struct CustomDictionaryView: View {
 
             Spacer(minLength: self.theme.metrics.spacing.md)
 
-            Button("Edit") {
+            AppButton("Edit") {
                 self.startEditingFormattingAction(action)
             }
             .fluidButton(.compact, size: .compact)
@@ -1457,9 +1457,9 @@ struct CustomDictionaryView: View {
 
     private func formattingActionEditor(_ action: SettingsStore.SpokenFormattingAction) -> some View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
-            Text("Edit \(action.title) Phrases")
+            AppText("Edit {0} Phrases", arguments: [String(describing: action.title)])
                 .font(self.theme.typography.captionStrong)
-            Text("Enter one phrase per line. Clearing every phrase disables this action.")
+            AppText("Enter one phrase per line. Clearing every phrase disables this action.")
                 .font(self.theme.typography.caption)
                 .foregroundStyle(self.theme.palette.secondaryText)
 
@@ -1468,16 +1468,16 @@ struct CustomDictionaryView: View {
                 .frame(minHeight: 68, maxHeight: 92)
                 .scrollContentBackground(.hidden)
                 .dictionaryInputChrome(minHeight: 68)
-                .accessibilityLabel("Spoken phrases for \(action.title)")
+                .accessibilityLabel(AppLanguage.format("Spoken phrases for {0}", String(describing: action.title)))
 
             HStack {
                 Spacer()
-                Button("Cancel") {
+                AppButton("Cancel") {
                     self.dismissFormattingActionEditor()
                 }
                 .fluidButton(.compact, size: .compact)
 
-                Button("Save Phrases") {
+                AppButton("Save Phrases") {
                     self.saveFormattingActionAliases(action)
                 }
                 .fluidButton(.accent, size: .small)
@@ -1496,10 +1496,10 @@ struct CustomDictionaryView: View {
 
     private var punctuationDictionaryInfoPanel: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Say the start word first, then a formatting action or punctuation name.")
-            Text("When you say \"\(self.punctuationPreviewPrefix) next line\", it starts a new line.")
-            Text("When you say \"\(self.punctuationPreviewPrefix) comma\", it types \",\".")
-            Text("Add one spoken phrase per line. Formatting actions always keep their fixed output.")
+            AppText("Say the start word first, then a formatting action or punctuation name.")
+            AppText("When you say \"{0} next line\", it starts a new line.", arguments: [String(describing: self.punctuationPreviewPrefix)])
+            AppText("When you say \"{0} comma\", it types \",\".", arguments: [String(describing: self.punctuationPreviewPrefix)])
+            AppText("Add one spoken phrase per line. Formatting actions always keep their fixed output.")
         }
         .font(self.theme.typography.caption)
         .foregroundStyle(self.theme.palette.secondaryText)
@@ -1543,14 +1543,8 @@ struct CustomDictionaryView: View {
     }
 
     private func punctuationExampleText(spoken: String, typed: String) -> Text {
-        Text("When you say ")
-            .foregroundStyle(self.theme.palette.secondaryText) +
-            Text("\"\(spoken)\"")
-            .foregroundStyle(self.theme.palette.accent) +
-            Text(", it types ")
-            .foregroundStyle(self.theme.palette.secondaryText) +
-            Text("\"\(typed)\"")
-            .foregroundStyle(self.theme.palette.accent)
+        Text(AppLanguage.format("When you say \"{0}\", it types \"{1}\"", spoken, typed))
+            .foregroundStyle(self.theme.palette.secondaryText)
     }
 
     private var punctuationRuleEditor: some View {
@@ -1573,19 +1567,19 @@ struct CustomDictionaryView: View {
             HStack {
                 Spacer()
 
-                Button("Clear") {
+                AppButton("Clear") {
                     self.clearPunctuationRuleFields()
                 }
                 .fluidButton(.compact, size: .compact)
 
                 Spacer()
 
-                Button("Cancel") {
+                AppButton("Cancel") {
                     self.dismissPunctuationRuleEditor()
                 }
                 .fluidButton(.compact, size: .compact)
 
-                Button("Save Rule") {
+                AppButton("Save Rule") {
                     self.savePunctuationRuleIfValid()
                 }
                 .fluidButton(.accent, size: .small)
@@ -1606,9 +1600,9 @@ struct CustomDictionaryView: View {
 
     private var punctuationAliasesEditor: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("What You Say")
+            AppText("What You Say")
                 .font(self.theme.typography.captionStrong)
-            Text("One way per line, like comma or full stop.")
+            AppText("One way per line, like comma or full stop.")
                 .font(self.theme.typography.caption)
                 .foregroundStyle(self.theme.palette.secondaryText)
             TextEditor(text: self.$punctuationAliasesText)
@@ -1622,13 +1616,13 @@ struct CustomDictionaryView: View {
 
     private var punctuationSymbolEditor: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("What It Types")
+            AppText("What It Types")
                 .font(self.theme.typography.captionStrong)
             TextField(",", text: self.$punctuationSymbolText)
                 .font(self.theme.typography.bodySmallStrong)
                 .dictionaryInputChrome()
                 .frame(width: 92)
-            Text("One punctuation symbol, like , or ?.")
+            AppText("One punctuation symbol, like , or ?.")
                 .font(self.theme.typography.caption)
                 .foregroundStyle(self.theme.palette.secondaryText)
         }
@@ -1645,9 +1639,9 @@ struct CustomDictionaryView: View {
                 .foregroundStyle(self.theme.palette.tertiaryText)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                AppText(title)
                     .font(self.theme.typography.bodySmallStrong)
-                Text(detail)
+                AppText(detail)
                     .font(self.theme.typography.caption)
                     .foregroundStyle(self.theme.palette.secondaryText)
             }
@@ -1655,7 +1649,7 @@ struct CustomDictionaryView: View {
             if let action {
                 Spacer()
 
-                Button("Add", action: action)
+                AppButton("Add", action: action)
                     .fluidButton(.compact, size: .compact)
             }
         }
@@ -1697,8 +1691,8 @@ struct CustomDictionaryView: View {
         self.entries.insert(entry, at: 0)
         self.saveEntries()
         self.showReplacementConfirmation(
-            title: "Replacement added",
-            detail: "It is at the top of the list."
+            title: AppLanguage.text("Replacement added"),
+            detail: AppLanguage.text("It is at the top of the list.")
         )
     }
 
@@ -2304,11 +2298,11 @@ struct CustomDictionaryView: View {
             try data.write(to: url, options: .atomic)
 
             self.presentInfoAlert(
-                title: "Dictionary Exported",
-                message: "Saved \(document.replacements.count) replacement rules and \(document.customWords.count) custom words."
+                title: AppLanguage.text("Dictionary Exported"),
+                message: AppLanguage.format("Saved {0} replacement rules and {1} custom words.", String(describing: document.replacements.count), String(describing: document.customWords.count))
             )
         } catch {
-            self.presentErrorAlert(title: "Dictionary Export Failed", message: error.localizedDescription)
+            self.presentErrorAlert(title: AppLanguage.text("Dictionary Export Failed"), message: error.localizedDescription)
         }
     }
 
@@ -2331,11 +2325,11 @@ struct CustomDictionaryView: View {
             self.loadBoostTerms()
 
             self.presentInfoAlert(
-                title: "Dictionary Imported",
-                message: "Now using \(summary.replacementCount) replacement rules and \(summary.customWordCount) custom words."
+                title: AppLanguage.text("Dictionary Imported"),
+                message: AppLanguage.format("Now using {0} replacement rules and {1} custom words.", String(describing: summary.replacementCount), String(describing: summary.customWordCount))
             )
         } catch {
-            self.presentErrorAlert(title: "Dictionary Import Failed", message: error.localizedDescription)
+            self.presentErrorAlert(title: AppLanguage.text("Dictionary Import Failed"), message: error.localizedDescription)
         }
     }
 
@@ -2430,7 +2424,7 @@ private extension CustomDictionaryView {
 
     func trainingInstruction(number: Int, text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("\(number)")
+            AppText("{0}", arguments: [String(describing: number)])
                 .font(self.theme.typography.captionStrong)
                 .foregroundStyle(self.theme.palette.accent)
                 .frame(width: 16, alignment: .center)
@@ -2468,22 +2462,22 @@ private struct VoiceMatchingSettingsRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
             HStack(spacing: self.theme.metrics.spacing.sm) {
-                self.methodButton(title: "Basic", systemImage: "checkmark", enabledValue: false)
-                self.methodButton(title: "Advanced", systemImage: "waveform", enabledValue: true, isResearchPreview: true)
+                self.methodButton(title: AppLanguage.text("Basic"), systemImage: "checkmark", enabledValue: false)
+                self.methodButton(title: AppLanguage.text("Advanced"), systemImage: "waveform", enabledValue: true, isResearchPreview: true)
             }
 
             if self.isEnabled {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "flask.fill")
                         .foregroundStyle(self.theme.palette.accent)
-                    Text("Research Preview: Compares how your voice sounds instead of only the words \(ConnectingCaptionsProduct.displayName) hears. Results may vary.")
+                    AppText("Research Preview: Compares how your voice sounds instead of only the words {0} hears. Results may vary.", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                         .font(self.theme.typography.caption)
                         .foregroundStyle(self.theme.palette.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.horizontal, 2)
             } else if !self.isAdvancedAvailable {
-                Text("Advanced voice matching requires Parakeet TDT on Apple Silicon.")
+                AppText("Advanced voice matching requires Parakeet TDT on Apple Silicon.")
                     .font(self.theme.typography.caption)
                     .foregroundStyle(self.theme.palette.secondaryText)
                     .padding(.horizontal, 2)
@@ -2515,9 +2509,9 @@ private struct VoiceMatchingSettingsRow: View {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: systemImage)
-                Text(title)
+                AppText(title)
                 if isResearchPreview {
-                    Text("Research Preview")
+                    AppText("Research Preview")
                         .font(self.theme.typography.captionSmall)
                         .foregroundStyle(isSelected ? Color.white.opacity(0.86) : self.theme.palette.accent)
                 }
@@ -2709,9 +2703,9 @@ private enum DictionaryComposerMode: CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .train:
-            return "Train by Voice"
+            return AppLanguage.text("Train by Voice")
         case .manual:
-            return "Add Manually"
+            return AppLanguage.text("Add Manually")
         }
     }
 
@@ -2727,9 +2721,9 @@ private enum DictionaryComposerMode: CaseIterable, Identifiable {
     var detail: String {
         switch self {
         case .train:
-            return "Teach a word by speaking it."
+            return AppLanguage.text("Teach a word by speaking it.")
         case .manual:
-            return "Type the misheard text and the spelling you want."
+            return AppLanguage.text("Type the misheard text and the spelling you want.")
         }
     }
 }
@@ -2749,7 +2743,7 @@ private struct DictionaryComposerModeTab: View {
             HStack(spacing: self.theme.metrics.spacing.sm) {
                 Image(systemName: self.mode.systemImage)
                     .font(.system(size: 12, weight: .semibold))
-                Text(self.mode.title)
+                AppText(self.mode.title)
                     .font(self.theme.typography.bodySmallStrong)
             }
             .foregroundStyle(self.foreground)
@@ -2998,7 +2992,7 @@ private struct ReplacementConfirmationToast: View {
             }
 
             VStack(spacing: 3) {
-                Text(self.confirmation.title)
+                AppText(self.confirmation.title)
                     .font(self.theme.typography.sectionTitle)
                     .foregroundStyle(self.theme.palette.primaryText)
                 Text(self.confirmation.detail)
@@ -3060,7 +3054,7 @@ private struct DictionaryTrainingReadinessRing: View {
                 .rotationEffect(.degrees(-90))
 
             VStack(spacing: 1) {
-                Text("\(self.progress)/\(self.total)")
+                AppText("{0}/{1}", arguments: [String(describing: self.progress), String(describing: self.total)])
                     .font(self.theme.typography.sectionTitle)
                     .foregroundStyle(self.isReady ? self.theme.palette.accent : self.theme.palette.primaryText)
                     .monospacedDigit()
@@ -3074,7 +3068,7 @@ private struct DictionaryTrainingReadinessRing: View {
         .shadow(color: self.isReady ? self.theme.palette.accent.opacity(0.2) : .clear, radius: 10)
         .animation(.easeOut(duration: 0.24), value: self.progress)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Training progress")
+        .accessibilityLabel(AppLanguage.text("Training progress"))
         .accessibilityValue("\(self.progress) of \(self.total) correct")
     }
 }
@@ -3088,7 +3082,7 @@ private struct TrainingVariantChip: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text("\(self.number)")
+            AppText("{0}", arguments: [String(describing: self.number)])
                 .font(self.theme.typography.captionSmall)
                 .foregroundStyle(self.theme.palette.accent)
                 .frame(minWidth: 11)
@@ -3104,7 +3098,7 @@ private struct TrainingVariantChip: View {
                     .foregroundStyle(self.theme.palette.tertiaryText)
             }
             .buttonStyle(.plain)
-            .help("Remove \(self.variant)")
+            .help(AppLanguage.format("Remove {0}", String(describing: self.variant)))
         }
         .frame(maxWidth: 165)
         .padding(.horizontal, 7)
@@ -3214,7 +3208,7 @@ struct BoostTermRow: View {
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(SquareIconButtonStyle())
-                .help("Configure \(self.term.text)")
+                .help(AppLanguage.format("Configure {0}", String(describing: self.term.text)))
 
                 Button(role: .destructive) {
                     self.onDelete()
@@ -3224,7 +3218,7 @@ struct BoostTermRow: View {
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(SquareIconButtonStyle(foreground: .red, borderColor: .red))
-                .help("Delete \(self.term.text)")
+                .help(AppLanguage.format("Delete {0}", String(describing: self.term.text)))
             }
         }
         .padding(.horizontal, self.theme.metrics.spacing.md)
@@ -3280,7 +3274,7 @@ struct DictionaryEntryRow: View {
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(SquareIconButtonStyle())
-                .help("Configure replacement")
+                .help(AppLanguage.text("Configure replacement"))
 
                 Button(role: .destructive) {
                     self.onDelete()
@@ -3290,7 +3284,7 @@ struct DictionaryEntryRow: View {
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(SquareIconButtonStyle(foreground: .red, borderColor: .red))
-                .help("Delete replacement")
+                .help(AppLanguage.text("Delete replacement"))
             }
         }
         .padding(.horizontal, self.theme.metrics.spacing.md)
@@ -3341,7 +3335,7 @@ private struct PunctuationDictionaryRuleRow: View {
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(SquareIconButtonStyle())
-                .help("Edit punctuation rule")
+                .help(AppLanguage.text("Edit punctuation rule"))
 
                 Button(role: .destructive) {
                     self.onDelete()
@@ -3351,7 +3345,7 @@ private struct PunctuationDictionaryRuleRow: View {
                         .frame(width: 32, height: 32)
                 }
                 .buttonStyle(SquareIconButtonStyle(foreground: .red, borderColor: .red))
-                .help("Delete punctuation rule")
+                .help(AppLanguage.text("Delete punctuation rule"))
             }
         }
         .padding(.horizontal, self.theme.metrics.spacing.md)
@@ -3393,10 +3387,10 @@ struct AddDictionaryEntrySheet: View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack {
-                Text("Add Dictionary Entry")
+                AppText("Add Dictionary Entry")
                     .font(.headline)
                 Spacer()
-                Button("Cancel") { self.dismiss() }
+                AppButton("Cancel") { self.dismiss() }
                     .buttonStyle(.bordered)
             }
 
@@ -3404,9 +3398,9 @@ struct AddDictionaryEntrySheet: View {
 
             // Triggers input
             VStack(alignment: .leading, spacing: 6) {
-                Text("Misheard Words (triggers)")
+                AppText("Misheard Words (triggers)")
                     .font(.subheadline.weight(.medium))
-                Text("Add one version per line. Commas can be saved too.")
+                AppText("Add one version per line. Commas can be saved too.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 TextEditor(text: self.$triggersText)
@@ -3420,7 +3414,7 @@ struct AddDictionaryEntrySheet: View {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
-                        Text("Duplicate triggers: \(self.duplicateTriggers.joined(separator: ", "))")
+                        AppText("Duplicate triggers: {0}", arguments: [String(describing: self.duplicateTriggers.joined(separator: ", "))])
                             .foregroundStyle(.orange)
                     }
                     .font(.caption)
@@ -3429,12 +3423,12 @@ struct AddDictionaryEntrySheet: View {
 
             // Replacement input
             VStack(alignment: .leading, spacing: 6) {
-                Text("Correct Spelling (replacement)")
+                AppText("Correct Spelling (replacement)")
                     .font(.subheadline.weight(.medium))
-                Text("This is what will appear in the final transcription.")
+                AppText("This is what will appear in the final transcription.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("\(ConnectingCaptionsProduct.displayName)", text: self.$replacement)
+                TextField(AppLanguage.format("{0}", String(describing: ConnectingCaptionsProduct.displayName)), text: self.$replacement)
                     .dictionaryInputChrome()
                     .onSubmit { self.saveIfValid() }
             }
@@ -3444,7 +3438,7 @@ struct AddDictionaryEntrySheet: View {
             // Preview
             if !self.triggersText.isEmpty && !self.replacement.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Preview")
+                    AppText("Preview")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
 
@@ -3487,7 +3481,7 @@ struct AddDictionaryEntrySheet: View {
             // Save button
             HStack {
                 Spacer()
-                Button("Add Replacement") { self.saveIfValid() }
+                AppButton("Add Replacement") { self.saveIfValid() }
                     .buttonStyle(.borderedProminent)
                     .tint(self.theme.palette.accent)
                     .disabled(!self.canSave)
@@ -3545,10 +3539,10 @@ struct EditDictionaryEntrySheet: View {
         VStack(alignment: .leading, spacing: 16) {
             // Header
             HStack {
-                Text("Edit Dictionary Entry")
+                AppText("Edit Dictionary Entry")
                     .font(.headline)
                 Spacer()
-                Button("Cancel") { self.dismiss() }
+                AppButton("Cancel") { self.dismiss() }
                     .buttonStyle(.bordered)
             }
 
@@ -3556,9 +3550,9 @@ struct EditDictionaryEntrySheet: View {
 
             // Triggers input
             VStack(alignment: .leading, spacing: 6) {
-                Text("Misheard Words (triggers)")
+                AppText("Misheard Words (triggers)")
                     .font(.subheadline.weight(.medium))
-                Text("Add one version per line. Commas can be saved too.")
+                AppText("Add one version per line. Commas can be saved too.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 TextEditor(text: self.$triggersText)
@@ -3572,7 +3566,7 @@ struct EditDictionaryEntrySheet: View {
                     HStack(spacing: 4) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundStyle(.orange)
-                        Text("Duplicate triggers: \(self.duplicateTriggers.joined(separator: ", "))")
+                        AppText("Duplicate triggers: {0}", arguments: [String(describing: self.duplicateTriggers.joined(separator: ", "))])
                             .foregroundStyle(.orange)
                     }
                     .font(.caption)
@@ -3581,12 +3575,12 @@ struct EditDictionaryEntrySheet: View {
 
             // Replacement input
             VStack(alignment: .leading, spacing: 6) {
-                Text("Correct Spelling (replacement)")
+                AppText("Correct Spelling (replacement)")
                     .font(.subheadline.weight(.medium))
-                Text("This is what will appear in the final transcription.")
+                AppText("This is what will appear in the final transcription.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("\(ConnectingCaptionsProduct.displayName)", text: self.$replacement)
+                TextField(AppLanguage.format("{0}", String(describing: ConnectingCaptionsProduct.displayName)), text: self.$replacement)
                     .dictionaryInputChrome()
                     .onSubmit { self.saveIfValid() }
             }
@@ -3596,7 +3590,7 @@ struct EditDictionaryEntrySheet: View {
             // Preview
             if !self.triggersText.isEmpty && !self.replacement.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Preview")
+                    AppText("Preview")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
 
@@ -3641,7 +3635,7 @@ struct EditDictionaryEntrySheet: View {
             // Save button
             HStack {
                 Spacer()
-                Button("Save Changes") { self.saveIfValid() }
+                AppButton("Save Changes") { self.saveIfValid() }
                     .buttonStyle(.borderedProminent)
                     .tint(self.theme.palette.accent)
                     .disabled(!self.canSave)

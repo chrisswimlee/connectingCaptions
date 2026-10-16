@@ -124,4 +124,12 @@ final class TheaterSpeechSession: SpeechCapturePolicy {
     func handleEndOfUtterance() {
         LiveTranslationController.shared.handleEndOfUtterance()
     }
+
+    func noteTimedSegments(_ segments: [ASRTimedSegment]) {
+        LiveTranslationController.shared.subscriber.noteTimedSegments(segments)
+    }
+
+    func noteAudioContainsSpeech(_ containsSpeech: Bool) {
+        LiveTranslationController.shared.subscriber.noteAudioContainsSpeech(containsSpeech)
+    }
 }

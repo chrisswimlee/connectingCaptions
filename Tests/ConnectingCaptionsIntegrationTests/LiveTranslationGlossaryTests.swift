@@ -3,6 +3,7 @@ import AVFoundation
 import XCTest
 @testable import ConnectingCaptions_Debug
 
+@MainActor
 final class LiveTranslationGlossaryTests: XCTestCase {
     func testProtectAndRestoreKeepsNames() {
         let terms = ["connectingCaptions", "Keynote"]
@@ -322,17 +323,6 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertTrue(
             LiveTranslationController.shared.subscriber.statusText.contains("only hear English")
         )
-    }
-
-    @MainActor
-    func testFinishedLinePolishIsAvailableWhenMLXIsEnabled() throws {
-        try XCTSkipIf(TheaterTranslationEngineKind.appleTranslationOnly, "Translation Engine is Apple Translation only")
-        let settings = SettingsStore.shared
-        let original = settings.mlxRunnerEnabled
-        defer { settings.mlxRunnerEnabled = original }
-        settings.mlxRunnerEnabled = true
-        XCTAssertTrue(LLMTranslationEngine().isAvailable(settings: settings))
-        XCTAssertEqual(MLXRunnerService.shared.canServe, MLXRunnerService.shared.status.running)
     }
 
     func testAppleLanguagePrefersInstalledEnglish() {
@@ -731,7 +721,7 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertTrue(TranslationEngineError.timeout.isTimeout)
     }
 
-    func testEitherWayControlShowsForADistinctTranslatePair() {
+    func testEitherWayControlRequiresInstalledModelsAndBothTranslationDirections() {
         let settings = SettingsStore.shared
         let originalSource = settings.translationSourceLanguageID
         let originalTarget = settings.translationTargetLanguageID
@@ -744,14 +734,25 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         settings.theaterSessionMode = .translation
         settings.translationSourceLanguageID = "en"
         settings.translationTargetLanguageID = "ko"
-        XCTAssertTrue(SpokenLanguageResolver.showsEitherWayControl(settings: settings))
+        let source = SpokenLanguageResolver.sourceLanguage(settings: settings)
+        let target = SpokenLanguageResolver.targetLanguage(settings: settings)
+        let engine = AppleTranslationEngine.shared
+        let ready = EitherWayAvailability.isVisible(
+            speechReady: SettingsStore.SpeechModel.eitherWayAddOn.isInstalled,
+            forward: engine.cachedPackAvailability(source: source, target: target),
+            reverse: engine.cachedPackAvailability(source: target, target: source)
+        )
+        XCTAssertEqual(SpokenLanguageResolver.showsEitherWayControl(settings: settings), ready)
         settings.translationTargetLanguageID = "en"
         XCTAssertFalse(SpokenLanguageResolver.showsEitherWayControl(settings: settings))
     }
 
     func testEitherWayStaysOffUnlessWhisperHearsBothSides() throws {
+        // `availableModels` only says this Mac can run Whisper, not that the
+        // add-on is on disk. Every pairing assertion below needs Whisper to
+        // actually hear both sides, so gate on the download, not the arch.
         try XCTSkipUnless(
-            SettingsStore.SpeechModel.availableModels.contains(.whisperSmall),
+            SettingsStore.SpeechModel.eitherWayAddOn.isInstalled,
             "Whisper Small Either way add-on missing"
         )
         let settings = SettingsStore.shared

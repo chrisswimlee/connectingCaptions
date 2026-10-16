@@ -63,22 +63,22 @@ extension SettingsStore {
 
         var displayName: String {
             switch self {
-            case .parakeetTDT: return "Parakeet TDT v3 (Multilingual)"
-            case .parakeetTDTv2: return "Parakeet TDT v2 (English Only)"
-            case .parakeetRealtime: return "Parakeet Flash (Beta)"
-            case .qwen3Asr: return "Qwen3 ASR (Beta)"
-            case .cohereTranscribeSixBit: return "Cohere Transcribe"
-            case .nemotronOffline: return "Nemotron 3.5 Multilingual"
-            case .nemotronStreaming: return "Nemotron Speech 3.5 - Ultra Fast Low Latency"
-            case .nemotronStreaming320: return "Nemotron Speech 3.5 - Ultra Fast Low Latency"
-            case .appleSpeech: return "Apple ASR Legacy"
-            case .appleSpeechAnalyzer: return "Apple Speech - macOS 26+"
-            case .whisperTiny: return "Whisper Tiny"
-            case .whisperBase: return "Whisper Base"
-            case .whisperSmall: return "Whisper Small"
-            case .whisperMedium: return "Whisper Medium"
-            case .whisperLargeTurbo: return "Whisper Large Turbo"
-            case .whisperLarge: return "Whisper Large"
+            case .parakeetTDT: return AppLanguage.text("Parakeet TDT v3 (Multilingual)")
+            case .parakeetTDTv2: return AppLanguage.text("Parakeet TDT v2 (English Only)")
+            case .parakeetRealtime: return AppLanguage.text("Parakeet Flash (Beta)")
+            case .qwen3Asr: return AppLanguage.text("Qwen3 ASR (Beta)")
+            case .cohereTranscribeSixBit: return AppLanguage.text("Cohere Transcribe")
+            case .nemotronOffline: return AppLanguage.text("Nemotron 3.5 Multilingual")
+            case .nemotronStreaming: return AppLanguage.text("Nemotron Speech 3.5 - Ultra Fast Low Latency")
+            case .nemotronStreaming320: return AppLanguage.text("Nemotron Speech 3.5 - Ultra Fast Low Latency")
+            case .appleSpeech: return AppLanguage.text("Apple ASR Legacy")
+            case .appleSpeechAnalyzer: return AppLanguage.text("Apple Speech - macOS 26+")
+            case .whisperTiny: return AppLanguage.text("Whisper Tiny")
+            case .whisperBase: return AppLanguage.text("Whisper Base")
+            case .whisperSmall: return AppLanguage.text("Whisper Small")
+            case .whisperMedium: return AppLanguage.text("Whisper Medium")
+            case .whisperLargeTurbo: return AppLanguage.text("Whisper Large Turbo")
+            case .whisperLarge: return AppLanguage.text("Whisper Large")
             }
         }
 
@@ -294,9 +294,9 @@ extension SettingsStore {
             case .nemotronStreaming320:
                 return "Streaming Nemotron for most supported languages. Thai is experimental. Malay and Indonesian need Apple Speech or Whisper."
             case .appleSpeech:
-                return "Built-in macOS speech. No download. Hears every supported language on this Mac."
+                return "Built-in macOS speech. Only languages confirmed for offline recognition on this Mac can be used."
             case .appleSpeechAnalyzer:
-                return "On-device Speech Analyzer for the languages this Mac includes. Requires a newer macOS. Other languages use Apple Speech or Whisper."
+                return "On-device Speech Analyzer on macOS 26. Language support and installed speech assets are checked on this Mac."
             case .whisperTiny:
                 return "Minimal resource usage. Best for older Macs or battery life."
             case .whisperBase:
@@ -730,9 +730,9 @@ extension SettingsStore {
 
         var displayName: String {
             switch self {
-            case .auto: return "Automatic (Recommended)"
-            case .fluidAudio: return "Parakeet (Apple Silicon)"
-            case .whisper: return "Whisper (Intel/Universal)"
+            case .auto: return AppLanguage.text("Automatic (Recommended)")
+            case .fluidAudio: return AppLanguage.text("Parakeet (Apple Silicon)")
+            case .whisper: return AppLanguage.text("Whisper (Intel/Universal)")
             }
         }
 
@@ -822,20 +822,20 @@ extension SettingsStore {
 
         var displayName: String {
             switch self {
-            case .arabic: return "Arabic"
-            case .german: return "German"
-            case .greek: return "Greek"
-            case .english: return "English"
-            case .spanish: return "Spanish"
-            case .french: return "French"
-            case .italian: return "Italian"
-            case .japanese: return "Japanese"
-            case .korean: return "Korean"
-            case .dutch: return "Dutch"
-            case .polish: return "Polish"
-            case .portuguese: return "Portuguese"
-            case .vietnamese: return "Vietnamese"
-            case .mandarinChinese: return "Mandarin Chinese"
+            case .arabic: return AppLanguage.text("Arabic")
+            case .german: return AppLanguage.text("German")
+            case .greek: return AppLanguage.text("Greek")
+            case .english: return AppLanguage.text("English")
+            case .spanish: return AppLanguage.text("Spanish")
+            case .french: return AppLanguage.text("French")
+            case .italian: return AppLanguage.text("Italian")
+            case .japanese: return AppLanguage.text("Japanese")
+            case .korean: return AppLanguage.text("Korean")
+            case .dutch: return AppLanguage.text("Dutch")
+            case .polish: return AppLanguage.text("Polish")
+            case .portuguese: return AppLanguage.text("Portuguese")
+            case .vietnamese: return AppLanguage.text("Vietnamese")
+            case .mandarinChinese: return AppLanguage.text("Mandarin Chinese")
             }
         }
 

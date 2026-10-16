@@ -126,7 +126,7 @@ nonisolated enum CommercialSeat {
         let trimmed = rosterToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !trimmed.isEmpty else { return .refused(.missingRoster) }
         switch self.verify(trimmed, publicKey: publicKey, now: now) {
-        case let .failure:
+        case .failure:
             return .refused(.invalidRoster)
         case let .success(roster):
             guard roster.org == license.org else { return .refused(.orgMismatch) }

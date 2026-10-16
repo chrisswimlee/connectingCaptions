@@ -7,6 +7,7 @@ import XCTest
 
 // swiftlint:disable file_length type_body_length function_body_length cyclomatic_complexity
 // Tracked grandfather: hotkey suite. New cases belong in a focused test file.
+@MainActor
 final class HotkeyShortcutTests: XCTestCase {
     private let legacyHotkeyShortcutKey = "HotkeyShortcutKey"
     private let primaryDictationShortcutsKey = "PrimaryDictationShortcuts"

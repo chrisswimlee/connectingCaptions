@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       relevant: ${{ steps.filter.outputs.relevant }}
+      docs: ${{ steps.filter.outputs.docs }}
 
     steps:
     - name: Checkout code
@@ -39,9 +40,16 @@ jobs:
             - 'connectingCaptions.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved'
             - 'Info.plist'
             - 'connectingCaptions.entitlements'
+            - 'xcconfig/**'
+            - 'build.sh'
             - '.swiftlint.yml'
-            - 'scripts/test-omitted-tests.sh'
+            - 'scripts/**'
             - '.github/workflows/build.yml'
+            - '.github/workflows/release.yml'
+          docs:
+            - '*.md'
+            - 'docs/**'
+            - 'scripts/test-docs-copy.sh'
 
   lint:
     name: SwiftLint
@@ -54,8 +62,28 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-    - name: Check test harness wiring
+    # The enforced guard chain (docs in CONTRIBUTING.md "First hour"; keep
+    # them in sync): test-wiring guard -> team-ID guard -> UI-copy guard ->
+    # quality-scorer guard -> interface catalog -> Python tests -> SwiftLint strict.
+    # Guards are plain sh + git +
+    # grep + python3, CI-safe on ubuntu.
+    - name: Check test harness wiring (and committed team IDs)
       run: sh scripts/test-omitted-tests.sh
+
+    - name: Check no committed Developer Team IDs
+      run: bash scripts/check-team-id.sh
+
+    - name: Check UI copy and VoiceOver traps
+      run: sh scripts/test-ui-copy.sh
+
+    - name: Check the Theater quality scorer still means what it says
+      run: sh scripts/test-quality-score.sh
+
+    - name: Check interface localization catalog
+      run: python3 scripts/update-interface-catalog.py --check
+
+    - name: Check quality-review and tooling regressions
+      run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
     - name: Run SwiftLint (strict)
       run: |
@@ -130,16 +158,43 @@ jobs:
         path: ${{ runner.temp }}/Tests.xcresult
         retention-days: 7
 
+  docs-check:
+    name: Docs copy and link check
+    if: needs.changes.outputs.docs == 'true' && (github.event_name == 'push' || github.event.pull_request.draft == false)
+    needs: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+    - name: Check docs copy and relative links
+      run: sh scripts/test-docs-copy.sh
+
   ci-ok:
     name: Build and Test
     if: always() && (github.event_name == 'push' || github.event.pull_request.draft == false)
-    needs: [changes, lint, build]
+    needs: [changes, lint, build, docs-check]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Require lint and tests when sources changed
         run: |
           set -euo pipefail
+          # A failed or cancelled change-detection job leaves both filters empty.
+          # Without this the empty `relevant` reads as "nothing build-relevant
+          # changed" and the required check goes green with nothing built, no
+          # tests run and the docs sweep skipped.
+          if [ "${{ needs.changes.result }}" != "success" ]; then
+            echo "Change detection did not succeed (result: ${{ needs.changes.result }})."
+            exit 1
+          fi
+          if [ "${{ needs.changes.outputs.docs }}" = "true" ] && [ "${{ needs['docs-check'].result }}" != "success" ]; then
+            echo "Docs copy/link check failed."
+            exit 1
+          fi
+          # Empty `relevant` now only means "the filter ran and matched nothing".
           if [ "${{ needs.changes.outputs.relevant }}" != "true" ]; then
             echo "No build-relevant paths. Build and Test is green."
             exit 0

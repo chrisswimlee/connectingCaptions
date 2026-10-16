@@ -164,7 +164,7 @@ final class TheaterOverlayPolicyTests: XCTestCase {
                 minimized: false
             )
         )
-        XCTAssertTrue(
+        XCTAssertFalse(
             TheaterOverlayPolicy.movableByBackground(
                 presentation: .transparent,
                 toolsPinned: true,
@@ -599,6 +599,20 @@ final class TheaterMenuBarTests: XCTestCase {
         )
     }
 
+    func testMenuBarOffersAnExplicitOverlayPlacementLock() {
+        let settings = SettingsStore.shared
+        let previous = settings.theaterPresentationStyle
+        defer { settings.theaterPresentationStyle = previous }
+        let menu = self.overlayMenu()
+        settings.theaterPresentationStyle = TheaterPresentationStyle.popup.rawValue
+        TheaterMenuBarController.applyState(to: menu)
+        let item = TheaterMenuBarController.item(.overlayPlacement, in: menu)
+        XCTAssertNotNil(item?.action)
+        XCTAssertTrue(item?.target === TheaterMenuBarController.shared)
+        XCTAssertEqual(item?.isEnabled, false)
+        XCTAssertEqual(item?.toolTip, TheaterChromeHelp.keepOverlayText)
+    }
+
     func testMenuBarDoesNotOfferAScreenShareToggle() {
         let menu = self.overlayMenu()
         XCTAssertNil(menu.items.first { $0.title == "Hide from Screen Share" })
@@ -843,5 +857,58 @@ final class TheaterCaptionScaleTests: XCTestCase {
             ),
             50
         )
+    }
+}
+
+@MainActor
+final class OverlayPlacementLockTests: XCTestCase {
+    func testLockDisablesNativeMovingAndResizingWithoutChangingTheFrame() {
+        let panel = NSPanel(
+            contentRect: CGRect(x: 80, y: 80, width: 900, height: 300),
+            styleMask: [.titled, .resizable], backing: .buffered, defer: false
+        )
+        let frame = panel.frame
+        PresenterCaptionController.applyGeometryLock(to: panel, presentation: .transparent, placing: false, minimized: false)
+        XCTAssertFalse(panel.isMovable)
+        XCTAssertFalse(panel.styleMask.contains(.resizable))
+        XCTAssertEqual(panel.frame, frame)
+
+        PresenterCaptionController.applyGeometryLock(to: panel, presentation: .transparent, placing: true, minimized: false)
+        XCTAssertTrue(panel.isMovable)
+        XCTAssertTrue(panel.styleMask.contains(.resizable))
+        XCTAssertEqual(panel.frame, frame)
+
+        PresenterCaptionController.applyGeometryLock(to: panel, presentation: .popup, placing: false, minimized: false)
+        XCTAssertTrue(panel.isMovable)
+        XCTAssertTrue(panel.styleMask.contains(.resizable))
+        XCTAssertEqual(panel.frame, frame)
+        panel.close()
+    }
+
+    func testAnExplicitlyLockedDefaultOrFullScreenRectangleRestoresLocked() {
+        let visible = CGRect(x: 0, y: 0, width: 1800, height: 1000)
+        for frame in [CGRect(x: 80, y: 80, width: 1100, height: 440), visible] {
+            XCTAssertTrue(TheaterWindowPlacement.canLockOverlayFrame(frame, visible: visible))
+            let decision = TheaterWindowPlacement.overlayFrameDecision(
+                stored: nil, saved: frame, visible: visible, preset: nil, placing: false
+            )
+            XCTAssertFalse(decision.needsPlacement)
+            XCTAssertEqual(decision.frame, frame)
+        }
+    }
+
+    func testSavedAreaClampsToTheCurrentDisplayAndRejectsInvalidSizes() {
+        let visible = CGRect(x: 0, y: 0, width: 1280, height: 800)
+        let decision = TheaterWindowPlacement.overlayFrameDecision(
+            stored: nil, saved: CGRect(x: 2000, y: 1000, width: 900, height: 300),
+            visible: visible, preset: nil, placing: false
+        )
+        XCTAssertFalse(decision.needsPlacement)
+        XCTAssertTrue(visible.contains(decision.frame))
+        XCTAssertEqual(decision.frame.size, CGSize(width: 900, height: 300))
+        for frame in [CGRect(x: 0, y: 0, width: 10, height: 10),
+                      CGRect(x: CGFloat.nan, y: 0, width: 900, height: 300)] {
+            XCTAssertFalse(TheaterWindowPlacement.canLockOverlayFrame(frame, visible: visible))
+        }
     }
 }

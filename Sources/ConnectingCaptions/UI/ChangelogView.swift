@@ -44,8 +44,8 @@ struct ChangelogView: View {
         VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
             FluidPageHeader(
                 systemImage: "doc.text.magnifyingglass",
-                title: "Changelog",
-                subtitle: "Recent releases of \(ConnectingCaptionsProduct.displayName)."
+                title: AppLanguage.text("Changelog"),
+                subtitle: AppLanguage.format("Recent releases of {0}.", String(describing: ConnectingCaptionsProduct.displayName))
             ) {
                 if self.isRefreshing {
                     ProgressView()
@@ -57,7 +57,7 @@ struct ChangelogView: View {
                         Image(systemName: "arrow.clockwise")
                     }
                     .buttonStyle(.borderless)
-                    .help("Refresh changelog")
+                    .help(AppLanguage.text("Refresh changelog"))
                 }
             }
 
@@ -74,7 +74,7 @@ struct ChangelogView: View {
             HStack(spacing: self.theme.metrics.spacing.md) {
                 ProgressView()
                     .controlSize(.small)
-                Text("Loading release notes...")
+                AppText("Loading release notes...")
                     .font(self.theme.typography.body)
                     .foregroundStyle(self.theme.palette.secondaryText)
             }
@@ -84,7 +84,7 @@ struct ChangelogView: View {
     private var emptyCard: some View {
         ThemedCard(style: .standard, hoverEffect: false) {
             VStack(alignment: .leading, spacing: self.theme.metrics.spacing.sm) {
-                Text("No changelog available")
+                AppText("No changelog available")
                     .font(self.theme.typography.sectionTitle)
                     .foregroundStyle(self.theme.palette.primaryText)
                 Text(ConnectingCaptionsProduct.updateRepository == nil
@@ -100,7 +100,7 @@ struct ChangelogView: View {
         HStack {
             if let url = ConnectingCaptionsProduct.releasesURL {
                 Link(destination: url) {
-                    Label("View older release notes on GitHub", systemImage: "arrow.up.right.square")
+                    AppLabel("View older release notes on GitHub", systemImage: "arrow.up.right.square")
                         .font(self.theme.typography.bodySmallStrong)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 9)
@@ -184,13 +184,13 @@ private struct ChangelogReleaseCard: View {
                 HStack(alignment: .firstTextBaseline, spacing: self.theme.metrics.spacing.sm) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: self.theme.metrics.spacing.sm) {
-                            Text(self.release.title)
+                            AppText(self.release.title)
                                 .font(self.theme.typography.sectionTitle)
                                 .foregroundStyle(self.theme.palette.primaryText)
                                 .lineLimit(2)
 
                             if self.isLatest {
-                                Text("Latest")
+                                AppText("Latest")
                                     .font(self.theme.typography.badge)
                                     .foregroundStyle(self.theme.palette.accent)
                                     .padding(.horizontal, 8)
@@ -202,7 +202,7 @@ private struct ChangelogReleaseCard: View {
                             }
 
                             if self.release.isPrerelease {
-                                Text("Beta")
+                                AppText("Beta")
                                     .font(self.theme.typography.badge)
                                     .foregroundStyle(self.theme.palette.warning)
                                     .padding(.horizontal, 8)
@@ -228,7 +228,7 @@ private struct ChangelogReleaseCard: View {
                                 .padding(7)
                         }
                         .buttonStyle(.borderless)
-                        .help("Open this release on GitHub")
+                        .help(AppLanguage.text("Open this release on GitHub"))
                     }
                 }
 

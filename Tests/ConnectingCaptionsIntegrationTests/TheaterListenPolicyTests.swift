@@ -1,7 +1,61 @@
-import XCTest
 @testable import ConnectingCaptions_Debug
+import XCTest
 
 final class TheaterListenPolicyTests: XCTestCase {
+    func testMissingModelDoesNotPrescribeMatchingAnAlreadyMatchingLanguage() {
+        let advice = TheaterReadyGate.voiceEngineAdvice(
+            model: .whisperBase,
+            source: TranslationLanguageCatalog.english,
+            heard: TranslationLanguageCatalog.english,
+            modelInstalled: false
+        )
+        XCTAssertTrue(advice.contains("Download Whisper Base"), advice)
+        XCTAssertFalse(advice.contains("Match I speak"), advice)
+        XCTAssertFalse(advice.contains("not English"), advice)
+
+        let snapshot = TheaterReadyGate.snapshot(
+            engineSupportsSource: true,
+            modelInstalled: false,
+            sameLanguagePair: true,
+            pack: .installed,
+            microphone: .authorized,
+            firstCaptionPrinted: true,
+            voiceEngineAdvice: advice
+        )
+        XCTAssertFalse(snapshot.canListen)
+        XCTAssertFalse(snapshot.voiceEngineNeedsRealign)
+        XCTAssertEqual(snapshot.nextAction, advice)
+    }
+
+    func testPackChecksRejectOutOfOrderResultsAndReturningToAnEarlierPair() {
+        let englishKorean = TranslationPairKey(sourceID: "en", targetID: "ko", bidirectional: false, mode: "translation")
+        let englishThai = TranslationPairKey(sourceID: "en", targetID: "th", bidirectional: false, mode: "translation")
+        var checks = TranslationPairCheck()
+        let old = checks.begin(pair: englishKorean)
+        let newer = checks.begin(pair: englishThai)
+        XCTAssertFalse(checks.accepts(old, currentPair: englishThai))
+        XCTAssertTrue(checks.accepts(newer, currentPair: englishThai))
+
+        let returned = checks.begin(pair: englishKorean)
+        XCTAssertFalse(checks.accepts(old, currentPair: englishKorean))
+        XCTAssertFalse(checks.accepts(newer, currentPair: englishKorean))
+        XCTAssertTrue(checks.accepts(returned, currentPair: englishKorean))
+        checks.invalidate()
+        XCTAssertFalse(checks.accepts(returned, currentPair: englishKorean))
+    }
+
+    func testPackChecksIncludeDirectionAndMode() {
+        let original = TranslationPairKey(sourceID: "en", targetID: "ko", bidirectional: false, mode: "translation")
+        var checks = TranslationPairCheck()
+        let request = checks.begin(pair: original)
+        XCTAssertFalse(checks.accepts(request, currentPair: TranslationPairKey(
+            sourceID: "en", targetID: "ko", bidirectional: true, mode: "translation"
+        )))
+        XCTAssertFalse(checks.accepts(request, currentPair: TranslationPairKey(
+            sourceID: "en", targetID: "ko", bidirectional: false, mode: "transcription"
+        )))
+    }
+
     func testVoiceEngineAdviceMatchesWhyTheEngineIsNotReady() {
         let mismatch = TheaterReadyGate.voiceEngineAdvice(
             model: .appleSpeechAnalyzer,
@@ -155,29 +209,29 @@ final class TheaterListenPolicyTests: XCTestCase {
     }
 
     func testJunkGateDropsBoilerplateAndPhraseLoops() {
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("Thanks for watching."))
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("ご視聴ありがとうございました"))
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("시청해 주셔서 감사합니다."))
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("字幕由 Amara.org"))
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("Subtítulos realizados por Amara"))
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("Please subscribe."))
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("チャンネル登録"))
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("구독과 좋아요"))
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("订阅"))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("How do I 订阅 this channel?"))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("チャンネル登録の方法を説明します。"))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("Thank you."))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("감사합니다."))
-        XCTAssertTrue(CaptionJunkGate.shouldDrop("감사합니다 감사합니다 감사합니다"))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("Thanks for watching.", audioContainsSpeech: false))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("ご視聴ありがとうございました", audioContainsSpeech: false))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("시청해 주셔서 감사합니다.", audioContainsSpeech: false))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("字幕由 Amara.org", audioContainsSpeech: false))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("Subtítulos realizados por Amara", audioContainsSpeech: false))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("Please subscribe.", audioContainsSpeech: false))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("チャンネル登録", audioContainsSpeech: false))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("구독과 좋아요", audioContainsSpeech: false))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("订阅", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("How do I 订阅 this channel?", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("チャンネル登録の方法を説明します。", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("Thank you.", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("감사합니다.", audioContainsSpeech: false))
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("감사합니다 감사합니다 감사합니다", audioContainsSpeech: false))
         XCTAssertTrue(CaptionJunkGate.hasPhraseRepeat("hello hello hello"))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("ㅋㅋㅋㅋ"))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("ㅎㅎㅎ"))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("진짜진짜"))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("มากๆ"))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("네."))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("ครับ"))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("Yes."))
-        XCTAssertFalse(CaptionJunkGate.shouldDrop("오늘 모델을 학습했습니다."))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("ㅋㅋㅋㅋ", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("ㅎㅎㅎ", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("진짜진짜", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("มากๆ", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("네.", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("ครับ", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("Yes.", audioContainsSpeech: false))
+        XCTAssertFalse(CaptionJunkGate.shouldDrop("오늘 모델을 학습했습니다.", audioContainsSpeech: false))
     }
 
     func testPauseDropsPacketsAndResumeResetsSampleClock() {
@@ -213,7 +267,7 @@ final class TheaterListenPolicyTests: XCTestCase {
                 frameCount: samples.count,
                 sampleRate: 16_000,
                 inputHostTime: mach_absolute_time(),
-                inputSampleTime: 4_000
+                inputSampleTime: 4000
             )
         }
         XCTAssertEqual(pipeline.lastInputSampleEndForTesting, 4)
@@ -331,4 +385,28 @@ final class TheaterListenPolicyTests: XCTestCase {
 
 private final class SampleBatchSink {
     var batches: [[Float]] = []
+}
+
+
+final class FaithfulCaptionContentTests: XCTestCase {
+    func testQuotedCreditsAndSpokenOutrosAreNotDroppedWithoutSilenceEvidence() {
+        let lines = ["The phrase thank you for watching appears at the end of our training video.",
+                     "Thank you for watching.", "ご視聴ありがとうございました", "시청해 주셔서 감사합니다.",
+                     "hello hello hello"]
+        for line in lines {
+            XCTAssertFalse(CaptionJunkGate.shouldDrop(line))
+            XCTAssertFalse(CaptionJunkGate.shouldDrop(line, audioContainsSpeech: true))
+        }
+        let quoted = lines[0]
+        XCTAssertEqual(TheaterBoardAdmission.decide(quoted, languageID: "en", phase: .propose,
+                                                    context: .init(audioContainsSpeech: true)), .admit)
+        XCTAssertTrue(CaptionJunkGate.shouldDrop("Thank you for watching.", audioContainsSpeech: false))
+    }
+
+    func testSuccessfulInvariantTranslationsPreserveNamesNumbersAndAcronyms() {
+        for text in ["Barack Obama.", "NASA", "12345", "OpenAI", "Bangkok 2026"] {
+            XCTAssertEqual(LiveTranslationCaptionGate.captionSafeForBoard(text, sourceText: text), text)
+        }
+        XCTAssertNil(LiveTranslationCaptionGate.captionSafeForBoard("Error: quota exceeded", sourceText: "Barack Obama."))
+    }
 }

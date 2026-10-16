@@ -96,6 +96,12 @@ enum AudioCaptureIdlePolicy {
             self.hasRequestedRecovery = true
             return true
         }
+
+        /// Clears the one-shot latch after a recovery succeeds, so a later
+        /// disconnect in the same session can trigger recovery again.
+        mutating func rearm() {
+            self = Self()
+        }
     }
 
     struct BluetoothInputStabilization {

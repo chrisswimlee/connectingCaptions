@@ -19,6 +19,16 @@ protocol SpeechCapturePolicy: AnyObject {
     func markSilenceHold()
     func markPauseSkip()
     func handleEndOfUtterance()
+    func noteTimedSegments(_ segments: [ASRTimedSegment])
+    /// Whether the audio behind the chunk that just produced text had
+    /// confirmed voice energy, so the caption-honesty gate can tell real
+    /// speech from a hallucinated line over silence.
+    func noteAudioContainsSpeech(_ containsSpeech: Bool)
+}
+
+extension SpeechCapturePolicy {
+    func noteTimedSegments(_ segments: [ASRTimedSegment]) {}
+    func noteAudioContainsSpeech(_ containsSpeech: Bool) {}
 }
 
 /// Theater Listen never pauses the presenter's deck or chimes into the room.

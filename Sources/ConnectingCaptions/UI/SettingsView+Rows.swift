@@ -22,10 +22,10 @@ extension SettingsView {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
+                    AppText(title)
                         .font(self.theme.typography.bodyStrong)
                         .foregroundStyle(self.settingsTitleText)
-                    Text(description)
+                    AppText(description)
                         .font(self.theme.typography.bodySmall)
                         .foregroundStyle(self.settingsSecondaryText)
                 }
@@ -40,13 +40,13 @@ extension SettingsView {
             }
 
             if let footnote = footnote {
-                Text(footnote)
+                AppText(footnote)
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.settingsSecondaryText)
             }
 
             if let errorMessage = errorMessage {
-                Text(errorMessage)
+                AppText(errorMessage)
                     .font(.caption)
                     .foregroundStyle(self.theme.palette.warning)
             }
@@ -61,10 +61,10 @@ extension SettingsView {
                 .frame(width: 24, alignment: .center)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Backup & Restore")
+                AppText("Backup & Restore")
                     .font(self.theme.typography.bodyStrong)
                     .foregroundStyle(self.settingsTitleText)
-                Text("Export or import settings, prompt profiles, history, and stats. API keys excluded.")
+                AppText("Export or import settings, prompt profiles, history, and stats. API keys excluded.")
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.settingsSecondaryText)
             }
@@ -73,14 +73,14 @@ extension SettingsView {
 
             HStack(spacing: 8) {
                 Button(action: self.exportBackup) {
-                    Label("Export", systemImage: "square.and.arrow.up")
+                    AppLabel("Export", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(self.theme.palette.accent)
                 .controlSize(.regular)
 
                 Button(action: self.importBackup) {
-                    Label("Import", systemImage: "square.and.arrow.down")
+                    AppLabel("Import", systemImage: "square.and.arrow.down")
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
@@ -91,7 +91,7 @@ extension SettingsView {
     func historyRetentionControls() -> some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Keep History")
+                AppText("Keep History")
                     .font(self.theme.typography.bodyStrong)
                     .foregroundStyle(self.settingsTitleText)
                 Text(SettingsStore.shared.historyRetention.detail)
@@ -106,7 +106,7 @@ extension SettingsView {
                 set: { SettingsStore.shared.historyRetention = $0 }
             )) {
                 ForEach(HistoryRetention.allCases) { retention in
-                    Text(retention.displayName).tag(retention)
+                    AppText(retention.displayName).tag(retention)
                 }
             }
             .pickerStyle(.menu)
@@ -118,10 +118,10 @@ extension SettingsView {
         VStack(spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
-                    Text("Audio Storage")
+                    AppText("Audio Storage")
                         .font(self.theme.typography.bodyStrong)
                         .foregroundStyle(self.settingsTitleText)
-                    Text("Audio history: \(DictationAudioHistoryStore.formattedGigabytes(self.audioHistoryUsageBytes)) / \(Self.audioBudgetText(for: SettingsStore.shared.audioHistoryBudgetGB)) GB Budget")
+                    AppText("Audio history: {0} / {1} GB Budget", arguments: [String(describing: DictationAudioHistoryStore.formattedGigabytes(self.audioHistoryUsageBytes)), String(describing: Self.audioBudgetText(for: SettingsStore.shared.audioHistoryBudgetGB))])
                         .font(self.theme.typography.bodySmall)
                         .foregroundStyle(self.settingsSecondaryText)
 
@@ -133,7 +133,7 @@ extension SettingsView {
                 Spacer(minLength: 16)
 
                 HStack(spacing: 8) {
-                    Text("Budget")
+                    AppText("Budget")
                         .font(.caption)
                         .foregroundStyle(self.settingsSecondaryText)
 
@@ -141,12 +141,12 @@ extension SettingsView {
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 58)
 
-                    Text("GB")
+                    AppText("GB")
                         .font(.caption)
                         .foregroundStyle(self.settingsSecondaryText)
 
-                    Button("Apply") {
-                        self.applyAudioHistoryBudget()
+                    AppButton("Apply") {
+                        Task { await self.applyAudioHistoryBudget() }
                     }
                     .controlSize(.small)
                 }
@@ -156,10 +156,10 @@ extension SettingsView {
 
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Export Audio")
+                    AppText("Export Audio")
                         .font(self.theme.typography.bodyStrong)
                         .foregroundStyle(self.settingsTitleText)
-                    Text("ZIP with manifest.jsonl and WAV audio.")
+                    AppText("ZIP with manifest.jsonl and WAV audio.")
                         .font(self.theme.typography.bodySmall)
                         .foregroundStyle(self.settingsSecondaryText)
                 }
@@ -169,14 +169,14 @@ extension SettingsView {
                 Button {
                     self.exportAudioZip()
                 } label: {
-                    Label("Export ZIP", systemImage: "square.and.arrow.up")
+                    AppLabel("Export ZIP", systemImage: "square.and.arrow.up")
                 }
                 .controlSize(.small)
 
                 Button(role: .destructive) {
                     self.deleteSavedAudio()
                 } label: {
-                    Label("Delete Audio", systemImage: "trash")
+                    AppLabel("Delete Audio", systemImage: "trash")
                 }
                 .controlSize(.small)
                 .disabled(self.audioHistoryUsageBytes <= 0)
@@ -203,10 +203,10 @@ extension SettingsView {
     ) -> some View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title)
+                AppText(title)
                     .font(self.theme.typography.bodyStrong)
                     .foregroundStyle(self.settingsTitleText)
-                Text(description)
+                AppText(description)
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.settingsSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -230,7 +230,7 @@ extension SettingsView {
                 Image(systemName: "info.circle.fill")
                     .foregroundStyle(warningStyle ? self.theme.palette.warning : self.theme.palette.accent)
                     .font(.caption)
-                Text(title)
+                AppText(title)
                     .font(self.theme.typography.bodySmallStrong)
                     .foregroundStyle(self.settingsTitleText)
             }
@@ -238,7 +238,7 @@ extension SettingsView {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                     HStack(alignment: .top, spacing: 8) {
-                        Text("\(index + 1).")
+                        AppText("{0}.", arguments: [String(describing: index + 1)])
                             .font(.caption)
                             .foregroundStyle(warningStyle ? self.theme.palette.warning : self.theme.palette.accent)
                             .fontWeight(.semibold)
@@ -269,10 +269,10 @@ extension SettingsView {
                     .frame(width: 20)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Primary Dictation Shortcuts")
+                    AppText("Primary Dictation Shortcuts")
                         .font(self.theme.typography.bodyStrong)
                         .foregroundStyle(self.settingsTitleText)
-                    Text("Use any keyboard shortcut, auxiliary mouse button, or modified click.")
+                    AppText("Use any keyboard shortcut, auxiliary mouse button, or modified click.")
                         .font(self.theme.typography.bodySmall)
                         .foregroundStyle(self.settingsSecondaryText)
                         .lineLimit(1)
@@ -336,7 +336,7 @@ extension SettingsView {
             .controlSize(.small)
             .disabled(!isRecording && self.isRecordingAnyShortcut)
 
-            Button("Remove") {
+            AppButton("Remove") {
                 guard self.primaryDictationShortcuts.count > 1,
                       self.primaryDictationShortcuts.indices.contains(index)
                 else { return }
@@ -376,7 +376,7 @@ extension SettingsView {
     }
 
     func shortcutCapturePill() -> some View {
-        Text("Press shortcut...")
+        AppText("Press shortcut...")
             .font(.caption.weight(.medium))
             .foregroundStyle(.orange)
             .padding(.horizontal, 8)
@@ -425,7 +425,7 @@ extension SettingsView {
                     .frame(width: 20)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(content.title)
+                    AppText(content.title)
                         .font(self.theme.typography.bodyStrong)
                         .foregroundStyle(self.settingsTitleText)
                     Text(content.description)
@@ -468,7 +468,7 @@ extension SettingsView {
                 .disabled(!isRecording && (isAnyRecordingActive || (!enabledValue && hasShortcut)))
 
                 if let onRemovePressed {
-                    Button("Remove") {
+                    AppButton("Remove") {
                         onRemovePressed()
                     }
                     .buttonStyle(.bordered)
@@ -520,7 +520,7 @@ extension SettingsView {
     var microphonePrioritySection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Input Device Priority")
+                AppText("Input Device Priority")
                     .font(self.theme.typography.bodyStrong)
                     .foregroundStyle(self.settingsTitleText)
 
@@ -531,7 +531,7 @@ extension SettingsView {
                         self.settings.restoreRemovedMicrophones(with: self.inputDevices)
                         self.refreshActiveInputSelection()
                     } label: {
-                        Label("Restore Removed", systemImage: "arrow.uturn.backward")
+                        AppLabel("Restore Removed", systemImage: "arrow.uturn.backward")
                     }
                     .buttonStyle(.plain)
                     .font(self.theme.typography.bodySmall)
@@ -571,7 +571,7 @@ extension SettingsView {
             )
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-            Text("\(ConnectingCaptionsProduct.displayName) tries microphones from top to bottom. Drag to reorder; unavailable devices keep their place.")
+            AppText("{0} tries microphones from top to bottom. Drag to reorder; unavailable devices keep their place.", arguments: [String(describing: ConnectingCaptionsProduct.displayName)])
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(self.settingsSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
@@ -617,7 +617,7 @@ extension SettingsView {
                 .allowsHitTesting(self.isMicrophonePriorityEditingDisabled == false)
                 .accessibilityHidden(true)
 
-            Text("\(rank).")
+            AppText("{0}.", arguments: [String(describing: rank)])
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(self.settingsSecondaryText)
                 .monospacedDigit()
@@ -642,17 +642,17 @@ extension SettingsView {
                 }
                 .buttonStyle(.plain)
                 .disabled(self.isMicrophonePriorityEditingDisabled)
-                .help("Remove \(entry.name) from microphone priority")
-                .accessibilityLabel("Remove \(entry.name)")
+                .help(AppLanguage.format("Remove {0} from microphone priority", String(describing: entry.name)))
+                .accessibilityLabel(AppLanguage.format("Remove {0}", String(describing: entry.name)))
                 .transition(.opacity)
             } else if isActive {
                 Circle()
                     .fill(Color(nsColor: .systemGreen))
                     .frame(width: 7, height: 7)
                     .shadow(color: Color(nsColor: .systemGreen).opacity(0.45), radius: 3)
-                    .accessibilityLabel("Active microphone")
+                    .accessibilityLabel(AppLanguage.text("Active microphone"))
             } else if isAvailable == false {
-                Text("Unavailable")
+                AppText("Unavailable")
                     .font(self.theme.typography.bodySmall)
                     .foregroundStyle(self.settingsSecondaryText)
             }
@@ -682,13 +682,13 @@ extension SettingsView {
             )
         )
         .contextMenu {
-            Button("Move Up") {
+            AppButton("Move Up") {
                 self.settings.moveMicrophonePriority(uid: entry.uid, by: -1)
                 self.refreshActiveInputSelection()
             }
             .disabled(self.isMicrophonePriorityEditingDisabled || rank == 1)
 
-            Button("Move Down") {
+            AppButton("Move Down") {
                 self.settings.moveMicrophonePriority(uid: entry.uid, by: 1)
                 self.refreshActiveInputSelection()
             }
@@ -696,13 +696,13 @@ extension SettingsView {
 
             Divider()
 
-            Button("Remove from Priority", role: .destructive) {
+            AppButton("Remove from Priority", role: .destructive) {
                 self.removeMicrophonePriorityEntry(entry)
             }
             .disabled(self.isMicrophonePriorityEditingDisabled)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Priority \(rank), \(entry.name)")
+        .accessibilityLabel(AppLanguage.format("Priority {0}, {1}", String(describing: rank), String(describing: entry.name)))
         .accessibilityValue(isActive ? "Active" : (isAvailable ? "Available" : "Unavailable"))
         .accessibilityAction(named: "Move up") {
             guard self.isMicrophonePriorityEditingDisabled == false, rank > 1 else { return }
@@ -752,13 +752,13 @@ extension SettingsView {
     var microphoneQualityGuidance: some View {
         if self.selectedInputDevice?.isBluetooth == true {
             self.microphoneQualityGuidanceRow(
-                message: "Bluetooth microphone mode can reduce headphone playback quality. Prefer a wired, USB, or display microphone when available.",
+                message: AppLanguage.text("Bluetooth microphone mode can reduce headphone playback quality. Prefer a wired, USB, or display microphone when available."),
                 systemImage: "exclamationmark.triangle.fill",
                 color: self.theme.palette.warning
             )
         } else {
             self.microphoneQualityGuidanceRow(
-                message: "This order applies only to \(ConnectingCaptionsProduct.displayName) and does not change your macOS input.",
+                message: AppLanguage.format("This order applies only to {0} and does not change your macOS input.", String(describing: ConnectingCaptionsProduct.displayName)),
                 systemImage: "info.circle",
                 color: self.settingsSecondaryText
             )
@@ -773,7 +773,7 @@ extension SettingsView {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: systemImage)
                 .foregroundStyle(color)
-            Text(message)
+            AppText(message)
                 .font(self.theme.typography.bodySmall)
                 .foregroundStyle(color)
                 .fixedSize(horizontal: false, vertical: true)
