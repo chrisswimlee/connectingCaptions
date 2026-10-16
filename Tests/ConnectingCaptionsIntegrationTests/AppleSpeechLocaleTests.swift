@@ -432,7 +432,9 @@ final class VoiceEngineLanguageReadinessTests: XCTestCase {
 
 final class CapabilityConsistencyTests: XCTestCase {
     @MainActor
-    func testMenuBarOnlyOffersSpeechLanguagesWithInstalledAssetsAndStatus() {
+    func testMenuBarOnlyOffersSpeechLanguagesWithInstalledAssetsAndStatus() throws {
+        // Before macOS 26 the stored Analyzer selection reads back as Whisper Base.
+        guard #available(macOS 26.0, *) else { throw XCTSkip("Apple Speech Analyzer needs macOS 26.") }
         let settings = SettingsStore.shared
         let model = settings.selectedSpeechModel
         let mode = settings.theaterSessionMode

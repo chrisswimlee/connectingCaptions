@@ -9,7 +9,6 @@ All notable changes to connectingCaptions are documented in this file.
 ### Theater and setup
 
 - Voice Engine opens with its heading below the toolbar instead of scrolling the title behind it.
-
 - First run guides you through languages, the microphone, and Listen. Setup groups Voice Engine and Language packs; missing permissions, models, or packs appear beside Listen.
 - Theater shows the selected input and a microphone meter. Capture supports built-in, wired, USB, line-in, Bluetooth HFP, and routed virtual loopback inputs.
 - Caption appearance, original text, and advanced controls have clearer groups and labels. Language and mode changes explain when they stop Listen; outdated language checks no longer replace the current result.
@@ -18,15 +17,14 @@ All notable changes to connectingCaptions are documented in this file.
 - Either way appears only with Whisper Small installed and translation ready in both directions. Turning it off keeps the selected engine.
 - Language menus and the selected pair share readiness indicators. Missing speech assets, translation packs, and permissions stay distinct; unknown availability requires another check. Speak captions explains missing voices or disconnected outputs before it can be enabled.
 - App interface translation supports all 19 setup languages, independently of caption languages. Translations are generated on-device and cached locally; Settings → General includes language and retry controls. Interface translation pauses during Listen.
+- Overlay has an explicit text-area lock. Unlock to move or resize it, then lock to save the area and prevent accidental changes. Keeping Tools visible does not unlock the area.
 
 ### Captions and transcripts
 
 - Caption fades survive routine view updates, and corrections do not fade an already-visible line out again. Word printing uses dictionary word boundaries, including Thai and Japanese, and prints the final word in full. Wrapped whitespace preserves reveal progress; delayed animation ticks catch up to elapsed time. Changing print style or enabling Reduce Motion finishes the current line without replaying it.
 - Translation cleanup from a stopped Listen cannot cancel work queued by a new Listen.
-
-- Overlay has an explicit text-area lock. Unlock to move or resize it, then lock to save the area and prevent accidental changes. Keeping Tools visible does not unlock the area.
 - Finished recognition updates that arrive just after a pause keep their sentence timer instead of waiting for the older open-clause timer. Live pause confirmation has a shorter deadline; Stop retains the full confirmation budget.
-
+- A sentence said twice in one talk no longer holds the last caption until you speak again, and the last words still print once the room stays quiet.
 - Fixed pause hallucinations, repeated shorter captions, and premature sentence breaks in English and Japanese. Continuations stay on the current line, and a noisy microphone packet no longer counts as speech.
 - Thai captions wrap at dictionary word boundaries when a word fits. Unfinished clauses appear dimmed with an ellipsis; a full board eases to the next line.
 - Apple Speech timestamps survive silence removal, history, and SRT/VTT export. Older or unmatched captions retain estimated timing.

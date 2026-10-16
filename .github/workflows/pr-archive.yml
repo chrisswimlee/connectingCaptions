@@ -117,7 +117,6 @@ jobs:
 
           ORIGINAL_APP_PATH="$ARCHIVE_PATH/Products/Applications/Connecting Captions.app"
           APP_PATH="$ARCHIVE_PATH/Products/Applications/$APP_NAME.app"
-          EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/connectingCaptions"
           INFO_PLIST="$APP_PATH/Contents/Info.plist"
           ARCHIVE_INFO_PLIST="$ARCHIVE_PATH/Info.plist"
           MANIFEST_PATH="$STAGING_PATH/build-manifest.json"
@@ -134,6 +133,9 @@ jobs:
           test -d "$ARCHIVE_PATH"
           test -d "$ORIGINAL_APP_PATH"
           test -f "$ARCHIVE_INFO_PLIST"
+          # The rebrand renamed the executable; read it rather than hard-code it.
+          EXECUTABLE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$ORIGINAL_APP_PATH/Contents/Info.plist")
+          EXECUTABLE_PATH="$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
 
           # Preserve Xcode's expanded entitlements, which combine connectingCaptions.entitlements
           # with target capabilities such as Hardened Runtime Audio Input.
@@ -286,7 +288,7 @@ jobs:
 
           ditto -x -k "$APP_ZIP" "$VERIFY_PATH"
           VERIFIED_APP_PATH="$VERIFY_PATH/$APP_NAME.app"
-          test -x "$VERIFIED_APP_PATH/Contents/MacOS/connectingCaptions"
+          test -x "$VERIFIED_APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
           test -L "$VERIFIED_APP_PATH/Contents/Frameworks/CTranscribe.framework/Versions/Current"
           codesign --verify --deep --strict --verbose=2 "$VERIFIED_APP_PATH"
           if [[ "$(codesign -d --entitlements - --xml "$VERIFIED_APP_PATH" 2>/dev/null | plutil -extract 'com\.apple\.security\.device\.audio-input' raw -o - -)" != "true" ]]; then

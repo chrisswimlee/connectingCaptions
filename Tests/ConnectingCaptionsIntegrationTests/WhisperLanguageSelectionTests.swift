@@ -273,7 +273,11 @@ final class WhisperLanguageSelectionTests: XCTestCase {
         let originalCohere = settings.selectedCohereLanguage
         let originalNemotron = settings.selectedNemotronLanguage
         let originalAlsoHear = settings.theaterAlsoHearOtherLanguages
+        let originalLegacy = AppleSpeechLiveCapability.legacyLanguagePrefixes
+        // This Mac's offline Apple Speech packs must not decide the result.
+        AppleSpeechLiveCapability.setLegacyLanguagePrefixesForTesting(["en", "ja"])
         defer {
+            AppleSpeechLiveCapability.setLegacyLanguagePrefixesForTesting(originalLegacy)
             settings.selectedSpeechModel = originalModel
             settings.translationSourceLanguageID = originalSource
             settings.selectedWhisperLanguageCode = originalWhisper
