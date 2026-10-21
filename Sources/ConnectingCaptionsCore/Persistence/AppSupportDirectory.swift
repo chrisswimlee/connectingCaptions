@@ -19,11 +19,19 @@ nonisolated public enum AppTestEnvironment {
 nonisolated public enum AppSupportDirectory {
     public static func url(fileManager: FileManager = .default) -> URL {
         if let testDirectory = AppTestEnvironment.supportDirectory { return testDirectory }
-        let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? fileManager.homeDirectoryForCurrentUser.appendingPathComponent(
+        let base: URL
+        if let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            base = support
+        } else {
+            #if os(macOS)
+            base = fileManager.homeDirectoryForCurrentUser.appendingPathComponent(
                 "Library/Application Support",
                 isDirectory: true
             )
+            #else
+            base = fileManager.temporaryDirectory
+            #endif
+        }
         let current = base.appendingPathComponent(ConnectingCaptionsProduct.supportFolderName, isDirectory: true)
 
         if fileManager.fileExists(atPath: current.path) {
