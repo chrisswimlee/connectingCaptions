@@ -1,0 +1,45 @@
+import Foundation
+
+/// Capture policy the speech engine reads for this Listen.
+/// Theater installs one; dictation leaves it nil.
+@MainActor
+public protocol SpeechCapturePolicy: AnyObject {
+    var isSessionActive: Bool { get }
+    var boundLiveTranscript: Bool { get }
+    var keepShortUtterances: Bool { get }
+    var preferLatestChunk: Bool { get }
+    var retainsAudio: Bool { get }
+    /// Dictation pauses Spotify so the mic hears you. A lectern's media is the talk.
+    var pausesMedia: Bool { get }
+    /// Dictation beeps so you know the hotkey stopped. A hall PA must stay silent.
+    var playsListenChime: Bool { get }
+
+    func markFirstBuffer()
+    func markSpeechStart(hostTime: UInt64)
+    func markSilenceHold()
+    func markPauseSkip()
+    func handleEndOfUtterance()
+    func noteTimedSegments(_ segments: [ASRTimedSegment])
+    /// Whether the audio behind the chunk that just produced text had
+    /// confirmed voice energy, so the caption-honesty gate can tell real
+    /// speech from a hallucinated line over silence.
+    func noteAudioContainsSpeech(_ containsSpeech: Bool)
+}
+
+public extension SpeechCapturePolicy {
+    public func noteTimedSegments(_ segments: [ASRTimedSegment]) {}
+    public func noteAudioContainsSpeech(_ containsSpeech: Bool) {}
+}
+
+/// Theater Listen never pauses the presenter's deck or chimes into the room.
+/// A missing policy is not dictation, so the old pause-media switch does not apply.
+public enum TheaterListenCapture {
+    public static func shouldPauseMedia(policyPausesMedia: Bool?, settingEnabled: Bool) -> Bool {
+        _ = settingEnabled
+        return policyPausesMedia == true
+    }
+
+    public static func shouldPlayListenChime(policyPlaysChime: Bool?) -> Bool {
+        policyPlaysChime == true
+    }
+}

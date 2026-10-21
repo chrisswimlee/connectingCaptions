@@ -21,13 +21,12 @@ enum MicrophoneAccess {
     /// A notarized app opened from the zip runs from a temporary path.
     /// Microphone Allow is granted to that path, then the next launch asks again.
     static var isOpenedFromDownload: Bool {
-        Bundle.main.bundlePath.contains("/AppTranslocation/")
+        PlatformHost.current.isOpenedFromDownload
     }
 
     @MainActor
     static func revealDownloadedApp() {
-        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
-        NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications"))
+        PlatformHost.current.revealDownloadedApp()
     }
 
     static func status() -> AVAuthorizationStatus {

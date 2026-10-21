@@ -3,40 +3,14 @@ import Carbon
 
 /// Fixed Control+Option chords for presenting: the slide app keeps focus.
 enum TheaterPresenterHotkey {
-    enum Action: String, Equatable {
-        case toggleVisible
-        case togglePause
-        case clear
-        case copy
-        case undo
-        case fontLarger
-        case fontSmaller
-        case toggleTools
-        case listen
-        case retry
-
-        var repeats: Bool {
-            self == .fontLarger || self == .fontSmaller
-        }
-    }
+    typealias Action = TheaterPresenterAction
 
     static let modifiers: NSEvent.ModifierFlags = [.control, .option]
-    static let fontStep = 2
+    static let fontStep = TheaterPresenterAction.fontStep
 
     /// Menu key equivalent for the same Control+Option chord `action` matches.
     static func keyEquivalent(for action: Action) -> String {
-        switch action {
-        case .toggleVisible: return "h"
-        case .togglePause: return "p"
-        case .clear: return "k"
-        case .copy: return "c"
-        case .undo: return "z"
-        case .fontLarger: return "="
-        case .fontSmaller: return "-"
-        case .toggleTools: return "t"
-        case .listen: return "l"
-        case .retry: return "r"
-        }
+        action.keyEquivalent
     }
 
     static func menuItem(title: String, action: Selector, shortcut: Action) -> NSMenuItem {

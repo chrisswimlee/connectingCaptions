@@ -7,6 +7,7 @@ import re
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / 'Sources/ConnectingCaptions'
+CORE_SOURCES = ROOT / 'Sources/ConnectingCaptionsCore'
 DESTINATION = SOURCES / 'Services/LiveTranslation/AppInterfaceCatalog.swift'
 PATTERN = re.compile(r'(?:\bApp(?:Text|Button|Label|Toggle)\(|\bAppLanguage\.(?:text|format)\()\s*("(?:[^"\\]|\\.)*")')
 COPY_FILES = {'TheaterReadiness.swift', 'TheaterEngineCopy.swift', 'TheaterStatus.swift', 'TheaterChromeHelp.swift'}
@@ -15,7 +16,10 @@ COPY_LITERAL = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 def catalog():
     keys = set()
-    for path in SOURCES.rglob('*.swift'):
+    source_trees = [SOURCES]
+    if CORE_SOURCES.exists():
+        source_trees.append(CORE_SOURCES)
+    for path in (p for tree in source_trees for p in tree.rglob('*.swift')):
         if path == DESTINATION:
             continue
         for match in PATTERN.finditer(path.read_text()):

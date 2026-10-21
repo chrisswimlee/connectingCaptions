@@ -184,6 +184,7 @@
 				7C9A71022F58B00000FB7CAF /* TranscribeCpp in Frameworks */,
 				7CE006BD2E80EBE600DDCCD6 /* AppUpdater in Frameworks */,
 				7C078DA52E3B386A00FB7CAC /* FluidAudio in Frameworks */,
+				CC0C00000000000000000003 /* ConnectingCaptionsCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -365,6 +366,7 @@
 				7C3697882ED70F9C005874CE /* DynamicNotchKit */,
 				7CE006BC2E80EBE600DDCCD6 /* AppUpdater */,
 				7C9A71012F58B00000FB7CAF /* TranscribeCpp */,
+				CC0C00000000000000000002 /* ConnectingCaptionsCore */,
 			);
 			productName = connectingCaptions;
 			productReference = 7C078D8F2E3B339200FB7CAC /* Connecting Captions Debug.app */;
@@ -444,6 +446,7 @@
 				7CE006BB2E80EBE600DDCCD6 /* XCRemoteSwiftPackageReference "AppUpdater" */,
 				7C3697872ED70F9C005874CE /* XCRemoteSwiftPackageReference "DynamicNotchKit" */,
 				7C9A71002F58B00000FB7CAF /* XCRemoteSwiftPackageReference "transcribe-cpp-swift" */,
+				CC0C00000000000000000001 /* XCLocalSwiftPackageReference "connectingCaptions" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7C078D902E3B339200FB7CAC /* Products */;
@@ -974,6 +977,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		CC0C00000000000000000001 /* XCLocalSwiftPackageReference "connectingCaptions" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		7C078DA32E3B386A00FB7CAC /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1029,6 +1039,15 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 7CE006BB2E80EBE600DDCCD6 /* XCRemoteSwiftPackageReference "AppUpdater" */;
 			productName = AppUpdater;
+		};
+		CC0C00000000000000000002 /* ConnectingCaptionsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC0C00000000000000000001 /* XCLocalSwiftPackageReference "connectingCaptions" */;
+			productName = ConnectingCaptionsCore;
+		};
+		CC0C00000000000000000003 /* ConnectingCaptionsCore in Frameworks */ = {
+			isa = PBXBuildFile;
+			productRef = CC0C00000000000000000002 /* ConnectingCaptionsCore */;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

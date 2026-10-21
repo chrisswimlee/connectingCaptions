@@ -2,10 +2,7 @@ import Foundation
 
 /// Protects custom-dictionary terms so Apple Translation does not rewrite names.
 enum TranslationGlossary {
-    struct ProtectedText: Equatable {
-        let text: String
-        let tokens: [String: String]
-    }
+    typealias ProtectedText = TranslationGlossaryLock.ProtectedText
 
     static func protectedTerms(from settings: SettingsStore = .shared) -> [String] {
         var terms: [String] = []
@@ -22,96 +19,20 @@ enum TranslationGlossary {
     }
 
     static func protect(_ text: String, terms: [String]) -> ProtectedText {
-        guard !text.isEmpty, !terms.isEmpty else {
-            return ProtectedText(text: text, tokens: [:])
-        }
-
-        var result = text
-        var tokens: [String: String] = [:]
-        var index = 0
-        for term in self.orderedTerms(terms) {
-            guard self.containsTerm(term, in: result) else { continue }
-            let token = Self.lockToken(index)
-            index += 1
-            tokens[token] = term
-            result = self.replaceTerm(term, with: token, in: result)
-        }
-        return ProtectedText(text: result, tokens: tokens)
+        TranslationGlossaryLock.protect(text, terms: terms)
     }
 
     static func restore(_ text: String, tokens: [String: String]) -> String {
-        var result = text
-        for (token, original) in tokens {
-            result = result.replacingOccurrences(of: token, with: original)
-        }
-        return result
+        TranslationGlossaryLock.restore(text, tokens: tokens)
     }
 
     /// Terms that appear in the source but vanished from a polished caption.
     static func lostProtectedTerms(source: String, polished: String, terms: [String]) -> [String] {
-        self.orderedTerms(terms).filter { term in
-            self.containsTerm(term, in: source) && !self.containsTerm(term, in: polished)
-        }
+        TranslationGlossaryLock.lostProtectedTerms(source: source, polished: polished, terms: terms)
     }
 
     static func containsTerm(_ term: String, in text: String) -> Bool {
-        let needle = term.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard needle.count >= 2, !text.isEmpty else { return false }
-        return text.range(of: self.termPattern(needle), options: self.termOptions(for: needle)) != nil
-    }
-
-    /// Short all-caps tokens match as written so IT does not eat "it" and AI does not eat Thai.
-    private static func termOptions(for term: String) -> String.CompareOptions {
-        if self.requiresExactCase(term) {
-            return [.regularExpression]
-        }
-        return [.regularExpression, .caseInsensitive, .diacriticInsensitive]
-    }
-
-    private static func requiresExactCase(_ term: String) -> Bool {
-        let letters = term.filter(\.isLetter)
-        return letters.count >= 2 && letters.count <= 3 && letters.allSatisfy(\.isUppercase)
-    }
-
-    private static func orderedTerms(_ terms: [String]) -> [String] {
-        var seen = Set<String>()
-        var unique: [String] = []
-        for term in terms
-            .map({ $0.trimmingCharacters(in: .whitespacesAndNewlines) })
-            .filter({ $0.count >= 2 })
-            .sorted(by: { $0.count > $1.count })
-        {
-            if seen.insert(term.lowercased()).inserted {
-                unique.append(term)
-            }
-        }
-        return unique
-    }
-
-    private static func replaceTerm(_ term: String, with token: String, in text: String) -> String {
-        text.replacingOccurrences(of: self.termPattern(term), with: token, options: self.termOptions(for: term))
-    }
-
-    private static func termPattern(_ term: String) -> String {
-        let escaped = NSRegularExpression.escapedPattern(for: term)
-        if self.usesWordBoundary(term) {
-            return "\\b\(escaped)\\b"
-        }
-        return escaped
-    }
-
-    private static func usesWordBoundary(_ term: String) -> Bool {
-        !term.unicodeScalars.contains { scalar in
-            (0xAC00...0xD7AF).contains(scalar.value)
-                || (0x3040...0x30FF).contains(scalar.value)
-                || (0x4E00...0x9FFF).contains(scalar.value)
-                || (0x0E00...0x0E7F).contains(scalar.value)
-        }
-    }
-
-    /// Private-use wrappers so a later term like FT cannot smash a lock token.
-    private static func lockToken(_ index: Int) -> String {
-        "\u{FFF9}\(index)\u{FFFA}"
+        TranslationGlossaryLock.containsTerm(term, in: text)
     }
 }
 
@@ -610,102 +531,5 @@ enum SpokenScriptDetector {
 
     private static func isThai(_ scalar: Unicode.Scalar) -> Bool {
         (0x0E00 ... 0x0E7F).contains(scalar.value)
-    }
-}
-
-nonisolated enum LiveTranslationTiming {
-    /// English confirm after a finished ending.
-    static let completeSettleNanoseconds: UInt64 = 500_000_000
-    /// English open-thought silence before a forced cut. The room is already
-    /// quiet for the 400 ms silence hold and the 400 ms end-of-utterance hold
-    /// before this starts, so this is the extra wait the audience feels.
-    static let openSettleNanoseconds: UInt64 = 1_200_000_000
-    /// Brief hold after end-of-utterance so the last ASR tick can land.
-    static let eouHoldNanoseconds: UInt64 = 400_000_000
-    /// Quiet gap after the last wording of a lone finished sentence. A revision
-    /// restarts it. The sentence prints when this gap passes, without waiting
-    /// for the next sentence.
-    static let loneSentencePrintNanoseconds: UInt64 = 220_000_000
-    /// Partials are de-duplicated, so a quiet gap only means the engine re-heard
-    /// the same text once it outlasts that engine's own update cadence (0.2–1 s).
-    static let loneSentenceCadenceFactor = 1.5
-    static let loneSentenceMaxNanoseconds: UInt64 = 1_500_000_000
-    /// A gap longer than this is a pause, not the engine's update cadence.
-    static let partialCadenceMaxSeconds: TimeInterval = 2.0
-
-    static func loneSentenceSettleNanoseconds(partialCadence: TimeInterval) -> UInt64 {
-        guard partialCadence > 0 else { return self.loneSentencePrintNanoseconds }
-        let scaled = UInt64(partialCadence * self.loneSentenceCadenceFactor * 1_000_000_000)
-        return min(max(scaled, self.loneSentencePrintNanoseconds), self.loneSentenceMaxNanoseconds)
-    }
-    static let minPauseFinalizeCharacters = 22
-    static let minPauseFinalizeWords = 4
-    /// Thai needs a real clause, not a few syllables.
-    static let minPauseFinalizeCharactersThai = 22
-    /// Korean/Japanese pause-cut. Same character floor as other languages,
-    /// so a real leftover does not wait for a long run-on.
-    static let minPauseFinalizeCharactersVerbFinal = 22
-    static let maxDraftCharacters = 240
-    /// Floor for a pause-cut so a leftover is a clause, not two words.
-    static let followAlongWords = 8
-    /// Pause-finalize only this much so a long unpunctuated talk is not one dump.
-    static let maxLineWords = 12
-    static let maxLineCharacters = 80
-    static let contextSentenceCount = 4
-    /// Recent lines the board can still show. A tall window fills from this
-    /// list and the presenter can scroll back a few minutes. Older lines stay
-    /// in the session record for History and export.
-    static let visibleTheaterLines = 48
-    static let maxCommittedLines = visibleTheaterLines
-    /// Leftover peel runs on every speech update. It uses this recent
-    /// suffix, not the whole board, so a full-screen talk stays inside one tick.
-    static let peelWindowLines = 12
-    /// Leftover peel and last-4 MT priors. Older clauses drop as new ones commit.
-    /// Sized off `peelWindowLines`, not the Theater board, since `listenHistory`
-    /// never needs more than the largest suffix its consumers take.
-    static let maxListenHistory = contextSentenceCount + peelWindowLines
-    /// After this much silence, skip ASR ticks and start a new e2e measurement.
-    static let silenceHoldNanoseconds: UInt64 = 400_000_000
-    static let silenceHoldSeconds: TimeInterval = 0.4
-    /// A commit MT call must fail, not hang. Warmup runs before the first
-    /// Listen, so the first caption uses the same mailbox timeout as the rest.
-    /// A hung call must not hold later sentences.
-    static let translateClauseTimeoutNanoseconds: UInt64 = 7_000_000_000
-    /// A hung commit fails here instead of blocking the board.
-    static let commitMailboxTimeoutNanoseconds: UInt64 = 7_000_000_000
-    static let liveMailboxTimeoutNanoseconds: UInt64 = 1_500_000_000
-    /// Visually separates captions that finished behind one slow ordered slot.
-    /// A normal next caption still publishes as soon as its translation lands.
-    static let orderedCatchUpGapNanoseconds: UInt64 = 180_000_000
-
-    static func mailboxTimeoutNanoseconds(for kind: TranslationRequestKind) -> UInt64 {
-        switch kind {
-        case .live:
-            return Self.liveMailboxTimeoutNanoseconds
-        case .firstCommit, .commit:
-            return Self.commitMailboxTimeoutNanoseconds
-        }
-    }
-
-    static func completeSettleNanoseconds(languageID: String) -> UInt64 {
-        switch TranslationClauseSegmenter.languageCode(from: languageID) {
-        case "ko", "ja":
-            return 1_000_000_000
-        case "th":
-            return 800_000_000
-        default:
-            return Self.completeSettleNanoseconds
-        }
-    }
-
-    static func openSettleNanoseconds(languageID: String) -> UInt64 {
-        switch TranslationClauseSegmenter.languageCode(from: languageID) {
-        case "ko", "ja":
-            return 2_000_000_000
-        case "th":
-            return 1_500_000_000
-        default:
-            return Self.openSettleNanoseconds
-        }
     }
 }

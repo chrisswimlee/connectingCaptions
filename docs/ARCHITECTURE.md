@@ -16,6 +16,7 @@ flowchart LR
 
 | Area | Path | Role |
 | --- | --- | --- |
+| Shared core | `Sources/ConnectingCaptionsCore/` | Platform-neutral Theater types: board admission, inbox, commit context, MT helpers, stitcher, speech policy, History FTS5, and `PlatformHost`. The iOS app depends on the `ConnectingCaptionsCore` product. |
 | Live translation | `Sources/ConnectingCaptions/Services/LiveTranslation/` | Clause split, Apple Translation, on-screen Theater captions, the Pop-up task bar, Speak captions, this-talk notes, pace cue, latency HUD. `LiveTranslationSubscriber` owns the session; `LiveTranslationCommitContext` and `LiveTranslationMT` are the commit / translate helpers; `TheaterInbox` is the task bar; `TheaterSpokenDelivery` speaks published Show-as lines; `TheaterStatus` is the status channel. |
 | Theater UI | `Sources/ConnectingCaptions/UI/LiveTranslation/` | Home, Theater window, presenter chrome |
 | Speech engine | `ASRService.swift` plus `ASRService+*.swift` | Captured audio → transcript, from any selected input device (built-in mic, wired/USB/line-in, Bluetooth, virtual loopback). Reads `SpeechCapturePolicy`. Keep this as the engine, not the product. Theater pause-only ticks call `PauseIntervalAudio` from the streaming and Stop paths. |

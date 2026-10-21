@@ -1,0 +1,266 @@
+import Foundation
+
+/// Whether a finished sentence may become a Theater board row.
+/// Propose runs before a sentence is queued. Publish runs after translation,
+/// while this sentence is still the in-flight entry. Both phases use the same
+/// checklist. Publish ignores this sentence's own in-flight entry, and a
+/// translated sentence must still be tracked.
+public enum TheaterBoardAdmission {
+    public enum Phase: Equatable {
+        case propose
+        case publish
+    }
+
+    public enum Decision: Equatable {
+        case admit
+        case skip(Reason)
+    }
+
+    public enum Reason: String, Equatable {
+        case empty
+        case junk
+        case tooThin
+        case inFlight
+        case sameAsPrinted
+        case revisesEarlier
+        case revisesNewest
+        case repeatsPrintedEnding
+        case printedThisListen
+        case rejoinsPrinted
+        case untracked
+    }
+
+    public struct Context: Equatable {
+        public var peelSources: [String] = []
+        public var inFlightSources: [String] = []
+        public var commitIdentities: Set<String> = []
+        public var latestHypothesis: String = ""
+        public var requiresTrackedIdentity: Bool = false
+        /// Insert Stop may type one trailing fragment the clause cutter refused.
+        public var allowTrailingFragment: Bool = false
+        public var audioContainsSpeech: Bool? = nil
+        /// Reserved by the recognition-occurrence queue, never inferred from
+        /// matching text alone. Still requires a valid, tracked translation.
+        public var hasNewRecognizedOccurrence: Bool = false
+
+        public init(
+            peelSources: [String] = [],
+            inFlightSources: [String] = [],
+            commitIdentities: Set<String> = [],
+            latestHypothesis: String = "",
+            requiresTrackedIdentity: Bool = false,
+            allowTrailingFragment: Bool = false,
+            audioContainsSpeech: Bool? = nil,
+            hasNewRecognizedOccurrence: Bool = false
+        ) {
+            self.peelSources = peelSources
+            self.inFlightSources = inFlightSources
+            self.commitIdentities = commitIdentities
+            self.latestHypothesis = latestHypothesis
+            self.requiresTrackedIdentity = requiresTrackedIdentity
+            self.allowTrailingFragment = allowTrailingFragment
+            self.audioContainsSpeech = audioContainsSpeech
+            self.hasNewRecognizedOccurrence = hasNewRecognizedOccurrence
+        }
+    }
+
+    public static func decide(
+        _ source: String,
+        languageID: String,
+        phase: Phase,
+        context: Context
+    ) -> Decision {
+        let cleaned = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned.isEmpty { return .skip(.empty) }
+        if CaptionJunkGate.shouldDrop(cleaned, audioContainsSpeech: context.audioContainsSpeech) { return .skip(.junk) }
+        if !context.allowTrailingFragment,
+           TranslationClauseSegmenter.isTooThinToCommit(cleaned, languageID: languageID)
+        {
+            return .skip(.tooThin)
+        }
+
+        var inFlight = context.inFlightSources
+        if phase == .publish {
+            inFlight.removeAll { TranslationClauseSegmenter.isSameClause($0, cleaned) }
+        }
+        if inFlight.contains(where: { TranslationClauseSegmenter.isSameClause($0, cleaned) }) {
+            return .skip(.inFlight)
+        }
+
+        if context.hasNewRecognizedOccurrence {
+            let key = TranslationClauseSegmenter.clauseIdentity(cleaned)
+            if phase == .publish, context.requiresTrackedIdentity,
+               !context.commitIdentities.contains(key) {
+                return .skip(.untracked)
+            }
+            return .admit
+        }
+
+        if context.peelSources.dropLast().contains(where: {
+            Self.repeatsEarlierRow($0, incoming: cleaned, languageID: languageID)
+        }) {
+            return .skip(.revisesEarlier)
+        }
+
+        if let last = context.peelSources.last {
+            if TranslationClauseSegmenter.isSameClause(last, cleaned) {
+                return .skip(.sameAsPrinted)
+            }
+            if TranslationClauseSegmenter.isInPlaceGrowth(previous: last, incoming: cleaned) {
+                return .skip(.revisesNewest)
+            }
+            if Self.revisesNewest(
+                previous: last,
+                incoming: cleaned,
+                languageID: languageID,
+                hypothesis: context.latestHypothesis
+            ) {
+                return .skip(.revisesNewest)
+            }
+        }
+        if context.peelSources.contains(where: { TranslationClauseSegmenter.isSameClause($0, cleaned) }) {
+            return .skip(.sameAsPrinted)
+        }
+        if Self.rejoinsPrintedRows(cleaned, rows: context.peelSources, languageID: languageID) {
+            return .skip(.rejoinsPrinted)
+        }
+        if context.peelSources.suffix(2).contains(where: {
+            Self.repeatsPrintedEnding(printed: $0, incoming: cleaned, hypothesis: context.latestHypothesis)
+        }) {
+            return .skip(.repeatsPrintedEnding)
+        }
+        // Lines older than the peel window are not in `peelSources`. A full
+        // sentence without evidence of a new occurrence is a recognition replay.
+        // Explicit repeated occurrences take the reserved path above.
+        if phase == .propose,
+           Self.alreadyPrinted(cleaned, rows: context.peelSources, identities: context.commitIdentities)
+        {
+            return .skip(.printedThisListen)
+        }
+
+        if phase == .publish, context.requiresTrackedIdentity {
+            let key = TranslationClauseSegmenter.clauseIdentity(cleaned)
+            if key.isEmpty || !context.commitIdentities.contains(key) {
+                return .skip(.untracked)
+            }
+        }
+        return .admit
+    }
+
+    /// Short replies ("Okay.", "Yeah, sure.") really do repeat in a talk.
+    public static let minimumWordsForListenRepeat = 4
+
+    /// A shortened replay is a long sentence. Four words still repeat for real.
+    public static let minimumWordsForShortenedReplay = 8
+
+    private static func alreadyPrinted(
+        _ incoming: String,
+        rows: [String],
+        identities: Set<String>
+    ) -> Bool {
+        let key = TranslationClauseSegmenter.normalizedKey(incoming)
+        let words = key.split(separator: " ")
+        if words.count >= Self.minimumWordsForListenRepeat,
+           identities.contains(TranslationClauseSegmenter.clauseIdentity(incoming))
+        {
+            return true
+        }
+        guard words.count >= Self.minimumWordsForShortenedReplay else { return false }
+        if rows.contains(where: {
+            TranslationClauseSegmenter.shouldIgnoreAsStalePrefix(previous: $0, incoming: incoming)
+        }) {
+            return true
+        }
+        let prefix = "n:" + key + " "
+        return identities.contains { $0.hasPrefix(prefix) }
+    }
+
+    /// An earlier row said again, or the same row with more words at its end.
+    /// A close sentence ("model" → "modal") after a newer row is the next
+    /// caption. Only the newest row takes a correction.
+    private static func repeatsEarlierRow(
+        _ printed: String,
+        incoming: String,
+        languageID _: String
+    ) -> Bool {
+        if TranslationClauseSegmenter.isSameClause(printed, incoming) { return true }
+        guard TranslationClauseSegmenter.isInPlaceGrowth(previous: printed, incoming: incoming) else {
+            return false
+        }
+        let printedKey = TranslationClauseSegmenter.normalizedKey(printed)
+        let incomingKey = TranslationClauseSegmenter.normalizedKey(incoming)
+        if TranslationClauseSegmenter.hasUnspacedScript(incomingKey) {
+            return incomingKey.hasPrefix(printedKey)
+        }
+        // "line 1." is not the start of "line 10.".
+        return incomingKey.hasPrefix(printedKey + " ")
+    }
+
+    /// Two neighbouring rows, said again as one sentence. "adjusts to new."
+    /// plus "inputs, and perform…" is the sentence those rows already printed.
+    private static func rejoinsPrintedRows(
+        _ incoming: String,
+        rows: [String],
+        languageID: String
+    ) -> Bool {
+        guard rows.count >= 2 else { return false }
+        for index in 0..<(rows.count - 1) {
+            let joined = rows[index] + " " + rows[index + 1]
+            if TranslationClauseSegmenter.isSameClause(joined, incoming)
+                || TranslationClauseSegmenter.isInPlaceGrowth(previous: joined, incoming: incoming)
+                || TranslationClauseSegmenter.shouldReviseCommitted(
+                    previous: joined,
+                    incoming: incoming,
+                    languageID: languageID
+                )
+            {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// A restitch re-punctuates a printed line ("come on, please work." →
+    /// "come on. Please work.") and its ending looks like a new sentence.
+    /// Speech that really says it twice still has two copies in the hypothesis.
+    public static func repeatsPrintedEnding(printed: String, incoming: String, hypothesis: String) -> Bool {
+        let printedKey = TranslationClauseSegmenter.normalizedKey(printed)
+        let incomingKey = TranslationClauseSegmenter.normalizedKey(incoming)
+        guard !incomingKey.isEmpty, printedKey.count > incomingKey.count else { return false }
+        let endsPrinted = TranslationClauseSegmenter.hasUnspacedScript(incomingKey)
+            ? printedKey.hasSuffix(incomingKey)
+            : printedKey.hasSuffix(" " + incomingKey)
+        guard endsPrinted else { return false }
+        let heard = TranslationClauseSegmenter.normalizedKey(hypothesis)
+        return Self.occurrences(of: incomingKey, in: heard) < 2
+    }
+
+    private static func occurrences(of needle: String, in haystack: String) -> Int {
+        guard !needle.isEmpty else { return 0 }
+        var count = 0
+        var searchRange = haystack.startIndex..<haystack.endIndex
+        while let found = haystack.range(of: needle, range: searchRange) {
+            count += 1
+            searchRange = found.upperBound..<haystack.endIndex
+        }
+        return count
+    }
+
+    private static func revisesNewest(
+        previous: String,
+        incoming: String,
+        languageID: String,
+        hypothesis: String
+    ) -> Bool {
+        guard TranslationClauseSegmenter.shouldReviseCommitted(
+            previous: previous,
+            incoming: incoming,
+            languageID: languageID
+        ) else { return false }
+        if TranslationClauseSegmenter.shouldReplaceLast(previous: previous, incoming: incoming) {
+            return true
+        }
+        guard !hypothesis.isEmpty else { return true }
+        return !TranslationClauseSegmenter.contains(hypothesis, clause: previous)
+    }
+}

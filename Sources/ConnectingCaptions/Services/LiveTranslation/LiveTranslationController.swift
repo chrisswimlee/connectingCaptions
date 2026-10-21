@@ -4,7 +4,7 @@ import Combine
 import Foundation
 
 @MainActor
-final class LiveTranslationController: ObservableObject {
+final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
     static let shared = LiveTranslationController()
 
     @Published private(set) var isSessionActive = false
@@ -1165,18 +1165,6 @@ final class LiveTranslationController: ObservableObject {
             self.trace("session \(outcome) token=\(self.sessionToken) lines=\(lines)")
         }
         self.sessionTrace = nil
-    }
-}
-
-/// Strips a trailing mark so a restitch can grow a clause. The mark arrives
-/// with the accepted sentence.
-enum TheaterLiveRow {
-    static func openText(_ text: String) -> String {
-        var open = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        while let last = open.last, ".…?!。！？".contains(last) {
-            open.removeLast()
-        }
-        return open.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

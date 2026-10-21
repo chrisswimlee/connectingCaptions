@@ -23,6 +23,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDele
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ConnectingCaptionsCoreBootstrap.install()
         // Bring up file logging + crash handlers immediately during launch.
         _ = FileLogger.shared
         UpdateHandoff.closePreviousCopy()

@@ -20,7 +20,7 @@ struct TheaterModeSection: View {
                 accessibilityLabel: AppLanguage.text(self.title),
                 accessibilityIdentifier: self.accessibilityIdentifier,
                 options: Array(TheaterSessionMode.allCases),
-                title: { $0.displayName },
+                title: { AppLanguage.text($0.displayName) },
                 selection: Binding(
                     get: { self.settings.theaterSessionMode },
                     set: { self.controller.applyTheaterSessionMode($0) }
