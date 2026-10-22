@@ -26,10 +26,7 @@ let package = Package(
         ),
         .target(
             name: "ConnectingCaptionsCore",
-            path: "Sources/ConnectingCaptionsCore",
-            linkerSettings: [
-                .linkedFramework("AVFoundation"),
-            ]
+            path: "Sources/ConnectingCaptionsCore"
         ),
     ]
 )

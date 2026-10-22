@@ -30,7 +30,7 @@ nonisolated public enum PauseIntervalAudio {
         }
 
         /// Undo silence removal when mapping recognizer timestamps to captured audio.
-        func sourceSample(at decodedSample: Int, isEnd: Bool = false) -> Int? {
+        public func sourceSample(at decodedSample: Int, isEnd: Bool = false) -> Int? {
             guard decodedSample >= 0 else { return nil }
             var offset = 0
             for range in self.sourceRanges {

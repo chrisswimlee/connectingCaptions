@@ -1,3 +1,5 @@
+// Upstream: FluidVoice (altic-dev), GPLv3. PCM ring for the macOS capture graph.
+// This file is not part of ConnectingCaptionsCore, so the iOS app does not link it.
 import Foundation
 
 nonisolated public enum LiveAudioRetention {
