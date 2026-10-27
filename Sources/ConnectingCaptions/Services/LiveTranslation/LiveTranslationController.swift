@@ -505,6 +505,11 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
             self.trace(LiveTranslationTrace.event("listen skip", token: self.sessionToken, "reason=alreadyActive kind=captions"), level: .debug)
             return
         }
+        if let blocked = SettingsStore.shared.blockListenStart() {
+            self.trace("listen blocked reason=license", level: .info)
+            self.reportListenFailure(blocked)
+            return
+        }
         guard !self.isStartingListen else {
             self.trace("listen skip reason=starting kind=captions", level: .debug)
             return
@@ -541,6 +546,12 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
     func startInsertListening() {
         if self.isSessionActive, self.listenKind == .insert {
             self.trace(LiveTranslationTrace.event("listen skip", token: self.sessionToken, "reason=alreadyActive kind=insert"), level: .debug)
+            return
+        }
+        if let blocked = SettingsStore.shared.blockListenStart() {
+            self.trace("listen blocked reason=license kind=insert", level: .info)
+            self.reportListenFailure(blocked)
+            QuickTranslateInsertController.presentNotice(blocked)
             return
         }
         guard !self.isStartingListen else {

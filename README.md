@@ -16,9 +16,9 @@ Open **Theater**, set **I speak** and **Show as**, then press **Open Theater** a
 
 By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
-[Download](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://chrisswimlee.com/connectingCaptions/license/)
+[Download](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://local-host.ai/connectingCaptions/license/)
 
-**For work:** a named license is $60 per Mac per year, five Macs minimum. Prices are on the [license page](https://chrisswimlee.com/connectingCaptions/license/). The app stays free for everyone, work use included.
+**License:** 14 days from the first Listen, then $49 once for up to two Macs you own ($29 during the Show HN launch week). Updates for version 1. A work license is $240 per Mac per year ($120 for schools), five Macs minimum, when an organization owns the Mac. Prices and checkout are on the [pricing page](https://local-host.ai/connectingCaptions/pricing/).
 
 ---
 
@@ -219,14 +219,12 @@ This release does not send analytics, feedback, or update checks to a third-part
 
 ## Commercial license
 
-connectingCaptions is free for everyone under GPLv3, work use included. Theater Listen stays unlocked. A commercial license is optional.
+Listen runs for 14 days from the first Listen, then needs a key. A personal license is $49 once for up to two Macs you own, with updates for version 1. It is $29 once during the Show HN launch week. Firms buy a work license when the organization owns the Mac:
 
-Firms that need a vendor they can sanction — a named license, a security contact, or a written SLA — buy at the published price:
+- [local-host.ai/connectingCaptions/pricing](https://local-host.ai/connectingCaptions/pricing/) — buy a personal key, $49 once ($29 launch week); work license $240 / Mac / year ($120 for schools), five Macs minimum; written SLA $3,000 / organization / year; installer package $2,500 once
+- Email [support@local-host.ai](mailto:support@local-host.ai?subject=Connecting%20Captions%20commercial%20license) with the organization and Mac count for a work license
 
-- [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/) — $60 / Mac / year, five Macs minimum; SLA +$90 / Mac / year; MDM pkg $1,500 once
-- Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=Connecting%20Captions%20commercial%20license) with the organization and Mac count
-
-A paid key is air-gapped. It replaces the in-app work notice with **Licensed to** your organization. It does not phone home. A written SLA and a signed seat list are optional. A Jamf or Fleet package can install the key, the seat list, and caption settings. The on-device audit log stores no captions. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
+A paid key is air-gapped. A personal key shows **Personal license**. A work key shows **Licensed to** your organization. It does not phone home. A written SLA and a signed seat list are optional. A Mac outside that list does not listen. An installer package can install the key, the seat list, and caption settings. The on-device audit log stores no captions. The source for a version is its git tag. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
 
 This is not consulting. Consulting is [Engage](https://chrisswimlee.com/engage/).
 

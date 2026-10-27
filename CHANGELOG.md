@@ -4,6 +4,8 @@ All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
 
+- Listen runs for 14 days from the first Listen, then needs a key. A personal license is $49 once for up to two Macs one person owns, with updates for version 1. A work license is $240 per Mac per year ($120 for schools) and is required when an organization owns the Mac. A Mac outside a seat list no longer listens. The key still stays on this Mac.
+
 ## [1.6.16] — 2026-10-16
 
 ### Theater and setup

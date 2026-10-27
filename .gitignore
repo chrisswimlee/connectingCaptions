@@ -230,3 +230,6 @@ brag-output*/
 
 # Local release evidence can include transcripts and diagnostic logs.
 release-evidence/
+
+checkout-worker/.wrangler/
+checkout-worker/node_modules/

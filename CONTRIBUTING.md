@@ -1,6 +1,6 @@
 # Contributing to Connecting Captions
 
-This repo is Theater captions and dictation insert for the setup languages: every language both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. Speech recognition engines come from [FluidVoice](https://github.com/altic-dev/FluidVoice). Theater Listen, captions, History, and the app identity are owned here. See [CREDITS.md](CREDITS.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues only through [SECURITY.md](SECURITY.md). Commercial and procurement questions go to [docs/COMMERCIAL.md](docs/COMMERCIAL.md) or [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/), not GitHub Issues.
+This repo is Theater captions and dictation insert for the setup languages: every language both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. Speech recognition engines come from [FluidVoice](https://github.com/altic-dev/FluidVoice). Theater Listen, captions, History, and the app identity are owned here. See [CREDITS.md](CREDITS.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues only through [SECURITY.md](SECURITY.md). Commercial and procurement questions go to [docs/COMMERCIAL.md](docs/COMMERCIAL.md) or [local-host.ai/connectingCaptions/license](https://local-host.ai/connectingCaptions/license/), not GitHub Issues.
 
 ## Who this repo is for
 
@@ -138,7 +138,7 @@ Start a [GitHub Discussion](https://github.com/chrisswimlee/connectingCaptions/d
 - Report behavior that you are not sure is a connectingCaptions bug.
 - Ask whether a change would be accepted before writing code.
 
-Do not open an issue to buy or quote a commercial license. Send IT and legal to [the license page](https://chrisswimlee.com/connectingCaptions/license/). Prices are on that page.
+Do not open an issue to buy or quote a commercial license. Send IT and legal to [the license page](https://local-host.ai/connectingCaptions/license/). Prices are on that page.
 
 Feature ideas should begin in the Ideas category. Maintainers may turn an accepted discussion into a tracked issue.
 

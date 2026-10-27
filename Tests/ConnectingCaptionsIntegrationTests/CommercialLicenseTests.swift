@@ -13,10 +13,12 @@ final class CommercialLicenseTests: XCTestCase {
         FleetManagedDirectory.machineRootOverride = nil
         CommercialSeat.machineIDOverride = nil
         SettingsStore.shared.removeCommercialLicense()
+        SettingsStore.shared.clearListenTrial()
     }
 
     override func tearDown() {
         SettingsStore.shared.removeCommercialLicense()
+        SettingsStore.shared.clearListenTrial()
         SettingsStore.licenseVerifyingKeyOverride = nil
         super.tearDown()
     }
@@ -108,13 +110,122 @@ final class CommercialLicenseTests: XCTestCase {
     func testCommercialLicenseURLsPointAtTheSiteAndMail() {
         XCTAssertEqual(
             ConnectingCaptionsProduct.commercialLicenseURL.absoluteString,
-            "https://chrisswimlee.com/connectingCaptions/license/"
+            "https://local-host.ai/connectingCaptions/license/"
         )
         XCTAssertEqual(ConnectingCaptionsProduct.commercialLicenseMailURL.scheme, "mailto")
         XCTAssertTrue(ConnectingCaptionsProduct.commercialLicenseMailURL.absoluteString.contains("commercial%20license"))
-        XCTAssertTrue(ConnectingCaptionsProduct.workNotice.contains("$60"))
+        XCTAssertTrue(ConnectingCaptionsProduct.workNotice.contains("$240"))
+        XCTAssertTrue(ConnectingCaptionsProduct.workNotice.contains("$49"))
+        XCTAssertEqual(ConnectingCaptionsProduct.personalLicensePriceLine, "$49 once")
+        XCTAssertEqual(ConnectingCaptionsProduct.personalLaunchPriceLine, "$29 once")
+        XCTAssertEqual(ConnectingCaptionsProduct.personalPurchaseURL.absoluteString, "https://local-host.ai/connectingCaptions/pricing/")
+        XCTAssertEqual(ConnectingCaptionsProduct.personalMacs, 2)
+        XCTAssertEqual(ConnectingCaptionsProduct.listenTrialDays, 14)
         XCTAssertEqual(ConnectingCaptionsProduct.commercialSeatMinimum, 5)
         XCTAssertTrue(ConnectingCaptionsProduct.commercialLicenseMailURL.absoluteString.contains("Mac%20count"))
+    }
+
+    func testPersonalKeyUnlocksTwoMacsAndHidesTheOrganization() throws {
+        let issued = try XCTUnwrap(CommercialLicense.day(from: "2026-10-24"))
+        let expires = try XCTUnwrap(CommercialLicense.day(from: "2099-12-31"))
+        let record = CommercialLicense.Record(
+            product: CommercialLicense.productID,
+            org: "ada@example.com",
+            seats: 2,
+            issued: issued,
+            expires: expires,
+            personal: true,
+            updatesThroughMajor: 1
+        )
+        let token = try CommercialLicense.makeToken(record: record, privateKey: self.privateKey)
+        let verified = try CommercialLicense.verify(token, publicKey: self.privateKey.publicKey, appVersion: "1.6.16").get()
+
+        XCTAssertTrue(verified.personal)
+        XCTAssertEqual(verified.seats, 2)
+        XCTAssertEqual(verified.updatesThroughMajor, 1)
+        XCTAssertEqual(verified.coverageTitle, "Personal license")
+        XCTAssertFalse(verified.coverageTitle.contains("ada@example.com"))
+
+        let settings = SettingsStore.shared
+        XCTAssertEqual(try settings.activateCommercialLicense(token).get().org, "ada@example.com")
+        XCTAssertTrue(settings.isCommerciallyLicensed)
+        let ended = try XCTUnwrap(CommercialLicense.day(from: "2026-11-08"))
+        XCTAssertNil(settings.blockListenStart(now: ended))
+    }
+
+    func testPersonalKeyRejectsExtraSeatsAndAnSLA() throws {
+        let issued = try XCTUnwrap(CommercialLicense.day(from: "2026-10-24"))
+        let expires = try XCTUnwrap(CommercialLicense.day(from: "2036-10-24"))
+        let tooMany = CommercialLicense.Record(
+            product: CommercialLicense.productID,
+            org: "ada@example.com",
+            seats: 3,
+            issued: issued,
+            expires: expires,
+            personal: true
+        )
+        let sla = CommercialLicense.Record(
+            product: CommercialLicense.productID,
+            org: "ada@example.com",
+            seats: 2,
+            issued: issued,
+            expires: expires,
+            sla: true,
+            personal: true
+        )
+        let tooManyToken = try CommercialLicense.makeToken(record: tooMany, privateKey: self.privateKey)
+        let slaToken = try CommercialLicense.makeToken(record: sla, privateKey: self.privateKey)
+
+        XCTAssertEqual(
+            CommercialLicense.verify(tooManyToken, publicKey: self.privateKey.publicKey),
+            .failure(.invalidRecord)
+        )
+        XCTAssertEqual(
+            CommercialLicense.verify(slaToken, publicKey: self.privateKey.publicKey),
+            .failure(.invalidRecord)
+        )
+        XCTAssertEqual(
+            CommercialLicense.verify(slaToken, publicKey: self.privateKey.publicKey, appVersion: "2.0"),
+            .failure(.invalidRecord)
+        )
+    }
+
+    func testPersonalKeyStopsAtTheNextMajorVersion() throws {
+        let issued = try XCTUnwrap(CommercialLicense.day(from: "2026-10-24"))
+        let expires = try XCTUnwrap(CommercialLicense.day(from: "2099-12-31"))
+        let record = CommercialLicense.Record(
+            product: CommercialLicense.productID,
+            org: "ada@example.com",
+            seats: 2,
+            issued: issued,
+            expires: expires,
+            personal: true,
+            updatesThroughMajor: 1
+        )
+        let token = try CommercialLicense.makeToken(record: record, privateKey: self.privateKey)
+
+        XCTAssertEqual(
+            CommercialLicense.verify(token, publicKey: self.privateKey.publicKey, appVersion: "2.0"),
+            .failure(.outsideVersion(1))
+        )
+        XCTAssertNoThrow(try CommercialLicense.verify(token, publicKey: self.privateKey.publicKey, appVersion: "1.9").get())
+    }
+
+    func testTrialLastsFourteenUTCDaysThenBlocksListen() throws {
+        let start = try XCTUnwrap(CommercialLicense.day(from: "2026-10-01"))
+        let lastDay = try XCTUnwrap(CommercialLicense.day(from: "2026-10-14"))
+        let nextDay = try XCTUnwrap(CommercialLicense.day(from: "2026-10-15"))
+
+        XCTAssertEqual(ListenAccess.phase(startedOn: nil, now: start), .notStarted)
+        XCTAssertEqual(ListenAccess.phase(startedOn: start, now: start), .inTrial(daysRemaining: 14))
+        XCTAssertEqual(ListenAccess.phase(startedOn: start, now: lastDay), .inTrial(daysRemaining: 1))
+        XCTAssertEqual(ListenAccess.phase(startedOn: start, now: nextDay), .ended)
+
+        let settings = SettingsStore.shared
+        XCTAssertNil(settings.blockListenStart(now: start))
+        XCTAssertEqual(settings.listenTrialStartedOn, start)
+        XCTAssertNil(settings.blockListenStart(now: lastDay))
+        XCTAssertEqual(settings.blockListenStart(now: nextDay), ListenAccess.trialEndedMessage)
     }
 
     private func makeRecord(

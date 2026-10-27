@@ -264,7 +264,7 @@ enum SettingsSearchIndex {
             terms: [
                 "license commercial enterprise SLA IT legal procurement named organization",
                 "for work email to buy licensed to activation key air-gapped",
-                "price $60 seat Mac year SLA MDM Jamf Fleet pkg",
+                "price $49 $240 $120 school seat Mac year SLA MDM Jamf Fleet pkg buy personal key",
                 "seat list Jamf Fleet MDM pkg audit log caption policy activity log backup restore",
             ]
         ),

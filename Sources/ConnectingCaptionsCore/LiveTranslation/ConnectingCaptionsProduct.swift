@@ -52,16 +52,23 @@ nonisolated public enum ConnectingCaptionsProduct {
     public static let publisherURL = URL(string: "https://local-host.ai")!
     public static let voiceEngineUpstreamName = "FluidVoice"
     public static let voiceEngineUpstreamURL = URL(string: "https://github.com/altic-dev/FluidVoice")!
-    public static let commercialLicenseEmail = "suyoung.lee99@gmail.com"
-    public static let commercialLicenseURL = URL(string: "https://chrisswimlee.com/connectingCaptions/license/")!
+    public static let commercialLicenseEmail = "support@local-host.ai"
+    public static let commercialLicenseURL = URL(string: "https://local-host.ai/connectingCaptions/license/")!
+    /// Pricing page with the Paddle checkout for a personal key. The checkout link lives on the page, so it can change without an app release.
+    public static let personalPurchaseURL = URL(string: "https://local-host.ai/connectingCaptions/pricing/")!
     public static let licenseKeychainService = "com.connectingcaptions.commercial-license"
     public static let licenseKeychainAccount = "connectingCaptionsCommercialLicense"
-    public static let workNoticeTitle = "For work"
+    public static let trialKeychainAccount = "connectingCaptionsListenTrial"
+    public static let workNoticeTitle = "Trial"
+    public static let personalLicensePriceLine = "$49 once"
+    public static let personalLaunchPriceLine = "$29 once"
+    public static let listenTrialDays = 14
+    public static let personalMacs = 2
     public static let workNotice =
-        "Free for everyone under GPLv3, work use included. Named license is $60 per Mac per year, five Macs minimum. Written SLA is +$90 per Mac per year. A Jamf or Fleet pkg is $1,500 once."
-    public static let commercialSeatPriceLine = "$60 / Mac / year"
-    public static let commercialSLAPriceLine = "+$90 / Mac / year"
-    public static let commercialMDMPriceLine = "$1,500 once"
+        "A 14-day trial, then $49 once for up to two Macs you own. Updates for version 1. A named license is $240 per Mac per year, or $120 for schools, five Macs minimum, and is required when an organization owns the Mac. A written SLA is $3,000 per organization per year. An installer package is $2,500 once."
+    public static let commercialSeatPriceLine = "$240 / Mac / year ($120 for schools)"
+    public static let commercialSLAPriceLine = "$3,000 / organization / year"
+    public static let commercialMDMPriceLine = "$2,500 once"
     public static let commercialSeatMinimum = 5
 
     public static var commercialLicenseMailURL: URL {
@@ -75,9 +82,11 @@ nonisolated public enum ConnectingCaptionsProduct {
 
                 Mac count (5 minimum):
 
-                Named license $60/Mac/year. Add written SLA +$90/Mac/year? (yes/no)
+                Named license $240/Mac/year ($120/Mac/year for schools). School? (yes/no)
 
-                MDM / Jamf pkg $1,500 once? (yes/no)
+                Add written SLA $3,000/organization/year? (yes/no)
+
+                MDM / Jamf pkg $2,500 once? (yes/no)
 
                 Anything else IT or legal needs:
                 """),

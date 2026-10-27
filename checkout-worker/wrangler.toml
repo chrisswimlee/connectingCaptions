@@ -1,0 +1,30 @@
+name = "connecting-captions-keys"
+main = "src/index.js"
+workers_dev = true
+compatibility_date = "2025-09-01"
+
+[vars]
+# Paddle price ID(s) for the $49 personal key. Comma-separated.
+# A price with custom data license=personal also counts.
+PERSONAL_PRICE_IDS = "pri_01m5vhcet3gp2wxbdz61p4awm4"
+# "production" or "sandbox". Must match where PADDLE_API_KEY comes from.
+PADDLE_ENVIRONMENT = "production"
+# Major app version a new personal key covers. Must match the app you ship.
+KEY_MAJOR = "1"
+# Sender must be on a domain verified in Resend.
+EMAIL_FROM = "Connecting Captions <keys@local-host.ai>"
+REPLY_TO = "support@local-host.ai"
+
+# One key per transaction, so webhook retries never send a second email.
+# Create it with: npx wrangler kv namespace create ISSUED_KEYS
+# then paste the id here.
+[[kv_namespaces]]
+binding = "ISSUED_KEYS"
+id = "2f613e2fb9f84946aec892e01848ff9c"
+
+# Secrets (never in this file). Set each with `npx wrangler secret put NAME`:
+#   LICENSE_PRIVATE_KEY     raw 32-byte Ed25519 private key, standard Base64
+#                           (same value as ~/.config/connectingcaptions/commercial-license.ed25519)
+#   PADDLE_WEBHOOK_SECRET   Paddle → Developer tools → Notifications → your destination → secret key
+#   PADDLE_API_KEY          Paddle → Developer tools → Authentication → API key with Customers: Read
+#   RESEND_API_KEY          resend.com → API Keys

@@ -56,6 +56,7 @@ struct CommercialLicenseStatusCard: View {
 
                 if self.showsLicenseRequest {
                     VStack(alignment: .leading, spacing: 4) {
+                        AppText("Personal license {0} for up to two Macs you own.", arguments: [String(describing: ConnectingCaptionsProduct.personalLicensePriceLine)])
                         AppText("Named license {0}, {1} Macs minimum.", arguments: [String(describing: ConnectingCaptionsProduct.commercialSeatPriceLine), String(describing: ConnectingCaptionsProduct.commercialSeatMinimum)])
                         AppText("Written SLA {0}.", arguments: [String(describing: ConnectingCaptionsProduct.commercialSLAPriceLine)])
                         AppText("MDM / Jamf pkg {0}.", arguments: [String(describing: ConnectingCaptionsProduct.commercialMDMPriceLine)])
@@ -65,6 +66,9 @@ struct CommercialLicenseStatusCard: View {
                     .accessibilityIdentifier("commercial.license.prices")
 
                     HStack(spacing: 8) {
+                        Link(AppLanguage.text("Buy a personal key"), destination: ConnectingCaptionsProduct.personalPurchaseURL)
+                            .textLinkPointer()
+                            .accessibilityIdentifier("commercial.license.buy")
                         Link(AppLanguage.text("Email to buy"), destination: ConnectingCaptionsProduct.commercialLicenseMailURL)
                             .textLinkPointer()
                             .accessibilityIdentifier("commercial.license.request")
@@ -79,9 +83,9 @@ struct CommercialLicenseStatusCard: View {
                     Divider().opacity(0.3)
                     self.seatLine
                     self.keyField
-                    if self.settings.commercialLicenseRecord != nil {
-                        self.fleetActions
-                    }
+                if let record = self.settings.commercialLicenseRecord, !record.personal {
+                    self.fleetActions
+                }
                 }
             }
         }
@@ -111,17 +115,25 @@ struct CommercialLicenseStatusCard: View {
         }
         if self.settings.commercialLicenseRecord != nil {
             let refusal = self.settings.commercialSeatRefusal
-                ?? "Free under GPLv3. Listen stays unlocked."
+                ?? "This Mac is outside the seat list. Listen stays off until the seat list includes it."
             return "\(refusal) Send Seat ID \(self.settings.commercialSeatID) to IT."
         }
-        return "Free under GPLv3, work use included."
+        return self.detail
     }
 
     private var title: String {
         if let record = self.settings.commercialLicenseRecord, self.settings.isCommerciallyLicensed {
-            return record.licensedToLine
+            return record.coverageTitle
         }
-        return ConnectingCaptionsProduct.workNoticeTitle
+        if self.settings.commercialLicenseRecord != nil {
+            return "Seat list"
+        }
+        switch self.settings.listenTrialPhase {
+        case .notStarted, .inTrial:
+            return ConnectingCaptionsProduct.workNoticeTitle
+        case .ended:
+            return "Trial ended"
+        }
     }
 
     private var detail: String {
@@ -136,7 +148,7 @@ struct CommercialLicenseStatusCard: View {
         if let failure = self.settings.commercialLicenseFailure {
             return failure.localizedDescription
         }
-        return ConnectingCaptionsProduct.workNotice
+        return ListenAccess.trialDetail(for: self.settings.listenTrialPhase)
     }
 
     private var seatLine: some View {
@@ -162,7 +174,7 @@ struct CommercialLicenseStatusCard: View {
             .buttonStyle(.theaterTextDestructive)
             .accessibilityIdentifier("commercial.license.remove")
         } else {
-            TextField(AppLanguage.text("Paste a commercial license key"), text: self.$draft)
+            TextField(AppLanguage.text("Paste a license key"), text: self.$draft)
                 .textFieldStyle(.roundedBorder)
                 .font(self.theme.typography.bodySmall)
                 .accessibilityIdentifier("commercial.license.field")

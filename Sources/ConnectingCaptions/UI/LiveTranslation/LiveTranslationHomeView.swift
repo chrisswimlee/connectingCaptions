@@ -58,9 +58,10 @@ struct LiveTranslationHomeView: View {
                         .accessibilityIdentifier("theater.home.advanced")
                     }
                 }
-                if self.settings.isCommerciallyLicensed || self.settings.commercialLicenseRecord != nil {
-                    CommercialLicenseStatusCard(compact: true)
-                }
+                CommercialLicenseStatusCard(
+                    showsKeyField: !self.settings.isCommerciallyLicensed,
+                    compact: self.settings.isCommerciallyLicensed
+                )
             }
             .fluidPageContent()
             .onAppear {

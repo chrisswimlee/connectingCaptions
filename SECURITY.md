@@ -8,7 +8,7 @@ Please report vulnerabilities against the current `main` branch of connectingCap
 
 Do not open a public issue for a security report.
 
-Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com) with:
+Email [support@local-host.ai](mailto:support@local-host.ai) with:
 
 - A description of the issue and its impact
 - Steps to reproduce, or a proof of concept if you have one
