@@ -1,5 +1,7 @@
 # Commercial license
 
+The published Mac download, release 1.6.16, is free until the App Store app is available. It does not ask for a key. The trial described below is not in that release.
+
 Listen runs for 14 days from the first Listen, then needs a key. The check stays on this Mac. It does not phone home.
 
 A personal key for this download is **$49 once**, or **$29 once** during the Show HN launch week. It covers one person, up to two of their own Macs, and updates for all of version 1. A named organization key is for Macs an organization owns. The App Store app is a separate binary. This repository stays the direct download.

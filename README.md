@@ -18,7 +18,7 @@ By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
 [Download](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://local-host.ai/connectingCaptions/license/)
 
-**License:** 14 days from the first Listen, then $49 once for up to two Macs you own ($29 during the Show HN launch week). Updates for version 1. A work license is $240 per Mac per year ($120 for schools), five Macs minimum, when an organization owns the Mac. Prices and checkout are on the [pricing page](https://local-host.ai/connectingCaptions/pricing/).
+**License:** The Mac download is free until the App Store app is available. This repository stays GPLv3. Release 1.6.16 does not ask for a key. A work license, for Macs an organization owns, is on the [pricing page](https://local-host.ai/connectingCaptions/pricing/).
 
 ---
 
@@ -219,12 +219,12 @@ This release does not send analytics, feedback, or update checks to a third-part
 
 ## Commercial license
 
-Listen runs for 14 days from the first Listen, then needs a key. A personal license is $49 once for up to two Macs you own, with updates for version 1. It is $29 once during the Show HN launch week. Firms buy a work license when the organization owns the Mac:
+The Mac download is free until the App Store app is available. Release 1.6.16 does not ask for a key. Organizations buy a work license when the organization owns the Mac:
 
-- [local-host.ai/connectingCaptions/pricing](https://local-host.ai/connectingCaptions/pricing/) — buy a personal key, $49 once ($29 launch week); work license $240 / Mac / year ($120 for schools), five Macs minimum; written SLA $3,000 / organization / year; installer package $2,500 once
+- [local-host.ai/connectingCaptions/pricing](https://local-host.ai/connectingCaptions/pricing/) — work license $240 / Mac / year ($120 for schools), five Macs minimum; written SLA $3,000 / organization / year; installer package $2,500 once
 - Email [support@local-host.ai](mailto:support@local-host.ai?subject=Connecting%20Captions%20commercial%20license) with the organization and Mac count for a work license
 
-A paid key is air-gapped. A personal key shows **Personal license**. A work key shows **Licensed to** your organization. It does not phone home. A written SLA and a signed seat list are optional. A Mac outside that list does not listen. An installer package can install the key, the seat list, and caption settings. The on-device audit log stores no captions. The source for a version is its git tag. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
+A work key is air-gapped. It shows **Licensed to** your organization. It does not phone home. A written SLA and a signed seat list are optional. A Mac outside that list does not listen. An installer package can install the key, the seat list, and caption settings. The on-device audit log stores no captions. The source for a version is its git tag. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
 
 This is not consulting. Consulting is [Engage](https://chrisswimlee.com/engage/).
 
