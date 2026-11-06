@@ -1,4 +1,4 @@
-# Contributing to Connecting Captions
+# Contributing to Connecting Captions Pro
 
 This repo is Theater captions and dictation insert for the setup languages: every language both Apple Translation and a Voice Engine can use. Translate follows I speak into Show as. Speech recognition engines come from [FluidVoice](https://github.com/altic-dev/FluidVoice). Theater Listen, captions, History, and the app identity are owned here. See [CREDITS.md](CREDITS.md). Please follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues only through [SECURITY.md](SECURITY.md). Commercial and procurement questions go to [docs/COMMERCIAL.md](docs/COMMERCIAL.md) or [local-host.ai/connectingCaptions/license](https://local-host.ai/connectingCaptions/license/), not GitHub Issues.
 

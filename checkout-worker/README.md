@@ -56,7 +56,7 @@ npx wrangler secret put PADDLE_WEBHOOK_SECRET
 
 ### 6. Test before launch
 
-Paddle has a separate sandbox account. To test end to end, make the same product there, set `PADDLE_ENVIRONMENT = "sandbox"` and the sandbox price ID, use sandbox API and webhook secrets, deploy, and buy with Paddle's test card. Paste the emailed key in Connecting Captions → Settings → General. It should say **Personal license**. Then switch everything back to production and deploy.
+Paddle has a separate sandbox account. To test end to end, make the same product there, set `PADDLE_ENVIRONMENT = "sandbox"` and the sandbox price ID, use sandbox API and webhook secrets, deploy, and buy with Paddle's test card. Paste the emailed key in Connecting Captions Pro → Settings → General. It should say **Personal license**. Then switch everything back to production and deploy.
 
 ### 7. Go live
 

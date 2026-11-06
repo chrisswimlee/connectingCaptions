@@ -42,16 +42,29 @@ enum DictationAudioHistoryError: LocalizedError {
 }
 
 final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
-    static let shared = DictationAudioHistoryStore()
+    static let shared = DictationAudioHistoryStore(usesProductionKey: true)
 
     private let audioFolder = "DictationAudioHistory"
     private let fileManager = FileManager.default
     private let audioDirectoryOverride: URL?
+    private let keyProvider: () -> Data?
     private let pendingSaveLock = NSLock()
     private var pendingSaveFileNames: Set<String> = []
 
-    init(audioDirectory: URL? = nil) {
+    init(audioDirectory: URL? = nil, key: Data? = nil, usesProductionKey: Bool = false) {
         self.audioDirectoryOverride = audioDirectory
+        if let key {
+            self.keyProvider = { key }
+        } else if usesProductionKey {
+            self.keyProvider = { HistoryKeySource.current }
+        } else {
+            self.keyProvider = { nil }
+        }
+        if usesProductionKey {
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                self?.sealLegacyFiles()
+            }
+        }
     }
 
     func save(
@@ -71,6 +84,9 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         do {
             data = Self.wavData(from: snapshot)
             try data.write(to: url, options: .atomic)
+            if let key = self.keyProvider() {
+                try SealedAudioFile.sealInPlace(at: url, key: key)
+            }
         } catch {
             self.completePendingSave(fileName: fileName)
             throw error
@@ -95,7 +111,7 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         }
         let url = directory.appendingPathComponent(fileName, isDirectory: false)
         do {
-            return try StreamingWavWriter(url: url, fileName: fileName)
+            return try StreamingWavWriter(url: url, fileName: fileName, key: self.keyProvider())
         } catch {
             self.completePendingSave(fileName: fileName)
             throw error
@@ -230,11 +246,11 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
     }
 
     func suggestedAudioExportFilename(for date: Date = Date()) -> String {
-        "connectingCaptions_Audio_\(Self.fileTimestampFormatter.string(from: date)).zip"
+        "\(ConnectingCaptionsProduct.displayName) Audio \(Self.fileTimestampFormatter.string(from: date)).zip"
     }
 
     func suggestedPairExportFilename(for entry: TranscriptionHistoryEntry) -> String {
-        "connectingCaptions_Pair_\(Self.fileTimestampFormatter.string(from: entry.timestamp))_\(entry.id.uuidString.prefix(8)).zip"
+        "\(ConnectingCaptionsProduct.displayName) Pair \(Self.fileTimestampFormatter.string(from: entry.timestamp)) \(entry.id.uuidString.prefix(8)).zip"
     }
 
     static func formattedGigabytes(_ bytes: Int64) -> String {
@@ -273,10 +289,13 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
 
             let exportFileName = "\(Self.fileTimestampFormatter.string(from: entry.timestamp))_\(entry.id.uuidString.prefix(8)).wav"
             let relativeAudioPath = "audio/\(exportFileName)"
-            try self.fileManager.copyItem(
-                at: sourceURL,
-                to: audioDirectory.appendingPathComponent(exportFileName, isDirectory: false)
-            )
+            let exportURL = audioDirectory.appendingPathComponent(exportFileName, isDirectory: false)
+            if SealedAudioFile.isSealed(at: sourceURL) {
+                guard let key = self.keyProvider() else { throw DictationAudioHistoryError.audioMissing }
+                try SealedAudioFile.plaintext(at: sourceURL, key: key).write(to: exportURL, options: .atomic)
+            } else {
+                try self.fileManager.copyItem(at: sourceURL, to: exportURL)
+            }
 
             let row = AudioManifestRow(
                 audio: relativeAudioPath,
@@ -304,6 +323,23 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
             try self.fileManager.removeItem(at: destinationURL)
         }
         try await self.zip(stagingDirectory: staging, destinationURL: destinationURL)
+    }
+
+    func sealLegacyFiles() {
+        guard let key = self.keyProvider() else { return }
+        guard let directory = try? self.audioDirectory(createIfNeeded: false),
+              self.fileManager.fileExists(atPath: directory.path)
+        else { return }
+        let files = (try? self.fileManager.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        let pending = self.pendingSaveLock.withLock { self.pendingSaveFileNames }
+        for file in files where file.pathExtension.lowercased() == "wav" && !pending.contains(file.lastPathComponent) {
+            guard !SealedAudioFile.isSealed(at: file) else { continue }
+            try? SealedAudioFile.sealInPlace(at: file, key: key)
+        }
     }
 
     private func audioDirectory(createIfNeeded: Bool = true) throws -> URL {
@@ -393,8 +429,10 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
         private let sampleRate = 16_000
         private let channels = 1
         private var aborted = false
+        private let key: Data?
 
-        init(url: URL, fileName: String) throws {
+        init(url: URL, fileName: String, key: Data? = nil) throws {
+            self.key = key
             self.url = url
             self.fileName = fileName
             if FileManager.default.fileExists(atPath: url.path) {
@@ -447,6 +485,9 @@ final nonisolated class DictationAudioHistoryStore: @unchecked Sendable {
             ))
             try handle.close()
             self.handle = nil
+            if let key = self.key {
+                try SealedAudioFile.sealInPlace(at: self.url, key: key)
+            }
             let durationMilliseconds = self.sampleRate > 0
                 ? Int((Double(self.sampleCount) / Double(self.sampleRate) * 1000).rounded())
                 : 0

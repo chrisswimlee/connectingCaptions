@@ -619,7 +619,7 @@ enum TheaterBilingualWrap {
             let next: TokenKind
             if character.isWhitespace {
                 next = .space
-            } else if character.isASCII, character.isLetter || character.isNumber {
+            } else if Self.isSpacedWordCharacter(character) {
                 next = .latin
             } else if character.unicodeScalars.contains(where: { (0x0E00...0x0E7F).contains($0.value) }) {
                 next = .thai
@@ -711,7 +711,22 @@ enum TheaterBilingualWrap {
     private static func isLatinAtom(_ atom: String) -> Bool {
         let trimmed = atom.drop(while: { $0.isWhitespace })
         guard let first = trimmed.first else { return false }
-        return first.isASCII && (first.isLetter || first.isNumber)
+        return Self.isSpacedWordCharacter(first)
+    }
+
+    /// Word atoms for spaced scripts, including accented Latin, Cyrillic, Arabic,
+    /// Hindi, and spaced Hangul. Han, kana, and Thai stay on their own paths.
+    private static func isSpacedWordCharacter(_ character: Character) -> Bool {
+        if character.unicodeScalars.contains(where: { scalar in
+            (0x4E00...0x9FFF).contains(scalar.value)
+                || (0x3400...0x4DBF).contains(scalar.value)
+                || (0x3040...0x30FF).contains(scalar.value)
+                || (0x31F0...0x31FF).contains(scalar.value)
+                || (0x0E00...0x0E7F).contains(scalar.value)
+        }) {
+            return false
+        }
+        return TranslationClauseSegmenter.keepsWordCharacter(character)
     }
 
     private static func isWordJoiner(_ character: Character) -> Bool {

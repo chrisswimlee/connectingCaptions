@@ -28,6 +28,17 @@ public enum CaptionJunkGate {
         "구독과 좋아요",
         "请不吝点赞",
         "订阅",
+        // Whisper's usual line over silence. Only reached with confirmed silent
+        // audio, so a spoken closing thank-you still prints.
+        "thank you",
+        "thank you very much",
+        "thank you so much",
+        "thanks",
+        "감사합니다",
+        "고맙습니다",
+        "ありがとうございました",
+        "ありがとうございます",
+        "谢谢",
     ]
 
     private static let acknowledgements: Set<String> = [
@@ -65,7 +76,7 @@ public enum CaptionJunkGate {
     private static func foldedLine(_ text: String) -> String {
         text
             .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
-            .filter { $0.isLetter || $0.isNumber }
+            .filter { TranslationClauseSegmenter.keepsWordCharacter($0) }
     }
 
     public static func hasPhraseRepeat(_ text: String) -> Bool {
@@ -109,10 +120,11 @@ public enum CaptionJunkGate {
     }
 
     private static func foldedToken(_ text: String) -> String {
-        let folded = text.folding(
-            options: [.caseInsensitive, .diacriticInsensitive],
-            locale: .current
-        )
-        return folded.filter { $0.isLetter || $0.isNumber }
+        let thai = text.unicodeScalars.contains { (0x0E00...0x0E7F).contains($0.value) }
+        let options: String.CompareOptions = thai
+            ? [.caseInsensitive]
+            : [.caseInsensitive, .diacriticInsensitive]
+        let folded = text.folding(options: options, locale: .current)
+        return folded.filter { TranslationClauseSegmenter.keepsWordCharacter($0) }
     }
 }

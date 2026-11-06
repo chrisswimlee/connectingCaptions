@@ -130,7 +130,14 @@ public struct LectureCaptionLog: Equatable {
     /// data."). Source and Show-as change together, and the id stays put even
     /// when a later sentence is already the last row.
     @discardableResult
-    public mutating func applyGrowth(id: UInt64, source: String, translated: String, speechTiming: CaptionSpeechTiming? = nil) -> Bool {
+    public mutating func applyGrowth(
+        id: UInt64,
+        source: String,
+        translated: String,
+        speechTiming: CaptionSpeechTiming? = nil,
+        sourceLanguageID: String? = nil,
+        targetLanguageID: String? = nil
+    ) -> Bool {
         let cleanedSource = source.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanedTranslation = translated.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanedSource.isEmpty,
@@ -141,6 +148,8 @@ public struct LectureCaptionLog: Equatable {
         self.entries[index].source = cleanedSource
         self.entries[index].translated = cleanedTranslation
         self.entries[index].wasPolished = false
+        if let sourceLanguageID { self.entries[index].sourceLanguageID = sourceLanguageID }
+        if let targetLanguageID { self.entries[index].targetLanguageID = targetLanguageID }
         // If a correction no longer aligns with timed recognizer segments, do
         // not attach the old sentence's timestamps to the new wording.
         if wordingChanged || speechTiming != nil { self.entries[index].speechTiming = speechTiming }
@@ -170,7 +179,7 @@ public enum LiveTranslationConfirm {
     /// fuller 30-second decode for leftover speech. Mid-talk prints from the live stitch.
     public static func requiresConfirmBeforePrint(languageID: String) -> Bool {
         switch TranslationClauseSegmenter.languageCode(from: languageID) {
-        case "ko", "ja", "th":
+        case "ko", "ja", "th", "zh":
             return true
         default:
             return false

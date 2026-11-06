@@ -19,7 +19,8 @@ extension SettingsStore {
             license: record,
             rosterToken: FleetManagedDirectory.rosterToken(),
             seatID: self.commercialSeatID,
-            publicKey: Self.licenseVerifyingKey
+            publicKey: Self.licenseVerifyingKey,
+            now: self.licenseClockNow
         )
     }
 

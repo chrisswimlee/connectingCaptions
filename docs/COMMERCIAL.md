@@ -2,9 +2,11 @@
 
 The published Mac download, release 1.6.16, is free until the App Store app is available. It does not ask for a key. The trial described below is not in that release.
 
-Listen runs for 14 days from the first Listen, then needs a key. The check stays on this Mac. It does not phone home.
+Release 1.6.16 does not run the trial below. Listen starts without a key. A work key can still be pasted in Settings when an organization owns the Mac.
 
-A personal key for this download is **$49 once**, or **$29 once** during the Show HN launch week. It covers one person, up to two of their own Macs, and updates for all of version 1. A named organization key is for Macs an organization owns. The App Store app is a separate binary. This repository stays the direct download.
+The later trial, which this release does not apply: Listen runs for 14 days from the first Listen, then needs a key. A date years ahead of when this copy was installed does not start that trial, and a date moved backward does not open it again. A Mac keeps Listen without a key when it was first set up before 2 November 2026 and already had a preferences file or history database created after that setup, before 2 November 2026, and before this copy of the app was installed. A copied home folder, an empty support folder, and a file this launch creates do not count. The first launch waits a day before sealing no, so a restore can finish. That Mac is told it is free because the download was early, and can share the app or email a donation. The check stays on this Mac. It does not phone home.
+
+A personal key for this download is **$49 once**, or **$29 once** during the Show HN launch week. It covers one person, up to two of their own Macs, and updates for all of version 1. Name those Macs with `--mac` when issuing the key; a key with no Mac names still activates on each Mac where it is pasted. Copying the preferences file to another Mac does not. A named organization key is for Macs an organization owns. The App Store app is a separate binary. This repository stays the direct download.
 
 **Buy a personal key:** [local-host.ai/connectingCaptions/pricing](https://local-host.ai/connectingCaptions/pricing/). Checkout is Paddle. The key arrives by email within a minute, signed by `checkout-worker/`. To issue one by hand, run the script with `--personal`.
 
@@ -14,20 +16,20 @@ A personal key for this download is **$49 once**, or **$29 once** during the Sho
 
 | | Price | Notes |
 | --- | --- | --- |
-| App Store app | **Free** | iPhone and iPad. One full Listen session, with translation, then the unlock. |
-| iPhone and iPad unlock | **$9.99 once** | Unlimited Listen, captions, and the keyboard that types the last line. Apple Speech and Apple Translation. |
-| Direct download | **$49 once** | This Mac app. Overlay, any input including loopback, Whisper, and typing into other apps. 14-day trial. One person, up to two of their own Macs. Updates for version 1. **$29 once** during the Show HN launch week. |
+| Connecting Captions | **Free** | App Store app for iPhone, iPad, and Mac. One full Listen session, with translation, then the unlock. |
+| Connecting Captions unlock | **$9.99 once** | Unlimited Listen, captions, and the keyboard that types the last line. Apple Speech and Apple Translation. |
+| Connecting Captions Pro | **Free in 1.6.16** | Direct Mac download, and the direct iPhone and iPad download. Overlay, any input including loopback, Whisper, and typing into other apps stay on the Mac. This release does not ask for a key on either download. A later personal key is $49 once ($29 once during the Show HN launch week) after a 14-day trial, for one person and up to two of their own Macs, with updates for version 1. The same key unlocks Connecting Captions Pro on iPhone and iPad. |
 | Work license | **$240 / Mac / year** | **$120 / Mac / year** for schools. Five Macs minimum. The organization's name on the Mac. Direct download only. Required when an organization owns the Mac. |
 | Written SLA | **$3,000 / organization / year** | Flat add-on to the work license. |
 | Installer package | **$2,500 once** | Add-on to the work license. |
 
-Apple Speech is the default for one speaker. Either way downloads Whisper Small once if the room talks both languages of the pair. The download is the trial build. Custom overlay or glossary work is [Engage](https://chrisswimlee.com/engage/), not this license.
+Apple Speech is the default for one speaker. Either way downloads Whisper Small once if the room talks both languages of the pair. Release 1.6.16 is the free download. Custom overlay or glossary work is [Engage](https://chrisswimlee.com/engage/), not this license.
 
 This is not consulting. Consulting is [Engage](https://chrisswimlee.com/engage/).
 
 ## What IT usually asks
 
-**How does this monetize?** Direct download $49 once after a 14-day trial, $29 during the Show HN launch week. Work license $240 per Mac per year, $120 for schools, five Macs minimum, required when an organization owns the Mac. Written SLA $3,000 per organization per year. Installer package $2,500 once. The App Store app is iPhone and iPad: one full Listen session, then $9.99 once. Not transcripts, voiceprints, or model training.
+**How does this monetize?** Release 1.6.16 does not ask for a key. A later personal license is $49 once after a 14-day trial, $29 during the Show HN launch week. Work license $240 per Mac per year, $120 for schools, five Macs minimum, required when an organization owns the Mac. Written SLA $3,000 per organization per year. Installer package $2,500 once. Connecting Captions is iPhone, iPad, and Mac: one full Listen session, then $9.99 once. Not transcripts, voiceprints, or model training.
 
 **Does voice leave this Mac?** No, unless someone opts in to a cloud speech model. There is no analytics host. Live Theater does not send telemetry. See the README Privacy section.
 
@@ -99,7 +101,7 @@ Each line is hashed and signed with a key that stays on that Mac. Export writes 
 
 ```bash
 ./scripts/build-mdm-pkg.sh \
-  --app dist/Connecting Captions.app \
+  --app dist/Connecting Captions Pro.app \
   --license ./license.key \
   --roster ./seats.roster \
   --settings ./settings.fleet.json \
@@ -115,6 +117,10 @@ It installs the app in `/Applications` and these root-owned files:
 - `/Library/Application Support/connectingCaptions/settings.fleet.json`
 
 While `license.key` is present, it wins over a key pasted in Settings. The row says **Installed for this Mac.**
+
+## Earlier downloads
+
+A release build reads `EARLY_INSTALL_SEAL_KEY` (64 hex characters) from the environment or `xcconfig/Local.xcconfig`. That value is not the license private key and does not belong in git. A release without it does not recognize an earlier download.
 
 ## Issue a key (maintainer)
 

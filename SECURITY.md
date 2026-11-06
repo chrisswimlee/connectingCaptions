@@ -41,7 +41,7 @@ The app is **unsandboxed**. Theater and dictation need the microphone — that i
 Automatic updates only install a zip that:
 
 - matches `SHA256SUMS` on the GitHub Release
-- contains a single top-level `Connecting Captions.app`
+- contains a single top-level `Connecting Captions Pro.app`
 - passes `codesign --verify --deep --strict`
 - uses bundle id `com.connectingcaptions.app`
 - is signed with a usable Developer ID team, not ad-hoc or `not set`

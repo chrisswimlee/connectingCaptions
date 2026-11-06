@@ -167,7 +167,7 @@ struct TheaterSidebarIdentity: View {
     }
 }
 
-#Preview("Connecting Captions mark") {
+#Preview("Connecting Captions Pro mark") {
     VStack(spacing: 20) {
         HStack(spacing: 20) {
             FluidIcon(size: 24)

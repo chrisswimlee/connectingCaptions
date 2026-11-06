@@ -1570,7 +1570,7 @@ struct ContentView: View {
             LiveTranslationController.shared.startInsertListening()
         }
         self.hotkeyManager?.setCaptionListenCallback {
-            LiveTranslationController.shared.toggleCaptionListening()
+            LiveTranslationController.shared.toggleCaptionListeningFromShortcut()
         }
 
         LiveTranslationController.shared.subscriber.confirmTranscript = {

@@ -54,6 +54,24 @@ struct CommercialLicenseStatusCard: View {
                     Spacer(minLength: 8)
                 }
 
+                if self.showsEarlyDownloadThanks {
+                    HStack(spacing: 8) {
+                        ShareLink(
+                            item: ConnectingCaptionsProduct.productPageURL,
+                            subject: Text(AppLanguage.text("Connecting Captions Pro")),
+                            message: Text(AppLanguage.text("Each sentence appears when it is ready."))
+                        ) {
+                            AppText("Share the app")
+                        }
+                        .textLinkPointer()
+                        .accessibilityIdentifier("commercial.early.share")
+                        Link(AppLanguage.text("Donate"), destination: ConnectingCaptionsProduct.donateMailURL)
+                            .textLinkPointer()
+                            .accessibilityIdentifier("commercial.early.donate")
+                    }
+                    .font(self.theme.typography.bodySmall)
+                }
+
                 if self.showsLicenseRequest {
                     VStack(alignment: .leading, spacing: 4) {
                         AppText("Personal license {0} for up to two Macs you own.", arguments: [String(describing: ConnectingCaptionsProduct.personalLicensePriceLine)])
@@ -79,7 +97,7 @@ struct CommercialLicenseStatusCard: View {
                     .font(self.theme.typography.bodySmall)
                 }
 
-                if self.showsKeyField {
+                if self.showsKeyField, !self.hidesKeyField {
                     Divider().opacity(0.3)
                     self.seatLine
                     self.keyField
@@ -105,13 +123,27 @@ struct CommercialLicenseStatusCard: View {
         }
     }
 
+    private var hidesKeyField: Bool {
+        self.settings.keepsEarlierCopy && !self.settings.isCommerciallyLicensed
+    }
+
+    private var showsEarlyDownloadThanks: Bool {
+        self.settings.keepsEarlierCopy && !self.settings.isCommerciallyLicensed
+    }
+
     private var showsLicenseRequest: Bool {
-        !self.settings.isCommerciallyLicensed && self.settings.commercialLicenseRecord == nil
+        ListenAccess.releaseAsksForKey
+            && !self.settings.isCommerciallyLicensed
+            && self.settings.commercialLicenseRecord == nil
+            && !self.settings.keepsEarlierCopy
     }
 
     private var compactStatus: String {
         if self.settings.isCommerciallyLicensed {
             return self.title
+        }
+        if self.settings.keepsEarlierCopy {
+            return self.detail
         }
         if self.settings.commercialLicenseRecord != nil {
             let refusal = self.settings.commercialSeatRefusal
@@ -125,8 +157,14 @@ struct CommercialLicenseStatusCard: View {
         if let record = self.settings.commercialLicenseRecord, self.settings.isCommerciallyLicensed {
             return record.coverageTitle
         }
+        if self.settings.keepsEarlierCopy {
+            return AppLanguage.text("Early download")
+        }
         if self.settings.commercialLicenseRecord != nil {
             return "Seat list"
+        }
+        if !ListenAccess.releaseAsksForKey {
+            return AppLanguage.text("Free download")
         }
         switch self.settings.listenTrialPhase {
         case .notStarted, .inTrial:
@@ -137,16 +175,23 @@ struct CommercialLicenseStatusCard: View {
     }
 
     private var detail: String {
-        if let record = self.settings.commercialLicenseRecord {
-            if self.settings.isCommerciallyLicensed {
-                return self.settings.commercialCoverageLine(for: record)
-            }
-            if let refusal = self.settings.commercialSeatRefusal {
-                return refusal
-            }
+        if let record = self.settings.commercialLicenseRecord, self.settings.isCommerciallyLicensed {
+            return self.settings.commercialCoverageLine(for: record)
+        }
+        if self.settings.keepsEarlierCopy {
+            return AppLanguage.text("You're getting Connecting Captions Pro for free because you downloaded it early.")
+        }
+        if self.settings.commercialLicenseRecord != nil, let refusal = self.settings.commercialSeatRefusal {
+            return refusal
         }
         if let failure = self.settings.commercialLicenseFailure {
             return failure.localizedDescription
+        }
+        if !ListenAccess.releaseAsksForKey {
+            if self.showsKeyField {
+                return AppLanguage.text("This release does not ask for a key. A work license covers Macs an organization owns.")
+            }
+            return AppLanguage.text("This release does not ask for a key.")
         }
         return ListenAccess.trialDetail(for: self.settings.listenTrialPhase)
     }
@@ -200,7 +245,7 @@ struct CommercialLicenseStatusCard: View {
     }
 
     private var canRemoveLicense: Bool {
-        self.settings.commercialLicenseToken != nil && self.settings.commercialLicenseFailure == nil
+        self.settings.commercialLicenseToken != nil
     }
 
     private var fleetActions: some View {

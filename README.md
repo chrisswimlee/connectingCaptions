@@ -1,12 +1,21 @@
-# Connecting Captions
+# Connecting Captions Pro
+
+This repository is Connecting Captions Pro, the direct-download Mac app. iPhone, iPad, and the Mac App Store app are Connecting Captions, in the private `connectingCaptions-iOS` project.
+
+| App | Project | Speech |
+| --- | --- | --- |
+| Connecting Captions Pro | This repo, Mac | FluidVoice, including when Apple Speech is selected |
+| Connecting Captions Pro for iPhone and iPad | This repo, scheme `ConnectingCaptionsProIOS` | FluidVoice (Parakeet on the microphone) |
+| Connecting Captions for iPhone and iPad | `connectingCaptions-iOS` | Apple Speech |
+| Connecting Captions for Mac | `connectingCaptions-iOS`, Mac Catalyst | Apple Speech |
 
 <p align="center">
-  <img src="docs/screenshots/app-icon.png" width="96" alt="Connecting Captions icon">
+  <img src="docs/screenshots/app-icon.png" width="96" alt="Connecting Captions Pro icon">
 </p>
 
 **Each sentence appears when it is ready.**
 
-Connecting Captions is live subtitles for macOS, with translation on the machine. Choose **I speak** and **Show as** from the compatible language choices. Voice Engine shows which languages each model supports and which are ready on this Mac. Translate follows I speak into Show as. The same language needs no translation pack. A sentence appears when it is ready. Best with one speaker and a close mic. It listens through any input device you pick — the built-in microphone, a wired, USB, or line-in mic, a Bluetooth headset in call mode, or a virtual loopback input (BlackHole or Loopback) when you route other audio into it.
+Connecting Captions Pro is live subtitles for macOS, with translation on the machine. Choose **I speak** and **Show as** from the compatible language choices. Voice Engine shows which languages each model supports and which are ready on this Mac. Translate follows I speak into Show as. The same language needs no translation pack. A sentence appears when it is ready. Best with one speaker and a close mic. It listens through any input device you pick — the built-in microphone, a wired, USB, or line-in mic, a Bluetooth headset in call mode, or a virtual loopback input (BlackHole or Loopback) when you route other audio into it.
 
 ![Translate home](docs/screenshots/translate-home.png)
 
@@ -87,7 +96,7 @@ checks and download behavior.
 
 ## Install
 
-**Preferred.** Download [Connecting-Captions.zip](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip). That name tracks the latest release. A notarized Developer ID zip should stay quiet in Gatekeeper. Drag **Connecting Captions** to Applications, open Theater, allow the microphone, and press **Listen**.
+**Preferred.** Download [Connecting Captions Pro](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip). That link tracks the latest release. A notarized Developer ID zip should stay quiet in Gatekeeper. Drag **Connecting Captions Pro** to Applications, open Theater, allow the microphone, and press **Listen**.
 
 **Homebrew.**
 
@@ -205,7 +214,7 @@ The paste-key and history harnesses are **not** XCTest targets — they compile 
 
 ## Privacy
 
-Connecting Captions is **local-first**. Your voice, audio, and transcribed text never leave your machine unless you explicitly opt in to a cloud AI provider.
+Connecting Captions Pro is **local-first**. Your voice, audio, and transcribed text never leave your machine unless you explicitly opt in to a cloud AI provider.
 
 This release does not send analytics, feedback, or update checks to a third-party analytics host. Voice Engine weights stay in this app's folder. A model already in the shared FluidAudio cache is copied once, and that cache is not deleted. A FluidVoice install on the same Mac is left alone: this app does not read or delete that app's Keychain or Application Support folder.
 

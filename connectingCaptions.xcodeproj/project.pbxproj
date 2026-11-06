@@ -45,6 +45,7 @@
 		FTIB00000000000000000002 /* TheaterInboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTIB00000000000000000001 /* TheaterInboxTests.swift */; };
 		FTIME0000000000000000002 /* InsertIMEGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTIME0000000000000000001 /* InsertIMEGuardTests.swift */; };
 		FTJA00000000000000000002 /* LiveTranslationJapaneseClauseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTJA00000000000000000001 /* LiveTranslationJapaneseClauseTests.swift */; };
+		FTMC00000000000000000002 /* LiveTranslationMidTalkRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTMC00000000000000000001 /* LiveTranslationMidTalkRuleTests.swift */; };
 		FTLIC000000000000000002 /* CommercialLicenseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTLIC000000000000000001 /* CommercialLicenseTests.swift */; };
 		FTLT00000000000000000002 /* LiveTranslationLatencyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTLT00000000000000000001 /* LiveTranslationLatencyTests.swift */; };
 		FTMA00000000000000000002 /* LiveTranslationMockASRTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTMA00000000000000000001 /* LiveTranslationMockASRTests.swift */; };
@@ -53,6 +54,9 @@
 		FB7400000000000000000002 /* CaptionPrintingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB7400000000000000000001 /* CaptionPrintingTests.swift */; };
 		FTPA00000000000000000002 /* PauseIntervalAudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTPA00000000000000000001 /* PauseIntervalAudioTests.swift */; };
 		FTQI00000000000000000002 /* QuickTranslateInsertTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTQI00000000000000000001 /* QuickTranslateInsertTests.swift */; };
+		QC0100000000000000000002 /* QuickCaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QC0100000000000000000001 /* QuickCaptureTests.swift */; };
+		KA0100000000000000000002 /* KeywordAnchorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = KA0100000000000000000001 /* KeywordAnchorTests.swift */; };
+		TE0100000000000000000002 /* TranscriptEncryptionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TE0100000000000000000001 /* TranscriptEncryptionTests.swift */; };
 		FTQT00000000000000000002 /* LiveTranslationQualityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTQT00000000000000000001 /* LiveTranslationQualityTests.swift */; };
 		FTRP00000000000000000002 /* TheaterRepeatTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTRP00000000000000000001 /* TheaterRepeatTests.swift */; };
 		FTSB00000000000000000002 /* LiveTranslationSubscriberTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FTSB00000000000000000001 /* LiveTranslationSubscriberTests.swift */; };
@@ -69,6 +73,10 @@
 		SPFC00000000000000000002 /* SpokenPunctuationFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SPFC00000000000000000001 /* SpokenPunctuationFormattingTests.swift */; };
 		SUPS00000000000000000002 /* SimpleUpdaterSignatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SUPS00000000000000000001 /* SimpleUpdaterSignatureTests.swift */; };
 		UIT10000000000000000008 /* TheaterSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UIT10000000000000000001 /* TheaterSmokeTests.swift */; };
+		PIOS00000000000000000012 /* ProDirectLicenseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PIOS00000000000000000011 /* ProDirectLicenseTests.swift */; };
+		PIOS00000000000000000008 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = PIOS0000000000000000000A /* FluidAudio */; };
+		PIOS00000000000000000009 /* ConnectingCaptionsCore in Frameworks */ = {isa = PBXBuildFile; productRef = PIOS0000000000000000000B /* ConnectingCaptionsCore */; };
+		IOSK00000000000000000008 /* ConnectingCaptionsProIOSKeyboard.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = IOSK00000000000000000001 /* ConnectingCaptionsProIOSKeyboard.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,6 +94,13 @@
 			remoteGlobalIDString = 7C078D8E2E3B339200FB7CAC;
 			remoteInfo = connectingCaptions;
 		};
+		IOSK00000000000000000009 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7C078D872E3B339200FB7CAC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = IOSK00000000000000000004;
+			remoteInfo = ConnectingCaptionsProIOSKeyboard;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -97,6 +112,17 @@
 			files = (
 			);
 			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		IOSK00000000000000000010 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				IOSK00000000000000000008 /* ConnectingCaptionsProIOSKeyboard.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -138,6 +164,7 @@
 		FTIB00000000000000000001 /* TheaterInboxTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterInboxTests.swift; sourceTree = "<group>"; };
 		FTIME0000000000000000001 /* InsertIMEGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsertIMEGuardTests.swift; sourceTree = "<group>"; };
 		FTJA00000000000000000001 /* LiveTranslationJapaneseClauseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationJapaneseClauseTests.swift; sourceTree = "<group>"; };
+		FTMC00000000000000000001 /* LiveTranslationMidTalkRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationMidTalkRuleTests.swift; sourceTree = "<group>"; };
 		FTLIC000000000000000001 /* CommercialLicenseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommercialLicenseTests.swift; sourceTree = "<group>"; };
 		FTLT00000000000000000001 /* LiveTranslationLatencyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationLatencyTests.swift; sourceTree = "<group>"; };
 		FTMA00000000000000000001 /* LiveTranslationMockASRTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationMockASRTests.swift; sourceTree = "<group>"; };
@@ -146,6 +173,9 @@
 		FB7400000000000000000001 /* CaptionPrintingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptionPrintingTests.swift; sourceTree = "<group>"; };
 		FTPA00000000000000000001 /* PauseIntervalAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PauseIntervalAudioTests.swift; sourceTree = "<group>"; };
 		FTQI00000000000000000001 /* QuickTranslateInsertTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickTranslateInsertTests.swift; sourceTree = "<group>"; };
+		QC0100000000000000000001 /* QuickCaptureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCaptureTests.swift; sourceTree = "<group>"; };
+		KA0100000000000000000001 /* KeywordAnchorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeywordAnchorTests.swift; sourceTree = "<group>"; };
+		TE0100000000000000000001 /* TranscriptEncryptionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptEncryptionTests.swift; sourceTree = "<group>"; };
 		FTQT00000000000000000001 /* LiveTranslationQualityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationQualityTests.swift; sourceTree = "<group>"; };
 		FTRP00000000000000000001 /* TheaterRepeatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterRepeatTests.swift; sourceTree = "<group>"; };
 		FTSB00000000000000000001 /* LiveTranslationSubscriberTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTranslationSubscriberTests.swift; sourceTree = "<group>"; };
@@ -165,6 +195,9 @@
 		UIT10000000000000000002 /* ConnectingCaptionsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ConnectingCaptionsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		XC0C00000000000000000001 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		XC0C00000000000000000002 /* Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = Local.xcconfig.example; sourceTree = "<group>"; };
+		PIOS00000000000000000001 /* Connecting Captions Pro.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Connecting Captions Pro.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		IOSK00000000000000000001 /* ConnectingCaptionsProIOSKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ConnectingCaptionsProIOSKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		PIOS00000000000000000011 /* ProDirectLicenseTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProDirectLicenseTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -173,7 +206,40 @@
 			path = Sources/ConnectingCaptions;
 			sourceTree = "<group>";
 		};
+		PIOS00000000000000000002 /* Sources/ConnectingCaptionsProIOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				PIOS00000000000000000003 /* Exceptions for "Sources/ConnectingCaptionsProIOS" folder in "ConnectingCaptionsProIOS" target */,
+			);
+			path = Sources/ConnectingCaptionsProIOS;
+			sourceTree = "<group>";
+		};
+		IOSK00000000000000000002 /* Sources/ConnectingCaptionsProIOSKeyboard */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				IOSK00000000000000000003 /* Exceptions for "Sources/ConnectingCaptionsProIOSKeyboard" folder in "ConnectingCaptionsProIOSKeyboard" target */,
+			);
+			path = Sources/ConnectingCaptionsProIOSKeyboard;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		PIOS00000000000000000003 /* Exceptions for "Sources/ConnectingCaptionsProIOS" folder in "ConnectingCaptionsProIOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = PIOS00000000000000000004 /* ConnectingCaptionsProIOS */;
+		};
+		IOSK00000000000000000003 /* Exceptions for "Sources/ConnectingCaptionsProIOSKeyboard" folder in "ConnectingCaptionsProIOSKeyboard" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = IOSK00000000000000000004 /* ConnectingCaptionsProIOSKeyboard */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		7C078D8C2E3B339200FB7CAC /* Frameworks */ = {
@@ -185,6 +251,7 @@
 				7CE006BD2E80EBE600DDCCD6 /* AppUpdater in Frameworks */,
 				7C078DA52E3B386A00FB7CAC /* FluidAudio in Frameworks */,
 				CC0C00000000000000000003 /* ConnectingCaptionsCore in Frameworks */,
+				SC0100000000000000000003 /* SQLCipher in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -203,6 +270,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		PIOS00000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				PIOS00000000000000000008 /* FluidAudio in Frameworks */,
+				PIOS00000000000000000009 /* ConnectingCaptionsCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		IOSK00000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -210,6 +293,8 @@
 			isa = PBXGroup;
 			children = (
 				7C078D912E3B339200FB7CAC /* Sources/ConnectingCaptions */,
+				PIOS00000000000000000002 /* Sources/ConnectingCaptionsProIOS */,
+				IOSK00000000000000000002 /* Sources/ConnectingCaptionsProIOSKeyboard */,
 				7CDB0A242F3C4D5600FB7CAD /* Tests */,
 				XC0C00000000000000000003 /* xcconfig */,
 				7CDB0A282F3C4D5600FB7CAD /* Frameworks */,
@@ -221,6 +306,8 @@
 			isa = PBXGroup;
 			children = (
 				7C078D8F2E3B339200FB7CAC /* Connecting Captions Debug.app */,
+				PIOS00000000000000000001 /* Connecting Captions Pro.app */,
+				IOSK00000000000000000001 /* ConnectingCaptionsProIOSKeyboard.appex */,
 				7CDB0A202F3C4D5600FB7CAD /* ConnectingCaptionsIntegrationTests.xctest */,
 				UIT10000000000000000002 /* ConnectingCaptionsUITests.xctest */,
 			);
@@ -257,6 +344,9 @@
 				FTAR00000000000000000001 /* LiveTranslationArchiveTests.swift */,
 				FTIME0000000000000000001 /* InsertIMEGuardTests.swift */,
 				FTQI00000000000000000001 /* QuickTranslateInsertTests.swift */,
+				QC0100000000000000000001 /* QuickCaptureTests.swift */,
+				KA0100000000000000000001 /* KeywordAnchorTests.swift */,
+				TE0100000000000000000001 /* TranscriptEncryptionTests.swift */,
 				FTAS00000000000000000001 /* AppleSpeechLocaleTests.swift */,
 				C0DE89000000000000000001 /* SettingsNavigationStateTests.swift */,
 				343B29013F4441D6A797D12D /* LLMClientRequestBodyTests.swift */,
@@ -282,6 +372,7 @@
 				FB7400000000000000000001 /* CaptionPrintingTests.swift */,
 				FTRP00000000000000000001 /* TheaterRepeatTests.swift */,
 				FTJA00000000000000000001 /* LiveTranslationJapaneseClauseTests.swift */,
+				FTMC00000000000000000001 /* LiveTranslationMidTalkRuleTests.swift */,
 				FTPA00000000000000000001 /* PauseIntervalAudioTests.swift */,
 				FTSE00000000000000000001 /* SpeechEnergyGateTests.swift */,
 				FTTE00000000000000000001 /* TypingEventSourceTests.swift */,
@@ -295,6 +386,7 @@
 				1DD32F2A3064563600D02CC2 /* SettingsStorePromptBindingAndMigrationTests.swift */,
 				1D344BAD307CDE6E0006B445 /* AudioCaptureIdlePolicyWatchdogTests.swift */,
 				1D344BAF307CDE750006B445 /* TranscriptionExecutorTests.swift */,
+				PIOS00000000000000000011 /* ProDirectLicenseTests.swift */,
 			);
 			path = ConnectingCaptionsIntegrationTests;
 			sourceTree = "<group>";
@@ -367,6 +459,7 @@
 				7CE006BC2E80EBE600DDCCD6 /* AppUpdater */,
 				7C9A71012F58B00000FB7CAF /* TranscribeCpp */,
 				CC0C00000000000000000002 /* ConnectingCaptionsCore */,
+				SC0100000000000000000002 /* SQLCipher */,
 			);
 			productName = connectingCaptions;
 			productReference = 7C078D8F2E3B339200FB7CAC /* Connecting Captions Debug.app */;
@@ -410,6 +503,52 @@
 			productReference = UIT10000000000000000002 /* ConnectingCaptionsUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		PIOS00000000000000000004 /* ConnectingCaptionsProIOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = PIOS0000000000000000000E /* Build configuration list for PBXNativeTarget "ConnectingCaptionsProIOS" */;
+			buildPhases = (
+				PIOS00000000000000000005 /* Sources */,
+				PIOS00000000000000000006 /* Frameworks */,
+				PIOS00000000000000000007 /* Resources */,
+				IOSK00000000000000000010 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				IOSK0000000000000000000A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				PIOS00000000000000000002 /* Sources/ConnectingCaptionsProIOS */,
+			);
+			name = ConnectingCaptionsProIOS;
+			packageProductDependencies = (
+				PIOS0000000000000000000A /* FluidAudio */,
+				PIOS0000000000000000000B /* ConnectingCaptionsCore */,
+			);
+			productName = ConnectingCaptionsProIOS;
+			productReference = PIOS00000000000000000001 /* Connecting Captions Pro.app */;
+			productType = "com.apple.product-type.application";
+		};
+		IOSK00000000000000000004 /* ConnectingCaptionsProIOSKeyboard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = IOSK0000000000000000000E /* Build configuration list for PBXNativeTarget "ConnectingCaptionsProIOSKeyboard" */;
+			buildPhases = (
+				IOSK00000000000000000005 /* Sources */,
+				IOSK00000000000000000006 /* Frameworks */,
+				IOSK00000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				IOSK00000000000000000002 /* Sources/ConnectingCaptionsProIOSKeyboard */,
+			);
+			name = ConnectingCaptionsProIOSKeyboard;
+			productName = ConnectingCaptionsProIOSKeyboard;
+			productReference = IOSK00000000000000000001 /* ConnectingCaptionsProIOSKeyboard.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -429,6 +568,12 @@
 					UIT10000000000000000004 = {
 						CreatedOnToolsVersion = 26.0;
 						TestTargetID = 7C078D8E2E3B339200FB7CAC;
+					};
+					PIOS00000000000000000004 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					IOSK00000000000000000004 = {
+						CreatedOnToolsVersion = 26.0;
 					};
 				};
 			};
@@ -456,6 +601,8 @@
 				7C078D8E2E3B339200FB7CAC /* connectingCaptions */,
 				7CDB0A1F2F3C4D5600FB7CAD /* ConnectingCaptionsIntegrationTests */,
 				UIT10000000000000000004 /* ConnectingCaptionsUITests */,
+				PIOS00000000000000000004 /* ConnectingCaptionsProIOS */,
+				IOSK00000000000000000004 /* ConnectingCaptionsProIOSKeyboard */,
 			);
 		};
 /* End PBXProject section */
@@ -477,6 +624,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		UIT10000000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		PIOS00000000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		IOSK00000000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -515,11 +676,26 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		PIOS00000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		IOSK00000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		7CDB0A212F3C4D5600FB7CAD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				7CDB0A2E2F3C4D5600FB7CAD /* AudioFixtureLoader.swift in Sources */,
+				PIOS00000000000000000012 /* ProDirectLicenseTests.swift in Sources */,
 				7CDB0A2D2F3C4D5600FB7CAD /* DictationE2ETests.swift in Sources */,
 				1D344BAE307CDE6E0006B445 /* AudioCaptureIdlePolicyWatchdogTests.swift in Sources */,
 				B52000000000000000000002 /* PrivateAIDictationTokenBudgetTests.swift in Sources */,
@@ -540,6 +716,9 @@
 				1DD32F2B3064563600D02CC2 /* SettingsStorePromptBindingAndMigrationTests.swift in Sources */,
 				FTIME0000000000000000002 /* InsertIMEGuardTests.swift in Sources */,
 				FTQI00000000000000000002 /* QuickTranslateInsertTests.swift in Sources */,
+				QC0100000000000000000002 /* QuickCaptureTests.swift in Sources */,
+				KA0100000000000000000002 /* KeywordAnchorTests.swift in Sources */,
+				TE0100000000000000000002 /* TranscriptEncryptionTests.swift in Sources */,
 				FTAS00000000000000000002 /* AppleSpeechLocaleTests.swift in Sources */,
 				C0DE89000000000000000002 /* SettingsNavigationStateTests.swift in Sources */,
 				86CAA2D4EF18433096185602 /* LLMClientRequestBodyTests.swift in Sources */,
@@ -566,6 +745,7 @@
 				FB7400000000000000000002 /* CaptionPrintingTests.swift in Sources */,
 				FTRP00000000000000000002 /* TheaterRepeatTests.swift in Sources */,
 				FTJA00000000000000000002 /* LiveTranslationJapaneseClauseTests.swift in Sources */,
+				FTMC00000000000000000002 /* LiveTranslationMidTalkRuleTests.swift in Sources */,
 				FTPA00000000000000000002 /* PauseIntervalAudioTests.swift in Sources */,
 				FTSE00000000000000000002 /* SpeechEnergyGateTests.swift in Sources */,
 				FTTE00000000000000000002 /* TypingEventSourceTests.swift in Sources */,
@@ -597,6 +777,11 @@
 			isa = PBXTargetDependency;
 			target = 7C078D8E2E3B339200FB7CAC /* connectingCaptions */;
 			targetProxy = UIT1000000000000000000A /* PBXContainerItemProxy */;
+		};
+		IOSK0000000000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = IOSK00000000000000000004 /* ConnectingCaptionsProIOSKeyboard */;
+			targetProxy = IOSK00000000000000000009 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -766,7 +951,7 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Connecting Captions";
+				INFOPLIST_KEY_CFBundleDisplayName = "Connecting Captions Pro";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Transcribe speech from microphone";
@@ -825,7 +1010,7 @@
 				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Connecting Captions";
+				INFOPLIST_KEY_CFBundleDisplayName = "Connecting Captions Pro";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Transcribe speech from microphone";
@@ -837,7 +1022,7 @@
 				MARKETING_VERSION = 1.6.16;
 				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.app;
 				PRODUCT_MODULE_NAME = ConnectingCaptions;
-				PRODUCT_NAME = "Connecting Captions";
+				PRODUCT_NAME = "Connecting Captions Pro";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -884,7 +1069,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD)";
-				BUNDLE_LOADER = "$(BUILT_PRODUCTS_DIR)/Connecting Captions.app/Contents/MacOS/Connecting Captions";
+				BUNDLE_LOADER = "$(BUILT_PRODUCTS_DIR)/Connecting Captions Pro.app/Contents/MacOS/Connecting Captions Pro";
 				CLANG_ENABLE_MODULES = YES;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
@@ -899,7 +1084,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.ConnectingCaptionsIntegrationTests;
 				PRODUCT_NAME = ConnectingCaptionsIntegrationTests;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Connecting Captions.app/Contents/MacOS/Connecting Captions";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Connecting Captions Pro.app/Contents/MacOS/Connecting Captions Pro";
 			};
 			name = Release;
 		};
@@ -933,6 +1118,138 @@
 				PRODUCT_NAME = ConnectingCaptionsUITests;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = connectingCaptions;
+			};
+			name = Release;
+		};
+		PIOS0000000000000000000C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = XC0C00000000000000000001 /* Shared.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = Sources/ConnectingCaptionsProIOS/ProIOS.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sources/ConnectingCaptionsProIOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Connecting Captions Pro";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Connecting Captions Pro needs the microphone so FluidVoice can caption speech on this device. Audio stays on this device.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.ios.pro;
+				PRODUCT_MODULE_NAME = ConnectingCaptionsProIOS;
+				PRODUCT_NAME = "Connecting Captions Pro";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		PIOS0000000000000000000D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = XC0C00000000000000000001 /* Shared.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = Sources/ConnectingCaptionsProIOS/ProIOS.entitlements;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sources/ConnectingCaptionsProIOS/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Connecting Captions Pro";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Connecting Captions Pro needs the microphone so FluidVoice can caption speech on this device. Audio stays on this device.";
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.ios.pro;
+				PRODUCT_MODULE_NAME = ConnectingCaptionsProIOS;
+				PRODUCT_NAME = "Connecting Captions Pro";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		IOSK0000000000000000000C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = XC0C00000000000000000001 /* Shared.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Sources/ConnectingCaptionsProIOSKeyboard/Keyboard.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sources/ConnectingCaptionsProIOSKeyboard/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.ios.pro.keyboard;
+				PRODUCT_MODULE_NAME = ConnectingCaptionsProIOSKeyboard;
+				PRODUCT_NAME = ConnectingCaptionsProIOSKeyboard;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		IOSK0000000000000000000D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = XC0C00000000000000000001 /* Shared.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Sources/ConnectingCaptionsProIOSKeyboard/Keyboard.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Sources/ConnectingCaptionsProIOSKeyboard/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.ios.pro.keyboard;
+				PRODUCT_MODULE_NAME = ConnectingCaptionsProIOSKeyboard;
+				PRODUCT_NAME = ConnectingCaptionsProIOSKeyboard;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -971,6 +1288,24 @@
 			buildConfigurations = (
 				UIT1000000000000000000B /* Debug */,
 				UIT1000000000000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		PIOS0000000000000000000E /* Build configuration list for PBXNativeTarget "ConnectingCaptionsProIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				PIOS0000000000000000000C /* Debug */,
+				PIOS0000000000000000000D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		IOSK0000000000000000000E /* Build configuration list for PBXNativeTarget "ConnectingCaptionsProIOSKeyboard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				IOSK0000000000000000000C /* Debug */,
+				IOSK0000000000000000000D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -1040,6 +1375,15 @@
 			package = 7CE006BB2E80EBE600DDCCD6 /* XCRemoteSwiftPackageReference "AppUpdater" */;
 			productName = AppUpdater;
 		};
+		SC0100000000000000000002 /* SQLCipher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC0C00000000000000000001 /* XCLocalSwiftPackageReference "connectingCaptions" */;
+			productName = SQLCipher;
+		};
+		SC0100000000000000000003 /* SQLCipher in Frameworks */ = {
+			isa = PBXBuildFile;
+			productRef = SC0100000000000000000002 /* SQLCipher */;
+		};
 		CC0C00000000000000000002 /* ConnectingCaptionsCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = CC0C00000000000000000001 /* XCLocalSwiftPackageReference "connectingCaptions" */;
@@ -1048,6 +1392,16 @@
 		CC0C00000000000000000003 /* ConnectingCaptionsCore in Frameworks */ = {
 			isa = PBXBuildFile;
 			productRef = CC0C00000000000000000002 /* ConnectingCaptionsCore */;
+		};
+		PIOS0000000000000000000A /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7C078DA32E3B386A00FB7CAC /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
+		};
+		PIOS0000000000000000000B /* ConnectingCaptionsCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CC0C00000000000000000001 /* XCLocalSwiftPackageReference "connectingCaptions" */;
+			productName = ConnectingCaptionsCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

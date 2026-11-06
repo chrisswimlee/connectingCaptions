@@ -158,6 +158,20 @@ public enum TheaterBoardAdmission {
         rows: [String],
         identities: Set<String>
     ) -> Bool {
+        if TranslationClauseSegmenter.hasCompactLetters(incoming) {
+            let compact = TranslationClauseSegmenter.compactKey(incoming)
+            let identity = "c:" + compact
+            if compact.count >= 8, identities.contains(identity) {
+                return true
+            }
+            guard compact.count >= 16 else { return false }
+            if rows.contains(where: {
+                TranslationClauseSegmenter.shouldIgnoreAsStalePrefix(previous: $0, incoming: incoming)
+            }) {
+                return true
+            }
+            return identities.contains(identity)
+        }
         let key = TranslationClauseSegmenter.normalizedKey(incoming)
         let words = key.split(separator: " ")
         if words.count >= Self.minimumWordsForListenRepeat,

@@ -871,6 +871,12 @@ final class LiveTranslationSubscriberTests: XCTestCase {
         )
         XCTAssertFalse(
             TranslationClauseSegmenter.continuesAsNewSentence(
+                "y lo aplicamos hoy",
+                languageID: "es"
+            )
+        )
+        XCTAssertTrue(
+            TranslationClauseSegmenter.continuesAsNewSentence(
                 "and we applied it",
                 languageID: "es"
             )

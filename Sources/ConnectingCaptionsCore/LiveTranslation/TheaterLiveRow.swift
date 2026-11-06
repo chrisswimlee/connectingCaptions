@@ -5,7 +5,7 @@ import Foundation
 public enum TheaterLiveRow {
     public static func openText(_ text: String) -> String {
         var open = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        while let last = open.last, ".…?!。！？".contains(last) {
+        while let last = open.last, TranslationClauseSegmenter.terminalPunctuationCharacters.contains(last) {
             open.removeLast()
         }
         return open.trimmingCharacters(in: .whitespacesAndNewlines)

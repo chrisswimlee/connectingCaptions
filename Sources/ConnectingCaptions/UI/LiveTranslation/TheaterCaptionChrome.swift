@@ -115,6 +115,8 @@ struct TheaterFlowLine: Equatable, Identifiable {
     let isCurrent: Bool
     let isDraft: Bool
     var failed: Bool = false
+    var sourceLanguageID: String?
+    var targetLanguageID: String?
 }
 
 enum TheaterPresentationStyle: String, CaseIterable, Identifiable {

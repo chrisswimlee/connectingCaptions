@@ -19,6 +19,10 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
     private var mailbox = TranslationRequestMailbox()
     private var lastPair: String = ""
     private var pairGeneration: UInt64 = 0
+    /// One installed-session serve loop per pair. A later SwiftUI attach claims
+    /// the mailbox and this task exits instead of translating beside it.
+    private var installedFallbackPair: String = ""
+    private var installedFallbackTask: Task<Void, Never>?
     /// Default strategy: prefers Apple Intelligence when the Mac has it,
     /// falls back to the small packs automatically otherwise. Drives actual
     /// translating and "can this pair translate right now" (Listen gating).
@@ -49,6 +53,7 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
         if pair == self.lastPair, self.configuration != nil {
             return
         }
+        self.stopInstalledFallback()
         self.pairGeneration &+= 1
         self.lastPair = pair
         self.mailbox.cancelAll(TranslationEngineError(message: "Language pair changed."))
@@ -97,13 +102,7 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
             return try await self.mailbox.submit(trimmed, kind: kind)
         case .installedSessionFallback:
             if #available(macOS 26.0, *) {
-                if let installed = try await self.translateWithInstalledSession(
-                    trimmed,
-                    source: source,
-                    target: target
-                ) {
-                    return installed
-                }
+                await self.ensureInstalledFallback(source: source, target: target)
             }
             try Task.checkCancellation()
             guard generation == self.pairGeneration else { throw TranslationEngineError.superseded }
@@ -174,6 +173,7 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
 
     private func tearDownSession(reason: String) {
         guard !self.lastPair.isEmpty || self.configuration != nil else { return }
+        self.stopInstalledFallback()
         self.pairGeneration &+= 1
         self.lastPair = ""
         self.mailbox.cancelAll(TranslationEngineError(message: reason))
@@ -343,27 +343,34 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
     }
 
     @available(macOS 26.0, *)
-    private func translateWithInstalledSession(
-        _ text: String,
+    private func ensureInstalledFallback(
         source: TranslationLanguage,
         target: TranslationLanguage
-    ) async throws -> String? {
-        do {
-            let session = Self.makeInstalledSession(
-                source: source.localeLanguage,
-                target: target.localeLanguage
-            )
-            let started = ProcessInfo.processInfo.systemUptime
-            let response = try await session.translate(text)
-            self.recordLatency(since: started)
-            return response.targetText
-        } catch {
-            DebugLogger.shared.debug(
-                "Apple Translation installed session unavailable, using SwiftUI host: \(DiagnosticMetadata.error(error))",
-                source: "AppleTranslationEngine"
-            )
-            return nil
+    ) async {
+        if self.mailbox.isReady { return }
+        let pair = Self.packCacheKey(source: source, target: target)
+        let previous = self.installedFallbackTask
+        self.installedFallbackTask = nil
+        previous?.cancel()
+        await previous?.value
+        if self.mailbox.isReady { return }
+        let session = Self.makeInstalledSession(
+            source: source.localeLanguage,
+            target: target.localeLanguage
+        )
+        self.installedFallbackPair = pair
+        let generation = self.mailbox.claimServe()
+        let mailbox = self.mailbox
+        let task = Task { @MainActor in
+            await self.serve(session: session, mailbox: mailbox, generation: generation)
         }
+        self.installedFallbackTask = task
+        await self.waitUntilMailboxReady()
+    }
+
+    private func stopInstalledFallback() {
+        self.installedFallbackPair = ""
+        self.installedFallbackTask?.cancel()
     }
 
     @available(macOS 26.0, *)
@@ -386,23 +393,30 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
             }
             if request.isCancelled { continue }
             let started = ProcessInfo.processInfo.systemUptime
-            do {
-                let text = try await Self.translate(
-                    request.text,
-                    session: session,
-                    kind: request.kind,
-                    isCancelled: { request.isCancelled }
-                )
+            let call = await Self.translate(
+                request.text,
+                session: session,
+                kind: request.kind,
+                isCancelled: { request.isCancelled }
+            )
+            switch call.result {
+            case .success(let text):
                 self.recordLatency(since: started)
-                if request.isCancelled { continue }
-                request.resume(.success(text))
-            } catch {
-                self.lastError = error.localizedDescription
-                if request.isCancelled { continue }
-                request.resume(.failure(error))
-                if (error as? TranslationEngineError)?.isTimeout == true {
-                    break
+                if !request.isCancelled {
+                    request.resume(.success(text))
                 }
+            case .failure(let error):
+                self.lastError = error.localizedDescription
+                if !request.isCancelled {
+                    request.resume(.failure(error))
+                }
+                call.task.cancel()
+            }
+            _ = await call.task.result
+            if case .failure(let error) = call.result,
+               (error as? TranslationEngineError)?.isTimeout == true
+            {
+                break
             }
         }
         // Only this generation's loop may ask for a new session, and only after
@@ -424,45 +438,71 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
     /// A `withThrowingTaskGroup` cannot express this: leaving its body
     /// implicitly awaits every child task, including one still stuck inside
     /// `session.translate`, so the deadline would only ever expire once the
-    /// work itself stopped. These three racers are unstructured `Task`s
-    /// instead, joined through a `FirstClaimant`-guarded continuation, so the
-    /// deadline or supersede check returns to the mailbox loop even while
-    /// `session.translate` is still abandoned in the background.
+    /// work itself stopped. The deadline resumes the caller immediately and
+    /// returns the in-flight task so `serve` can wait for it to unwind before
+    /// the next `session.translate` or before this host exits.
+    private struct SessionTranslation {
+        var result: Result<String, Error>
+        var task: Task<String, Error>
+    }
+
+    private final class TranslationRacers: @unchecked Sendable {
+        var timeout: Task<Void, Never>?
+        var supersede: Task<Void, Never>?
+
+        func cancel() {
+            self.timeout?.cancel()
+            self.supersede?.cancel()
+        }
+    }
+
     private static func translate(
         _ text: String,
         session: TranslationSession,
         kind: TranslationRequestKind = .commit,
-        isCancelled: @escaping () -> Bool = { false }
-    ) async throws -> String {
+        isCancelled: @escaping @Sendable () -> Bool = { false }
+    ) async -> SessionTranslation {
+        let translationTask = Task.detached {
+            try await session.translate(text).targetText
+        }
         let gate = FirstClaimant()
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-            let timeoutTask = Task.detached {
-                try? await Task.sleep(nanoseconds: LiveTranslationTiming.mailboxTimeoutNanoseconds(for: kind))
-                if gate.claim() { continuation.resume(throwing: TranslationEngineError.timeout) }
+        let racers = TranslationRacers()
+        let result: Result<String, Error> = await withCheckedContinuation { continuation in
+            let settle: @Sendable (Result<String, Error>) -> Void = { outcome in
+                if gate.claim() {
+                    racers.cancel()
+                    continuation.resume(returning: outcome)
+                }
             }
-            let supersedeTask = Task.detached {
-                while !isCancelled() {
+            racers.timeout = Task.detached {
+                do {
+                    try await Task.sleep(
+                        nanoseconds: LiveTranslationTiming.mailboxTimeoutNanoseconds(for: kind)
+                    )
+                } catch {
+                    return
+                }
+                settle(.failure(TranslationEngineError.timeout))
+            }
+            racers.supersede = Task.detached {
+                while !Task.isCancelled, !isCancelled() {
                     try? await Task.sleep(nanoseconds: 20_000_000)
                 }
-                if gate.claim() { continuation.resume(throwing: TranslationEngineError.superseded) }
+                if Task.isCancelled { return }
+                settle(.failure(TranslationEngineError.superseded))
             }
             Task.detached {
+                let outcome: Result<String, Error>
                 do {
-                    let result = try await session.translate(text).targetText
-                    if gate.claim() {
-                        continuation.resume(returning: result)
-                        timeoutTask.cancel()
-                        supersedeTask.cancel()
-                    }
+                    outcome = .success(try await translationTask.value)
                 } catch {
-                    if gate.claim() {
-                        continuation.resume(throwing: error)
-                        timeoutTask.cancel()
-                        supersedeTask.cancel()
-                    }
+                    outcome = .failure(error)
                 }
+                racers.cancel()
+                settle(outcome)
             }
         }
+        return SessionTranslation(result: result, task: translationTask)
     }
 
     /// Timeout or closing the pack sheet can leave the hidden host without a

@@ -28,11 +28,36 @@ public enum LiveTranslationCommitContext {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         guard !head.isEmpty else { return marked }
-        let context = TranslationClauseSegmenter.joinTranslatedLines(
-            head,
-            languageID: languageID
-        )
+        let context = Self.joinedContextPriors(head, languageID: languageID)
         return context + "\n" + marked
+    }
+
+    /// Korean and Thai priors are separate clauses even with no punctuation.
+    /// A prior that does not end a sentence gets a space in every language so
+    /// two clauses are not fused into one word.
+    private static func joinedContextPriors(_ priors: [String], languageID: String) -> String {
+        guard let first = priors.first else { return "" }
+        if priors.count == 1 { return first }
+        let code = TranslationClauseSegmenter.languageCode(from: languageID)
+        let spacedScript = code == "ko" || code == "th"
+        var result = first
+        for prior in priors.dropFirst() {
+            let previousEndsClause = TranslationClauseSegmenter.endsWithTerminalPunctuation(result)
+            let joiner: String
+            if spacedScript || !previousEndsClause {
+                joiner = " "
+            } else if code == "ja" || code == "zh" {
+                joiner = ""
+            } else {
+                joiner = " "
+            }
+            if joiner == " ", result.hasSuffix(" ") {
+                result += prior
+            } else {
+                result += joiner + prior
+            }
+        }
+        return result
     }
 
     /// Last line after a preserved break, when the model dropped the marks
@@ -139,17 +164,19 @@ public enum LiveTranslationCommitContext {
     public static func isSanePeeledCaption(
         _ peeled: String,
         isolatedSource: String,
-        targetID: String
+        targetID: String,
+        sourceID: String? = nil
     ) -> Bool {
         let cleaned = peeled.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { return false }
-        let sourceID = ListenLanguageID.current(for: isolatedSource)
+        let resolvedSourceID = sourceID ?? ListenLanguageID.current(for: isolatedSource)
         let peeledCount = TranslationClauseSegmenter.clauseUnitCount(cleaned, languageID: targetID)
         let sourceCount = max(
             1,
-            TranslationClauseSegmenter.clauseUnitCount(isolatedSource, languageID: sourceID)
+            TranslationClauseSegmenter.clauseUnitCount(isolatedSource, languageID: resolvedSourceID)
         )
-        return peeledCount <= sourceCount
+        // One extra unit covers a polite particle or a clause Apple split in two.
+        return peeledCount <= sourceCount + 1
     }
 
     public static func leftoverContainsPriorCaption(_ leftover: String, priors: [String]) -> Bool {
@@ -246,6 +273,19 @@ public enum LiveTranslationCommitContext {
     }
 
     public static func isNearReprint(_ previous: String, incoming: String) -> Bool {
+        if TranslationClauseSegmenter.hasUnspacedScript(previous)
+            || TranslationClauseSegmenter.hasUnspacedScript(incoming)
+        {
+            let prevKey = TranslationClauseSegmenter.compactKey(previous)
+            let nextKey = TranslationClauseSegmenter.compactKey(incoming)
+            guard prevKey.count >= 8, nextKey.count >= 8 else { return false }
+            var shared = 0
+            for (left, right) in zip(prevKey, nextKey) {
+                if left == right { shared += 1 } else { break }
+            }
+            let limit = min(prevKey.count, nextKey.count)
+            return shared * 2 >= limit
+        }
         let prev = previous
             .split(whereSeparator: \.isWhitespace)
             .map { $0.lowercased().trimmingCharacters(in: .punctuationCharacters) }
@@ -269,7 +309,7 @@ public enum LiveTranslationCommitContext {
 
     public static func foldedClause(_ text: String) -> String {
         let kept = text.lowercased().compactMap { character -> Character? in
-            if character.isLetter || character.isNumber { return character }
+            if TranslationClauseSegmenter.keepsWordCharacter(character) { return character }
             if character.isWhitespace { return " " }
             return nil
         }

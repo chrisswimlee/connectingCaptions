@@ -1,4 +1,4 @@
-// Connecting Captions key delivery (Paddle Billing).
+// Connecting Captions Pro key delivery (Paddle Billing).
 //
 // Paddle calls POST /webhook with `transaction.completed` when a purchase is paid.
 // This Worker checks the Paddle-Signature header, looks up the buyer's email,
@@ -153,13 +153,13 @@ async function sendKeyEmail(env, { email, token, major, reference }) {
     return { ok: false, detail: "RESEND_API_KEY or EMAIL_FROM is not set" };
   }
   const text = [
-    "Thanks for buying Connecting Captions.",
+    "Thanks for buying Connecting Captions Pro.",
     "",
     "Your personal license key:",
     "",
     token,
     "",
-    "To use it, open Connecting Captions, go to Settings → General, and paste the key.",
+    "To use it, open Connecting Captions Pro, go to Settings → General, and paste the key.",
     `It covers you on up to two of your own Macs, with updates for version ${major}.`,
     "The key is checked on your Mac. The app never sends it anywhere.",
     "",
@@ -177,7 +177,7 @@ async function sendKeyEmail(env, { email, token, major, reference }) {
       from: env.EMAIL_FROM,
       to: [email],
       reply_to: env.REPLY_TO || undefined,
-      subject: "Your Connecting Captions license key",
+      subject: "Your Connecting Captions Pro license key",
       text,
     }),
   });

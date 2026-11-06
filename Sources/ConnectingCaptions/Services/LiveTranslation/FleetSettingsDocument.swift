@@ -36,7 +36,7 @@ nonisolated struct FleetSettingsDocument: Equatable, Sendable {
         case invalidValue(String)
 
         var errorDescription: String? {
-            "This file is not a caption policy connectingCaptions can use. Ask IT for a new file."
+            "This file is not a caption policy Connecting Captions Pro can use. Ask IT for a new file."
         }
 
         var logDetail: String {

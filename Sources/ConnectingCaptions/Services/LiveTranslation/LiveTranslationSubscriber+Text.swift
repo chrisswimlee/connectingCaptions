@@ -37,10 +37,21 @@ extension LiveTranslationSubscriber {
         rest: String,
         languageID: String
     ) -> Bool {
-        guard TranslationClauseSegmenter.looksComplete(unit, languageID: languageID) else {
+        guard TranslationClauseSegmenter.canCommitMidTalk(unit, rest: rest, languageID: languageID) else {
             return false
         }
-        return TranslationClauseSegmenter.continuesAsNewSentence(rest, languageID: languageID)
+        // A run-on cut has no sentence ending, so the next words cannot
+        // confirm it. The cut itself is the confirmation.
+        if !TranslationClauseSegmenter.looksComplete(unit, languageID: languageID),
+           unit.count + rest.count >= LiveTranslationTiming.maxDraftCharacters
+        {
+            return true
+        }
+        return TranslationClauseSegmenter.continuesAsNewSentence(
+            rest,
+            languageID: languageID,
+            prefix: unit
+        )
     }
 
     /// The confirmed prefix already includes this sentence, ending included.
@@ -54,18 +65,17 @@ extension LiveTranslationSubscriber {
         let unit = unit.trimmingCharacters(in: .whitespacesAndNewlines)
         let confirmed = confirmed.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !unit.isEmpty, !confirmed.isEmpty else { return false }
-        guard TranslationClauseSegmenter.looksComplete(unit, languageID: languageID) else {
-            return false
-        }
+        guard TranslationClauseSegmenter.canCommitMidTalk(unit, languageID: languageID) else { return false }
         if confirmed == unit || confirmed.hasPrefix(unit) || confirmed.hasPrefix(unit + " ") {
             return true
         }
-        let stripped = unit.trimmingCharacters(in: CharacterSet(charactersIn: ".?!。！？…"))
+        let marks = TranslationClauseSegmenter.terminalPunctuationCharacters
+        let stripped = unit.trimmingCharacters(in: CharacterSet(charactersIn: marks))
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !stripped.isEmpty, stripped != unit, confirmed.hasPrefix(stripped) else { return false }
         let after = confirmed.dropFirst(stripped.count)
         guard let first = after.first else { return false }
-        return ".?!。！？…".contains(first)
+        return marks.contains(first)
     }
 
     static func priorClauses(
@@ -92,6 +102,106 @@ extension LiveTranslationSubscriber {
         if !tail.isEmpty { units.append(tail) }
         units.append(cleaned)
         return units
+    }
+
+    func rememberDetectedLanguage(_ text: String, languageID: String) {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty, !languageID.isEmpty else { return }
+        self.detectedLanguageByClause[cleaned] = languageID
+    }
+
+    func languageIDForClause(_ text: String) -> String {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let recorded = self.detectedLanguageByClause[cleaned] { return recorded }
+        if let entry = self.listenContextEntries.last(where: {
+            $0.source.trimmingCharacters(in: .whitespacesAndNewlines) == cleaned
+        }), let recorded = entry.sourceLanguageID, !recorded.isEmpty {
+            return recorded
+        }
+        return SpokenLanguageResolver.listenLanguageID(for: cleaned)
+    }
+
+    func pairForClause(
+        _ text: String,
+        settings: SettingsStore = .shared
+    ) -> (source: TranslationLanguage, target: TranslationLanguage) {
+        let configuredSource = SpokenLanguageResolver.sourceLanguage(settings: settings)
+        let configuredTarget = SpokenLanguageResolver.targetLanguage(settings: settings)
+        guard SpokenLanguageResolver.isDynamicPairingEnabled(settings: settings),
+              configuredSource.id != configuredTarget.id
+        else {
+            return (configuredSource, configuredTarget)
+        }
+        let heard = self.languageIDForClause(text)
+        if heard == configuredTarget.id, let heardLanguage = TranslationLanguageCatalog.language(id: heard) {
+            return (heardLanguage, configuredSource)
+        }
+        if heard == configuredSource.id {
+            return (configuredSource, configuredTarget)
+        }
+        return (configuredSource, configuredTarget)
+    }
+
+    static func prefixCompatible(_ shown: String, next: String) -> Bool {
+        if next.isEmpty { return shown.isEmpty }
+        return next.hasPrefix(shown) || shown.hasPrefix(next)
+    }
+
+    func livePrefetchContext(incoming: String) -> (
+        prior: (sources: [String], translations: [String]),
+        priorIDs: [UInt64]
+    ) {
+        (
+            self.priorClausesForContextualTranslation(incoming: incoming),
+            self.priorIDsForPrefetch(incoming: incoming)
+        )
+    }
+
+    /// The leftover moved to another sentence. Drop the previous Show-as
+    /// instead of pairing the new source with that caption: a commit reads
+    /// the pair as a cache hit and prints the previous line twice.
+    func dropStaleLiveDraftIfNewClause(_ leftover: String) {
+        let source = self.translatedDraftSource.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !source.isEmpty else { return }
+        let incoming = leftover.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !incoming.isEmpty else { return }
+        if self.liveDraftStillMatches(source, leftover: incoming) { return }
+        self.suppressLiveTranslationDraft()
+    }
+
+    func liveDraftStillMatches(_ source: String, leftover: String) -> Bool {
+        if TranslationClauseSegmenter.isSameClause(source, leftover) { return true }
+        if TranslationClauseSegmenter.isGrowingClause(source, toward: leftover) { return true }
+        if TranslationClauseSegmenter.isGrowingClause(leftover, toward: source) { return true }
+        let languageID = SpokenLanguageResolver.listenLanguageID(for: leftover)
+        return TranslationClauseSegmenter.isLivePrefetchMatch(
+            unit: source,
+            leftover: leftover,
+            languageID: languageID
+        )
+    }
+
+    func suppressLiveTranslationDraft() {
+        guard !self.translatedDraft.isEmpty || !self.translatedDraftSource.isEmpty else { return }
+        self.translatedDraft = ""
+        self.translatedDraftSource = ""
+        self.prefetchCache.invalidate()
+    }
+
+    func priorIDsForPrefetch(incoming: String) -> [UInt64] {
+        let prior = self.priorClausesForContextualTranslation(incoming: incoming)
+        let sources = Set(prior.sources.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) })
+        return self.listenContextEntries.compactMap { entry in
+            sources.contains(entry.source.trimmingCharacters(in: .whitespacesAndNewlines))
+                ? entry.id
+                : nil
+        }
+    }
+
+    func adjustIndexes(trimmedCount: Int) {
+        guard trimmedCount > 0 else { return }
+        self.listenBatchStart = max(0, self.listenBatchStart - trimmedCount)
+        self.postedLineCount = max(0, self.postedLineCount - trimmedCount)
     }
 
     static func isSameCaption(_ left: String, _ right: String) -> Bool {

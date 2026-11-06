@@ -115,7 +115,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ORIGINAL_APP_PATH="$ARCHIVE_PATH/Products/Applications/Connecting Captions.app"
+          ORIGINAL_APP_PATH="$ARCHIVE_PATH/Products/Applications/Connecting Captions Pro.app"
           APP_PATH="$ARCHIVE_PATH/Products/Applications/$APP_NAME.app"
           INFO_PLIST="$APP_PATH/Contents/Info.plist"
           ARCHIVE_INFO_PLIST="$ARCHIVE_PATH/Info.plist"

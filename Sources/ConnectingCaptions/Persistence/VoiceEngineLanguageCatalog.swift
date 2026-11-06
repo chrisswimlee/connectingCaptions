@@ -114,12 +114,30 @@ enum AppleSpeechLiveCapability {
         guard #available(macOS 26.0, *) else { return }
         let supported = await SpeechTranscriber.supportedLocales
         let installed = await SpeechTranscriber.installedLocales
-        let prefixes = Set(supported.map {
-            VoiceEngineLanguageCatalog.languagePrefix($0.identifier(.bcp47))
-        })
-        self.storeAnalyzer(supported: prefixes, installed: Set(installed.map {
-            VoiceEngineLanguageCatalog.languagePrefix($0.identifier(.bcp47))
-        }))
+        let supportedIDs = supported.map {
+            VoiceEngineLanguageCatalog.normalizeLocaleID($0.identifier(.bcp47))
+        }
+        let installedIDs = installed.map {
+            VoiceEngineLanguageCatalog.normalizeLocaleID($0.identifier(.bcp47))
+        }
+        let prefixes = Set(supportedIDs.map { VoiceEngineLanguageCatalog.languagePrefix($0) })
+        var installedPrefixes = Set<String>()
+        for language in TranslationLanguageCatalog.all {
+            guard let resolved = VoiceEngineLanguageCatalog.resolveAppleSpeechAnalyzerLocale(
+                preferredIdentifier: VoiceEngineLanguageCatalog.preferredAppleSpeechAnalyzerLocale(
+                    forLanguageID: language.id
+                ),
+                languageID: language.id,
+                supportedIdentifiers: supportedIDs
+            ) else { continue }
+            let exact = installedIDs.contains {
+                $0.caseInsensitiveCompare(resolved) == .orderedSame
+            }
+            if exact {
+                installedPrefixes.insert(language.id)
+            }
+        }
+        self.storeAnalyzer(supported: prefixes, installed: installedPrefixes)
         #endif
     }
 
@@ -416,55 +434,23 @@ enum VoiceEngineLanguageCatalog {
     /// ko / ja: Apple Speech Analyzer, Apple Speech, Cohere, Whisper, Nemotron. Never Parakeet.
     /// th: Apple Speech Analyzer, Apple Speech, Whisper, Nemotron last. Never Parakeet or Cohere.
     private static func preferredModelOrder(forLanguageID languageID: String) -> [SettingsStore.SpeechModel] {
-        switch languageID {
-        case "en":
-            return [
-                .appleSpeechAnalyzer,
-                .appleSpeech,
-                .parakeetRealtime,
-                .parakeetTDTv2,
-                .whisperSmall,
-                .whisperLargeTurbo,
-                .parakeetTDT,
-                .nemotronStreaming,
-                .nemotronOffline,
-                .cohereTranscribeSixBit,
-            ]
-        case "ko", "ja":
-            return [
-                .appleSpeechAnalyzer,
-                .appleSpeech,
-                .cohereTranscribeSixBit,
-                .whisperLargeTurbo,
-                .whisperLarge,
-                .whisperSmall,
-                .nemotronStreaming,
-                .nemotronOffline,
-            ]
-        case "th":
-            return [
-                .appleSpeechAnalyzer,
-                .appleSpeech,
-                .whisperLargeTurbo,
-                .whisperLarge,
-                .whisperSmall,
-                .nemotronStreaming,
-                .nemotronOffline,
-            ]
-        default:
-            return [
-                .appleSpeechAnalyzer,
-                .appleSpeech,
-                .whisperSmall,
-                .whisperLargeTurbo,
-                .parakeetTDTv2,
-                .parakeetTDT,
-                .parakeetRealtime,
-                .nemotronStreaming,
-                .nemotronOffline,
-                .cohereTranscribeSixBit,
-            ]
+        var order: [SettingsStore.SpeechModel] = [.appleSpeechAnalyzer, .appleSpeech]
+        if languageID == "en" {
+            order.append(contentsOf: [.parakeetRealtime, .parakeetTDTv2, .parakeetTDT])
         }
+        if self.cohereLanguage(for: languageID) != nil {
+            order.append(.cohereTranscribeSixBit)
+        }
+        order.append(contentsOf: [
+            .whisperLargeTurbo,
+            .whisperLarge,
+            .whisperMedium,
+            .whisperSmall,
+            .whisperBase,
+            .whisperTiny,
+        ])
+        order.append(contentsOf: [.nemotronStreaming, .nemotronOffline, .nemotronStreaming320])
+        return order
     }
 
     /// Thai + any Nemotron is weak when Apple Speech or Whisper can take over.
@@ -738,16 +724,24 @@ enum VoiceEngineLanguageCatalog {
 
     /// Locales SpeechTranscriber lists on macOS 27, plus Thai.
     private static let appleSpeechAnalyzerLocaleMap: [String: String] = [
+        "ar": "ar-SA",
         "de": "de-DE",
         "en": "en-US",
         "es": "es-ES",
         "fr": "fr-FR",
         "hi": "hi-IN",
+        "id": "id-ID",
         "it": "it-IT",
         "ja": "ja-JP",
         "ko": "ko-KR",
+        "nl": "nl-NL",
+        "pl": "pl-PL",
         "pt": "pt-BR",
+        "ru": "ru-RU",
         "th": "th-TH",
+        "tr": "tr-TR",
+        "uk": "uk-UA",
+        "vi": "vi-VN",
         "zh": "zh-CN",
     ]
 

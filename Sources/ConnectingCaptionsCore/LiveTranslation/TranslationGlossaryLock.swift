@@ -32,10 +32,69 @@ public enum TranslationGlossaryLock {
 
     public static func restore(_ text: String, tokens: [String: String]) -> String {
         var result = text
-        for (token, original) in tokens {
+        let ordered = tokens.keys.sorted { lhs, rhs in
+            let left = self.tokenDigits(lhs)
+            let right = self.tokenDigits(rhs)
+            if left.count != right.count { return left.count > right.count }
+            return left > right
+        }
+        for token in ordered {
+            guard let original = tokens[token] else { continue }
             result = result.replacingOccurrences(of: token, with: original)
+            let index = NSRegularExpression.escapedPattern(for: self.tokenDigits(token))
+            guard !index.isEmpty else { continue }
+            let literal = NSRegularExpression.escapedTemplate(for: original)
+            let patterns = [
+                "\u{FFF9}\\s*\(index)(?!\\d)\\s*\u{FFFA}",
+                "\u{FFF9}\\s*\(index)(?!\\d)",
+                "(?<!\\d)\(index)\\s*\u{FFFA}",
+            ]
+            for pattern in patterns {
+                result = result.replacingOccurrences(
+                    of: pattern,
+                    with: literal,
+                    options: .regularExpression
+                )
+            }
         }
         return result
+    }
+
+    /// Format characters left after a glossary token was only partly restored.
+    /// Contextual MT marks are removed first so `\u{FFF9}▸\u{FFFA}` is not a lock token.
+    public static func containsLockArtifact(_ text: String) -> Bool {
+        var stripped = text
+        stripped = stripped.replacingOccurrences(
+            of: LiveTranslationCommitContext.contextClauseStart,
+            with: ""
+        )
+        stripped = stripped.replacingOccurrences(
+            of: LiveTranslationCommitContext.contextClauseEnd,
+            with: ""
+        )
+        return stripped.unicodeScalars.contains { scalar in
+            scalar.value == 0xFFF9 || scalar.value == 0xFFFA || scalar.value == 0xFFFB
+        }
+    }
+
+    /// A dropped or localized lock token must not print as a digit. The caller
+    /// translates the same text again with no tokens.
+    public static func needsUnlockedFallback(
+        source: String,
+        rawTranslated _: String,
+        restored: String,
+        tokens: [String: String]
+    ) -> Bool {
+        guard !tokens.isEmpty else { return false }
+        if self.containsLockArtifact(restored) { return true }
+        // A padded token (`\u{FFF9} 0 \u{FFFA}`) is already restored to the name.
+        // Falling back only because the exact token string is absent would
+        // translate that name again with the lock removed.
+        return !self.lostProtectedTerms(
+            source: source,
+            polished: restored,
+            terms: Array(tokens.values)
+        ).isEmpty
     }
 
     /// Terms that appear in the source but vanished from a polished caption.
@@ -101,5 +160,9 @@ public enum TranslationGlossaryLock {
 
     private static func lockToken(_ index: Int) -> String {
         "\u{FFF9}\(index)\u{FFFA}"
+    }
+
+    private static func tokenDigits(_ token: String) -> String {
+        String(token.filter(\.isNumber))
     }
 }

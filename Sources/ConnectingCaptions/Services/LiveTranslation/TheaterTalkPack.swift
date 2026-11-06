@@ -40,6 +40,15 @@ nonisolated enum TheaterTalkPack {
                 url.stopAccessingSecurityScopedResource()
             }
         }
+        let ext = url.pathExtension.lowercased()
+        var isDirectory: ObjCBool = false
+        if ext == "key",
+           FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+           isDirectory.boolValue
+        {
+            let text = try self.keynotePackageText(at: url)
+            return try self.document(fromKeynoteText: text, fileName: url.lastPathComponent)
+        }
         let data = try Data(contentsOf: url)
         return try self.document(from: data, fileName: url.lastPathComponent)
     }
@@ -54,6 +63,12 @@ nonisolated enum TheaterTalkPack {
             let terms = self.extractTerms(from: text)
             guard !terms.isEmpty else { throw LoadError.empty }
             return Document(fileName: fileName, terms: terms, sourceCharacterCount: text.count)
+        }
+
+        if ext == "key" {
+            guard data.count <= maxArchiveBytes else { throw LoadError.unreadable }
+            let text = try self.keynoteZipText(from: data)
+            return try self.document(fromKeynoteText: text, fileName: fileName)
         }
 
         if let pack = try? LectureTermPack.document(from: data) {
@@ -115,6 +130,86 @@ nonisolated enum TheaterTalkPack {
         return text
     }
 
+    private static func document(fromKeynoteText text: String, fileName: String) throws -> Document {
+        let terms = self.extractTerms(from: text)
+        guard !terms.isEmpty else { throw LoadError.empty }
+        return Document(fileName: fileName, terms: terms, sourceCharacterCount: text.count)
+    }
+
+    /// A Keynote package is a directory. Slide archives and `index.apxl` are the text.
+    private static func keynotePackageText(at url: URL) throws -> String {
+        var parts: [String] = []
+        let indexZip = url.appendingPathComponent("Index.zip")
+        if FileManager.default.fileExists(atPath: indexZip.path),
+           let data = try? Data(contentsOf: indexZip),
+           data.count <= Self.maxArchiveBytes,
+           let text = try? self.keynoteZipText(from: data)
+        {
+            parts.append(text)
+        }
+        let index = url.appendingPathComponent("Index")
+        if let files = try? FileManager.default.contentsOfDirectory(
+            at: index,
+            includingPropertiesForKeys: nil
+        ) {
+            for file in files where file.pathExtension.lowercased() == "iwa" {
+                guard let data = try? Data(contentsOf: file), data.count <= KeynoteSlideText.maxIWABytes else { continue }
+                let page = KeynoteSlideText.plainText(inIWA: data)
+                if !page.isEmpty { parts.append(page) }
+            }
+        }
+        let apxl = url.appendingPathComponent("index.apxl")
+        if let data = try? Data(contentsOf: apxl), data.count <= KeynoteSlideText.maxOutputBytes {
+            let page = KeynoteSlideText.plainText(inAPXL: data)
+            if !page.isEmpty { parts.append(page) }
+        }
+        let text = parts.joined(separator: "\n")
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw LoadError.empty
+        }
+        return text
+    }
+
+    /// Slide text only. Preview images and other zip entries stay unread.
+    private static func keynoteZipText(from data: Data) throws -> String {
+        guard data.count <= Self.maxArchiveBytes else { throw LoadError.unreadable }
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("connectingCaptions-key-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let archive = folder.appendingPathComponent("deck.key")
+        try data.write(to: archive)
+        let names = try self.archiveNames(in: archive)
+        var parts: [String] = []
+        if names.contains(where: { self.normalizedZipName($0) == "Index.zip" }),
+           let nested = try? self.archiveBytes("Index.zip", in: archive)
+        {
+            let nestedURL = folder.appendingPathComponent("Index.zip")
+            try nested.write(to: nestedURL)
+            let nestedNames = try self.archiveNames(in: nestedURL)
+            for name in nestedNames where self.isNestedKeynoteIWA(name) {
+                guard let bytes = try? self.archiveBytes(name, in: nestedURL, allowed: self.isNestedKeynoteIWA) else { continue }
+                let page = KeynoteSlideText.plainText(inIWA: bytes)
+                if !page.isEmpty { parts.append(page) }
+            }
+        }
+        for name in names where self.isKeynoteIWA(name) {
+            guard let bytes = try? self.archiveBytes(name, in: archive) else { continue }
+            let page = KeynoteSlideText.plainText(inIWA: bytes)
+            if !page.isEmpty { parts.append(page) }
+        }
+        for name in names where self.normalizedZipName(name) == "index.apxl" {
+            guard let bytes = try? self.archiveBytes(name, in: archive) else { continue }
+            let page = KeynoteSlideText.plainText(inAPXL: bytes)
+            if !page.isEmpty { parts.append(page) }
+        }
+        let text = parts.joined(separator: "\n")
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw LoadError.empty
+        }
+        return text
+    }
+
     /// Slide and notes text only. Other zip entries, including media, stay unread.
     private static func presentationText(from data: Data) throws -> String {
         guard data.count <= Self.maxArchiveBytes else { throw LoadError.unreadable }
@@ -155,6 +250,19 @@ nonisolated enum TheaterTalkPack {
         return slides + notes
     }
 
+    private static func isKeynoteIWA(_ name: String) -> Bool {
+        let normalized = self.normalizedZipName(name)
+        guard !normalized.contains(".."), !normalized.hasPrefix("/") else { return false }
+        return normalized.range(of: #"^Index/[^/]+\.iwa$"#, options: .regularExpression) != nil
+    }
+
+    private static func isNestedKeynoteIWA(_ name: String) -> Bool {
+        let normalized = self.normalizedZipName(name)
+        guard !normalized.contains(".."), !normalized.hasPrefix("/") else { return false }
+        if self.isKeynoteIWA(normalized) { return true }
+        return normalized.range(of: #"^[^/]+\.iwa$"#, options: .regularExpression) != nil
+    }
+
     private static func isSlideXML(_ name: String) -> Bool {
         name.range(of: #"^ppt/slides/slide[0-9]+\.xml$"#, options: .regularExpression) != nil
     }
@@ -182,6 +290,19 @@ nonisolated enum TheaterTalkPack {
         guard data.count <= Self.maxPresentationCharacters else { throw LoadError.unreadable }
         guard let xml = String(data: data, encoding: .utf8) else { throw LoadError.unreadable }
         return xml
+    }
+
+    private static func archiveBytes(
+        _ name: String,
+        in archive: URL,
+        allowed: ((String) -> Bool)? = nil
+    ) throws -> Data {
+        let normalized = self.normalizedZipName(name)
+        let permits = allowed ?? { self.isKeynoteIWA($0) || $0 == "Index.zip" || $0 == "index.apxl" }
+        guard permits(normalized) else { throw LoadError.unreadable }
+        let data = try self.unzip(arguments: ["-p", archive.path, normalized])
+        guard data.count <= KeynoteSlideText.maxIWABytes else { throw LoadError.unreadable }
+        return data
     }
 
     private static func unzip(arguments: [String]) throws -> Data {

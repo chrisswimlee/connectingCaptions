@@ -5,11 +5,21 @@ public struct TheaterBoardRow: Equatable, Identifiable {
     public var id: UInt64
     public var source: String
     public var translated: String
+    public var sourceLanguageID: String?
+    public var targetLanguageID: String?
 
-    public init(id: UInt64, source: String, translated: String) {
+    public init(
+        id: UInt64,
+        source: String,
+        translated: String,
+        sourceLanguageID: String? = nil,
+        targetLanguageID: String? = nil
+    ) {
         self.id = id
         self.source = source
         self.translated = translated
+        self.sourceLanguageID = sourceLanguageID
+        self.targetLanguageID = targetLanguageID
     }
 }
 

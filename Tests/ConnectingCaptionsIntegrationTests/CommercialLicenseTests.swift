@@ -14,11 +14,15 @@ final class CommercialLicenseTests: XCTestCase {
         CommercialSeat.machineIDOverride = nil
         SettingsStore.shared.removeCommercialLicense()
         SettingsStore.shared.clearListenTrial()
+        SettingsStore.testingAppBundleCreation = nil
+        EarlyInstallAccess.resetForTests()
     }
 
     override func tearDown() {
         SettingsStore.shared.removeCommercialLicense()
         SettingsStore.shared.clearListenTrial()
+        SettingsStore.testingAppBundleCreation = nil
+        EarlyInstallAccess.resetForTests()
         SettingsStore.licenseVerifyingKeyOverride = nil
         super.tearDown()
     }
@@ -56,6 +60,29 @@ final class CommercialLicenseTests: XCTestCase {
         XCTAssertEqual(
             CommercialLicense.verify(token, publicKey: self.privateKey.publicKey),
             .failure(.wrongProduct)
+        )
+    }
+
+    func testKeyBeforeItsStartDateIsNotCalledExpired() throws {
+        let issued = try XCTUnwrap(CommercialLicense.day(from: "2026-12-01"))
+        let expires = try XCTUnwrap(CommercialLicense.day(from: "2027-12-01"))
+        let record = CommercialLicense.Record(
+            product: CommercialLicense.productID,
+            org: "Example LLP",
+            seats: 5,
+            issued: issued,
+            expires: expires
+        )
+        let token = try CommercialLicense.makeToken(record: record, privateKey: self.privateKey)
+        let now = try XCTUnwrap(CommercialLicense.day(from: "2026-11-01"))
+
+        XCTAssertEqual(
+            CommercialLicense.verify(token, publicKey: self.privateKey.publicKey, now: now),
+            .failure(.notYetValid)
+        )
+        XCTAssertEqual(
+            CommercialLicense.Failure.notYetValid.localizedDescription,
+            "That key is not active yet."
         )
     }
 
@@ -121,6 +148,8 @@ final class CommercialLicenseTests: XCTestCase {
         XCTAssertEqual(ConnectingCaptionsProduct.personalPurchaseURL.absoluteString, "https://local-host.ai/connectingCaptions/pricing/")
         XCTAssertEqual(ConnectingCaptionsProduct.personalMacs, 2)
         XCTAssertEqual(ConnectingCaptionsProduct.listenTrialDays, 14)
+        XCTAssertFalse(ListenAccess.releaseAsksForKey)
+        XCTAssertNotNil(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
         XCTAssertEqual(ConnectingCaptionsProduct.commercialSeatMinimum, 5)
         XCTAssertTrue(ConnectingCaptionsProduct.commercialLicenseMailURL.absoluteString.contains("Mac%20count"))
     }
@@ -211,7 +240,7 @@ final class CommercialLicenseTests: XCTestCase {
         XCTAssertNoThrow(try CommercialLicense.verify(token, publicKey: self.privateKey.publicKey, appVersion: "1.9").get())
     }
 
-    func testTrialLastsFourteenUTCDaysThenBlocksListen() throws {
+    func testReleaseDoesNotStartOrEndTheTrial() throws {
         let start = try XCTUnwrap(CommercialLicense.day(from: "2026-10-01"))
         let lastDay = try XCTUnwrap(CommercialLicense.day(from: "2026-10-14"))
         let nextDay = try XCTUnwrap(CommercialLicense.day(from: "2026-10-15"))
@@ -223,9 +252,270 @@ final class CommercialLicenseTests: XCTestCase {
 
         let settings = SettingsStore.shared
         XCTAssertNil(settings.blockListenStart(now: start))
-        XCTAssertEqual(settings.listenTrialStartedOn, start)
+        XCTAssertNil(settings.listenTrialStartedOn)
         XCTAssertNil(settings.blockListenStart(now: lastDay))
-        XCTAssertEqual(settings.blockListenStart(now: nextDay), ListenAccess.trialEndedMessage)
+        XCTAssertNil(settings.blockListenStart(now: nextDay))
+        XCTAssertNil(settings.listenTrialStartedOn)
+    }
+
+    func testTrialClockMovedBackwardDoesNotStartATrial() throws {
+        let start = try XCTUnwrap(CommercialLicense.day(from: "2026-10-01"))
+        let earlier = try XCTUnwrap(CommercialLicense.day(from: "2026-09-01"))
+        let settings = SettingsStore.shared
+        XCTAssertNil(settings.blockListenStart(now: start))
+        XCTAssertNil(settings.blockListenStart(now: earlier))
+        XCTAssertNil(settings.listenTrialStartedOn)
+        XCTAssertEqual(ListenAccess.phase(startedOn: start, now: earlier), .ended)
+    }
+
+    func testTrialClockYearsAheadDoesNotBlockListen() throws {
+        let installed = try XCTUnwrap(CommercialLicense.day(from: "2026-10-01"))
+        let ahead = try XCTUnwrap(CommercialLicense.day(from: "2099-01-01"))
+        SettingsStore.testingAppBundleCreation = installed
+        let settings = SettingsStore.shared
+        XCTAssertNil(settings.blockListenStart(now: ahead))
+        XCTAssertNil(settings.listenTrialStartedOn)
+        XCTAssertNil(ListenAccess.acceptedNow(ahead, appBirth: installed))
+    }
+
+    func testPersonalKeyRejectsAMacItDoesNotName() throws {
+        let issued = try XCTUnwrap(CommercialLicense.day(from: "2026-10-24"))
+        let expires = try XCTUnwrap(CommercialLicense.day(from: "2099-12-31"))
+        var record = CommercialLicense.Record(
+            product: CommercialLicense.productID,
+            org: "ada@example.com",
+            seats: 2,
+            issued: issued,
+            expires: expires,
+            personal: true,
+            updatesThroughMajor: 1
+        )
+        record.macs = ["AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"]
+        let token = try CommercialLicense.makeToken(record: record, privateKey: self.privateKey)
+        XCTAssertEqual(
+            CommercialLicense.verify(
+                token,
+                publicKey: self.privateKey.publicKey,
+                machineID: "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF"
+            ),
+            .failure(.wrongMac)
+        )
+        XCTAssertNoThrow(
+            try CommercialLicense.verify(
+                token,
+                publicKey: self.privateKey.publicKey,
+                machineID: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"
+            ).get()
+        )
+    }
+
+    func testExpiredKeyDoesNotStartATrial() throws {
+        let issued = try XCTUnwrap(CommercialLicense.day(from: "2026-01-01"))
+        let expires = try XCTUnwrap(CommercialLicense.day(from: "2026-06-01"))
+        let record = CommercialLicense.Record(
+            product: CommercialLicense.productID,
+            org: "ada@example.com",
+            seats: 1,
+            issued: issued,
+            expires: expires,
+            personal: true
+        )
+        let token = try CommercialLicense.makeToken(record: record, privateKey: self.privateKey)
+        let settings = SettingsStore.shared
+        XCTAssertEqual(try settings.activateCommercialLicense(token, now: issued).get().org, "ada@example.com")
+        let later = try XCTUnwrap(CommercialLicense.day(from: "2026-08-01"))
+        XCTAssertEqual(settings.blockListenStart(now: later), CommercialLicense.Failure.expired.localizedDescription)
+        XCTAssertNil(settings.listenTrialStartedOn)
+    }
+
+    func testEarlierCopyKeepsListenAfterTheTrialWouldEnd() throws {
+        let cutoff = try XCTUnwrap(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
+        let home = try self.makeHome(createdAt: cutoff.addingTimeInterval(-86_400))
+        EarlyInstallAccess.testingKey = SymmetricKey(size: .bits256)
+        EarlyInstallAccess.testingHome = home
+        EarlyInstallAccess.testingAppBirth = cutoff
+        EarlyInstallAccess.testingFirstSignOn = cutoff.addingTimeInterval(-40 * 86_400)
+        EarlyInstallAccess.testingLaunchedAt = cutoff
+
+        let settings = SettingsStore.shared
+        XCTAssertTrue(settings.keepsEarlierCopy)
+        XCTAssertNil(settings.blockListenStart(now: cutoff.addingTimeInterval(40 * 86_400)))
+        XCTAssertNil(settings.listenTrialStartedOn)
+    }
+
+    func testNewMacListensWithoutStartingATrialAfterAnOldFileAppears() throws {
+        let cutoff = try XCTUnwrap(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("earlier-copy-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        EarlyInstallAccess.testingKey = SymmetricKey(size: .bits256)
+        EarlyInstallAccess.testingHome = home
+        EarlyInstallAccess.testingAppBirth = cutoff
+        EarlyInstallAccess.testingFirstSignOn = cutoff.addingTimeInterval(-40 * 86_400)
+        EarlyInstallAccess.testingLaunchedAt = cutoff
+        EarlyInstallAccess.testingNow = cutoff.addingTimeInterval(25 * 60 * 60)
+
+        let settings = SettingsStore.shared
+        XCTAssertFalse(settings.keepsEarlierCopy)
+        _ = try self.makeHome(createdAt: cutoff.addingTimeInterval(-86_400), root: home)
+        EarlyInstallAccess.forgetCachedDecision()
+
+        XCTAssertFalse(settings.keepsEarlierCopy)
+        let start = try XCTUnwrap(CommercialLicense.day(from: "2026-10-01"))
+        let ended = try XCTUnwrap(CommercialLicense.day(from: "2026-10-15"))
+        XCTAssertNil(settings.blockListenStart(now: start))
+        XCTAssertNil(settings.blockListenStart(now: ended))
+        XCTAssertNil(settings.listenTrialStartedOn)
+    }
+
+    func testEarlierCopySealDoesNotOpenForAnotherMacOrATamperedBox() throws {
+        let cutoff = try XCTUnwrap(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
+        let key = SymmetricKey(size: .bits256)
+        let old = cutoff.addingTimeInterval(-86_400)
+        let granted = EarlyInstallAccess.decide(
+            stored: [],
+            birthDates: [old],
+            cutoff: cutoff,
+            key: key,
+            machineID: "AAAA"
+        )
+        let sealed = try XCTUnwrap(granted.sealed)
+        XCTAssertTrue(granted.allowed)
+
+        let otherMac = EarlyInstallAccess.decide(
+            stored: [sealed],
+            birthDates: [old],
+            cutoff: cutoff,
+            key: key,
+            machineID: "BBBB"
+        )
+        XCTAssertFalse(otherMac.allowed)
+        XCTAssertNil(otherMac.sealed)
+
+        var tampered = sealed
+        tampered[tampered.count - 1] ^= 0xFF
+        let broken = EarlyInstallAccess.decide(
+            stored: [tampered],
+            birthDates: [old],
+            cutoff: cutoff,
+            key: key,
+            machineID: "AAAA"
+        )
+        XCTAssertFalse(broken.allowed)
+        XCTAssertNil(broken.sealed)
+        XCTAssertNil(EarlyInstallAccess.key(fromMixedHex: "abcd"))
+    }
+
+    func testAPaidInstallDoesNotCountAsAnEarlierCopy() throws {
+        let cutoff = try XCTUnwrap(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
+        let home = try self.makeHome(createdAt: cutoff.addingTimeInterval(-60))
+        EarlyInstallAccess.testingKey = SymmetricKey(size: .bits256)
+        EarlyInstallAccess.testingHome = home
+        EarlyInstallAccess.testingAppBirth = cutoff.addingTimeInterval(-86_400)
+
+        XCTAssertFalse(SettingsStore.shared.keepsEarlierCopy)
+    }
+
+    func testYoungInstallWaitsForARestoreBeforeSealingNo() throws {
+        let cutoff = try XCTUnwrap(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("earlier-copy-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        EarlyInstallAccess.testingKey = SymmetricKey(size: .bits256)
+        EarlyInstallAccess.testingHome = home
+        EarlyInstallAccess.testingAppBirth = cutoff
+        EarlyInstallAccess.testingFirstSignOn = cutoff.addingTimeInterval(-40 * 86_400)
+        EarlyInstallAccess.testingLaunchedAt = cutoff.addingTimeInterval(60)
+        EarlyInstallAccess.testingNow = cutoff
+
+        XCTAssertFalse(SettingsStore.shared.keepsEarlierCopy)
+        _ = try self.makeHome(createdAt: cutoff.addingTimeInterval(-86_400), root: home)
+        EarlyInstallAccess.forgetCachedDecision()
+        XCTAssertTrue(SettingsStore.shared.keepsEarlierCopy)
+    }
+
+    func testCopiedHomeOlderThanThisMacDoesNotKeepListen() throws {
+        let cutoff = try XCTUnwrap(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
+        let home = try self.makeHome(createdAt: cutoff.addingTimeInterval(-40 * 86_400))
+        EarlyInstallAccess.testingKey = SymmetricKey(size: .bits256)
+        EarlyInstallAccess.testingHome = home
+        EarlyInstallAccess.testingAppBirth = cutoff
+        EarlyInstallAccess.testingFirstSignOn = cutoff.addingTimeInterval(-86_400)
+        EarlyInstallAccess.testingLaunchedAt = cutoff
+
+        XCTAssertFalse(SettingsStore.shared.keepsEarlierCopy)
+        EarlyInstallAccess.forgetCachedDecision()
+        EarlyInstallAccess.testingFirstSignOn = cutoff.addingTimeInterval(-80 * 86_400)
+        XCTAssertFalse(SettingsStore.shared.keepsEarlierCopy)
+    }
+
+    func testFileCreatedOnThisLaunchDoesNotKeepListen() throws {
+        let cutoff = try XCTUnwrap(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
+        let launchedAt = cutoff.addingTimeInterval(-86_400)
+        let home = try self.makeHome(createdAt: launchedAt.addingTimeInterval(5))
+        EarlyInstallAccess.testingKey = SymmetricKey(size: .bits256)
+        EarlyInstallAccess.testingHome = home
+        EarlyInstallAccess.testingAppBirth = cutoff
+        EarlyInstallAccess.testingFirstSignOn = cutoff.addingTimeInterval(-40 * 86_400)
+        EarlyInstallAccess.testingLaunchedAt = launchedAt
+
+        XCTAssertFalse(SettingsStore.shared.keepsEarlierCopy)
+    }
+
+    func testEmptySupportFolderIsNotAnEarlierCopy() throws {
+        let cutoff = try XCTUnwrap(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
+        let home = FileManager.default.temporaryDirectory
+            .appendingPathComponent("earlier-copy-\(UUID().uuidString)", isDirectory: true)
+        let folder = home.appendingPathComponent("Library/Application Support/connectingCaptions", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try FileManager.default.setAttributes(
+            [.creationDate: cutoff.addingTimeInterval(-86_400)],
+            ofItemAtPath: folder.path
+        )
+
+        XCTAssertTrue(EarlyInstallAccess.birthDates(in: home).isEmpty)
+        XCTAssertFalse(
+            EarlyInstallAccess.admits(
+                birth: cutoff.addingTimeInterval(-86_400),
+                cutoff: cutoff,
+                firstSignOn: nil,
+                appBirth: cutoff,
+                launchedAt: cutoff
+            )
+        )
+    }
+
+    func testPolicyTimestampAcceptsUnixAndAbsoluteTime() {
+        let unix = Date(timeIntervalSince1970: 1_767_484_800)
+        let absolute = unix.timeIntervalSinceReferenceDate
+        XCTAssertEqual(
+            MacFirstSignOn.date(fromPolicyTimestamp: unix.timeIntervalSince1970),
+            unix
+        )
+        XCTAssertEqual(
+            MacFirstSignOn.date(fromPolicyTimestamp: absolute),
+            unix
+        )
+        XCTAssertNil(MacFirstSignOn.date(fromPolicyTimestamp: 0))
+    }
+
+    func testThisMacSignOnPredatesNow() throws {
+        let signOn = try XCTUnwrap(MacFirstSignOn.date())
+        XCTAssertLessThan(signOn, Date().addingTimeInterval(60))
+        let started = try XCTUnwrap(MacFirstSignOn.processStart())
+        XCTAssertLessThanOrEqual(started.timeIntervalSince1970, Date().timeIntervalSince1970 + 1)
+        XCTAssertGreaterThan(started, Date().addingTimeInterval(-86_400))
+    }
+
+    private func makeHome(createdAt: Date, root: URL? = nil) throws -> URL {
+        let home = root ?? FileManager.default.temporaryDirectory
+            .appendingPathComponent("earlier-copy-\(UUID().uuidString)", isDirectory: true)
+        let prefs = home.appendingPathComponent("Library/Preferences", isDirectory: true)
+        try FileManager.default.createDirectory(at: prefs, withIntermediateDirectories: true)
+        let plist = prefs.appendingPathComponent("com.connectingcaptions.app.plist")
+        try Data("bplist00".utf8).write(to: plist)
+        try FileManager.default.setAttributes([.creationDate: createdAt], ofItemAtPath: plist.path)
+        return home
     }
 
     private func makeRecord(

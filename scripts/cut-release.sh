@@ -156,17 +156,30 @@ PY
     exit 1
 }
 
+# The iPhone and keyboard targets keep their own marketing version.
+# Only the two Mac app configurations match Info.plist.
+marketing_hits="$(grep -c "MARKETING_VERSION = ${current};" connectingCaptions.xcodeproj/project.pbxproj || true)"
+project_build_hits="$(grep -c "CURRENT_PROJECT_VERSION = ${build};" connectingCaptions.xcodeproj/project.pbxproj || true)"
+if [ "${marketing_hits}" -ne 2 ] || [ "${project_build_hits}" -ne 2 ]; then
+    echo "Expected the Mac app version ${current} (${build}) twice in the Xcode project." >&2
+    echo "Found ${marketing_hits} marketing versions and ${project_build_hits} build numbers." >&2
+    exit 1
+fi
+
 echo "Cut ${current} (${build}) → ${version} (${next_build}), tag ${tag}"
+python3 scripts/check-homebrew-cask.py \
+    --release-version "${version}" \
+    --cask "${ROOT}/../homebrew-connectingcaptions/Casks/connectingcaptions.rb"
 if [ "${DRY_RUN}" -eq 1 ]; then
     echo "Dry run. No files changed and nothing pushed."
     exit 0
 fi
 
-python3 - "${version}" "${next_build}" "$(date +%Y-%m-%d)" <<'PY'
+python3 - "${current}" "${version}" "${build}" "${next_build}" "$(date +%Y-%m-%d)" <<'PY'
 import re, sys
 from pathlib import Path
 
-version, build, day = sys.argv[1:4]
+current_version, version, current_build, next_build, day = sys.argv[1:6]
 
 changelog = Path("CHANGELOG.md")
 text = changelog.read_text(encoding="utf-8")
@@ -185,18 +198,18 @@ if "releases/latest/download/Connecting-Captions.zip" not in readme_text:
 project = Path("connectingCaptions.xcodeproj/project.pbxproj")
 project_text = project.read_text(encoding="utf-8")
 marketing, marketing_count = re.subn(
-    r"MARKETING_VERSION = [0-9.]+;",
+    rf"MARKETING_VERSION = {re.escape(current_version)};",
     f"MARKETING_VERSION = {version};",
     project_text,
 )
 build_text, build_count = re.subn(
-    r"CURRENT_PROJECT_VERSION = [0-9]+;",
-    f"CURRENT_PROJECT_VERSION = {build};",
+    rf"CURRENT_PROJECT_VERSION = {re.escape(current_build)};",
+    f"CURRENT_PROJECT_VERSION = {next_build};",
     marketing,
 )
 if marketing_count != 2 or build_count != 2:
     raise SystemExit(
-        f"Expected 2 MARKETING_VERSION and 2 CURRENT_PROJECT_VERSION edits, "
+        f"Expected 2 Mac MARKETING_VERSION and 2 CURRENT_PROJECT_VERSION edits, "
         f"got {marketing_count} and {build_count}"
     )
 project.write_text(build_text, encoding="utf-8")
@@ -240,7 +253,7 @@ notes_file="$(mktemp)"
 macOS 15 or later, Apple Silicon. The zip is notarized.
 
 1. Download [Connecting-Captions-${version}.zip](https://github.com/chrisswimlee/connectingCaptions/releases/download/${tag}/Connecting-Captions-${version}.zip).
-2. Unzip it and drag **Connecting Captions** to Applications.
+2. Unzip it and drag **Connecting Captions Pro** to Applications.
 3. Open Theater, allow the microphone, then press **Listen**.
 
 **Homebrew**
@@ -266,4 +279,5 @@ gh release edit "${tag}" --repo chrisswimlee/connectingCaptions --notes-file "${
 rm -f "${notes_file}"
 
 echo "Notarized release: https://github.com/chrisswimlee/connectingCaptions/releases/tag/${tag}"
-echo "The Homebrew tap still serves the previous zip until you update that cask."
+echo "Update the Homebrew cask in the same edit: version ${version}, its sha256, name \"Connecting Captions Pro\", app \"Connecting Captions Pro.app\"."
+echo "scripts/check-homebrew-cask.py fails if that version still installs Connecting Captions.app."

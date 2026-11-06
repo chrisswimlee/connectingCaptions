@@ -20,7 +20,7 @@ function env(extra = {}) {
     LICENSE_PRIVATE_KEY: PRIVATE_B64,
     PERSONAL_PRICE_IDS: PERSONAL_PRICE,
     RESEND_API_KEY: "re_test",
-    EMAIL_FROM: "Connecting Captions <keys@example.com>",
+    EMAIL_FROM: "Connecting Captions Pro <keys@example.com>",
     KEY_MAJOR: "1",
     ISSUED_KEYS: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v) },
     ...extra,
@@ -89,6 +89,8 @@ test("a completed personal purchase emails a key the public key verifies", async
     { product: "connectingCaptions", personal: true, seats: 2, major: 1, org: "ada@example.com", expires: "2099-12-31" },
   );
   assert.match(emails[0].text, /Order 325-10001/);
+  assert.match(emails[0].text, /Connecting Captions Pro/);
+  assert.equal(emails[0].subject, "Your Connecting Captions Pro license key");
 });
 
 test("custom data license=personal also counts as a personal purchase", async () => {

@@ -26,7 +26,9 @@ extension SettingsStore {
         guard let token = self.commercialLicenseToken else { return nil }
         if case let .success(record) = CommercialLicense.verify(
             token,
-            publicKey: Self.licenseVerifyingKey
+            publicKey: Self.licenseVerifyingKey,
+            now: self.licenseClockNow,
+            machineID: self.commercialSeatID
         ) {
             return record
         }
@@ -42,7 +44,9 @@ extension SettingsStore {
         guard let token = self.commercialLicenseToken else { return nil }
         if case let .failure(failure) = CommercialLicense.verify(
             token,
-            publicKey: Self.licenseVerifyingKey
+            publicKey: Self.licenseVerifyingKey,
+            now: self.licenseClockNow,
+            machineID: self.commercialSeatID
         ) {
             return failure
         }
@@ -55,7 +59,17 @@ extension SettingsStore {
         now: Date = Date()
     ) -> Result<CommercialLicense.Record, CommercialLicense.Failure> {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
-        switch CommercialLicense.verify(trimmed, publicKey: Self.licenseVerifyingKey, now: now) {
+        let clock = ListenAccess.advanceHighWater(
+            self.listenClockHighWater,
+            now: now,
+            appBirth: self.appBundleCreation
+        ) ?? now
+        switch CommercialLicense.verify(
+            trimmed,
+            publicKey: Self.licenseVerifyingKey,
+            now: clock,
+            machineID: self.commercialSeatID
+        ) {
         case let .success(record):
             do {
                 try self.writeCommercialLicenseToken(trimmed)
@@ -85,10 +99,21 @@ extension SettingsStore {
         if Self.isRunningTests {
             return self.defaults.string(forKey: LicenseDefaults.token)
         }
-        if let keychain = try? CommercialLicenseKeychain.read() {
-            return keychain
+        do {
+            if let keychain = try CommercialLicenseKeychain.read() {
+                return keychain
+            }
+            guard let fallback = self.defaults.string(forKey: LicenseDefaults.token)?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                !fallback.isEmpty,
+                try CommercialLicenseKeychain.readMac() == CommercialSeat.currentID
+            else {
+                return nil
+            }
+            return fallback
+        } catch {
+            return self.defaults.string(forKey: LicenseDefaults.token)
         }
-        return self.defaults.string(forKey: LicenseDefaults.token)
     }
 
     private func writeCommercialLicenseToken(_ token: String?) throws {
@@ -101,6 +126,7 @@ extension SettingsStore {
             return
         }
         try CommercialLicenseKeychain.write(token)
+        try CommercialLicenseKeychain.writeMac(token == nil ? nil : CommercialSeat.currentID)
         if let token {
             self.defaults.set(token, forKey: LicenseDefaults.token)
         } else {
@@ -163,6 +189,62 @@ private enum CommercialLicenseKeychain {
             kSecAttrService as String: ConnectingCaptionsProduct.licenseKeychainService,
             kSecAttrAccount as String: ConnectingCaptionsProduct.licenseKeychainAccount,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecAttrSynchronizable as String: false,
+        ]
+    }
+
+    static func readMac() throws -> String? {
+        try self.readValue(account: self.macAccount)
+    }
+
+    static func writeMac(_ identifier: String?) throws {
+        try self.writeValue(identifier, account: self.macAccount)
+    }
+
+    private static let macAccount = "connectingCaptionsCommercialLicenseMac"
+
+    private static func readValue(account: String) throws -> String? {
+        var query = self.baseQuery(account: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess else { throw KeychainServiceError.unhandled(status) }
+        guard let data = item as? Data, let text = String(data: data, encoding: .utf8) else {
+            throw KeychainServiceError.invalidData
+        }
+        return text
+    }
+
+    private static func writeValue(_ text: String?, account: String) throws {
+        let query = self.baseQuery(account: account)
+        if let text {
+            let data = Data(text.utf8)
+            let status: OSStatus
+            if try self.readValue(account: account) != nil {
+                status = SecItemUpdate(query as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+            } else {
+                var add = query
+                add[kSecValueData as String] = data
+                status = SecItemAdd(add as CFDictionary, nil)
+            }
+            guard status == errSecSuccess else { throw KeychainServiceError.unhandled(status) }
+        } else {
+            let status = SecItemDelete(query as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else {
+                throw KeychainServiceError.unhandled(status)
+            }
+        }
+    }
+
+    private static func baseQuery(account: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: ConnectingCaptionsProduct.licenseKeychainService,
+            kSecAttrAccount as String: account,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecAttrSynchronizable as String: false,
         ]
     }
 }

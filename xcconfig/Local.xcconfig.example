@@ -10,3 +10,7 @@
 //   CONNECTINGCAPTIONS_DEVELOPMENT_TEAM=XXXXXXXXXX ./build.sh
 
 DEVELOPMENT_TEAM = YOUR_TEAM_ID
+
+// 64 hex characters. A release build reads this to recognize a Mac that already
+// had the app. It is not the license private key. Leave it unset on a Personal Team build.
+// EARLY_INSTALL_SEAL_KEY =

@@ -558,6 +558,11 @@ struct OnboardingFlowView: View {
 
     func skipVoiceModelIfNeeded() {
         guard self.step == .voiceModel else { return }
+        let ready = VoiceEngineLanguageReadiness.current(
+            model: self.recommendedOnboardingModel,
+            languageID: self.selectedLanguageID
+        ) == .ready
+        guard ready else { return }
         self.applyOnboardingAppleVoice()
         self.currentStep = Step.permissions.rawValue
     }
@@ -583,6 +588,18 @@ struct OnboardingFlowView: View {
 
     func finishSetupFromPlayground() {
         guard !self.isFinishingOnboarding else { return }
+        if self.settings.onboardingPlaygroundSkipped {
+            self.asr.showError = false
+            self.isFinishingOnboarding = true
+            Task { @MainActor in
+                if self.asr.isRunning || self.asr.isStarting || self.translationController.isSessionActive {
+                    await self.stopAndProcessTranscription()
+                }
+                self.finishOnboardingAtTranslate()
+                self.isFinishingOnboarding = false
+            }
+            return
+        }
         if !self.isVoiceModelReady || !self.isMicrophoneReady || !self.isPlaygroundReady {
             var missing: [String] = []
             if !self.isVoiceModelReady { missing.append("Voice Engine") }

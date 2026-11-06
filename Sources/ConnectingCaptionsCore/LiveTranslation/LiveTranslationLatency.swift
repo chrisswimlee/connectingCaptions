@@ -58,6 +58,23 @@ public enum LiveTranslationSilenceGate {
         return consumedSilenceEdgeTick || self.treatsSilenceEdgeAsConsumed(thermal)
     }
 
+    /// A speech time to store. A packet that arrives late must not move the clock backward.
+    public static func laterVoicedUptime(_ current: TimeInterval?, voicedAt: TimeInterval) -> TimeInterval {
+        guard let current else { return voicedAt }
+        return max(current, voicedAt)
+    }
+
+    /// Speech still inside the hold may run another ASR tick. Speech whose audio
+    /// time is already past the hold must not, even if the callback arrives
+    /// while a decode still has the main thread.
+    public static func speechReopensSilenceEdge(
+        voicedAt: TimeInterval,
+        now: TimeInterval,
+        holdSeconds: TimeInterval = LiveTranslationTiming.silenceHoldSeconds
+    ) -> Bool {
+        self.isPastHold(lastVoicedUptime: voicedAt, now: now, holdSeconds: holdSeconds) == false
+    }
+
     /// Hot Macs skip the post-hold silence-edge tick so pause does not keep the Neural Engine warm.
     /// `.nominal`, `.fair`, and unknown states keep the existing consume-flag policy.
     public static func treatsSilenceEdgeAsConsumed(_ thermal: ProcessInfo.ThermalState) -> Bool {

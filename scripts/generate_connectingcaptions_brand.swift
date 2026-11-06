@@ -223,4 +223,4 @@ savePNG(
     to: wordDir.appendingPathComponent("BrandWordmark@2x.png")
 )
 
-print("Generated Connecting Captions brand assets.")
+print("Generated Connecting Captions Pro brand assets.")

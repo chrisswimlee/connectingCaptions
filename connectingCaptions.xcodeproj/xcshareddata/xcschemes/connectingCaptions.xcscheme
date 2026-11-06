@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "7C078D8E2E3B339200FB7CAC"
-               BuildableName = "Connecting Captions.app"
+               BuildableName = "Connecting Captions Pro.app"
                BlueprintName = "connectingCaptions"
                ReferencedContainer = "container:connectingCaptions.xcodeproj">
             </BuildableReference>
@@ -67,7 +67,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "7C078D8E2E3B339200FB7CAC"
-            BuildableName = "Connecting Captions.app"
+            BuildableName = "Connecting Captions Pro.app"
             BlueprintName = "connectingCaptions"
             ReferencedContainer = "container:connectingCaptions.xcodeproj">
          </BuildableReference>
@@ -84,7 +84,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "7C078D8E2E3B339200FB7CAC"
-            BuildableName = "Connecting Captions.app"
+            BuildableName = "Connecting Captions Pro.app"
             BlueprintName = "connectingCaptions"
             ReferencedContainer = "container:connectingCaptions.xcodeproj">
          </BuildableReference>

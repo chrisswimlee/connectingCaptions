@@ -141,12 +141,21 @@ final class LiveTranslationCommitContextTests: XCTestCase {
         )
     }
 
-    func testSanePeeledCaptionRejectsAPriorClauseStillInTheLeftover() {
-        XCTAssertFalse(
+    func testSanePeeledCaptionAllowsOneExtraClauseAndRejectsALongerLeftover() {
+        XCTAssertTrue(
             LiveTranslationCommitContext.isSanePeeledCaption(
                 "then applied it. It worked well.",
                 isolatedSource: "It worked well.",
-                targetID: "en"
+                targetID: "en",
+                sourceID: "en"
+            )
+        )
+        XCTAssertFalse(
+            LiveTranslationCommitContext.isSanePeeledCaption(
+                "then applied it. It worked well. The room stayed quiet.",
+                isolatedSource: "It worked well.",
+                targetID: "en",
+                sourceID: "en"
             )
         )
         XCTAssertTrue(
@@ -156,6 +165,21 @@ final class LiveTranslationCommitContextTests: XCTestCase {
                 targetID: "en"
             )
         )
+    }
+
+    func testMarkedPayloadSpacesUnpunctuatedKoreanAndThaiPriors() {
+        let korean = LiveTranslationCommitContext.markedContextPayload(
+            priors: ["안녕하세요", "다음으로 측정합니다"],
+            current: "감사합니다",
+            languageID: "ko"
+        )
+        XCTAssertTrue(korean.hasPrefix("안녕하세요 다음으로 측정합니다\n"))
+        let thai = LiveTranslationCommitContext.markedContextPayload(
+            priors: ["สวัสดีครับ", "ต่อไปวัดนะ"],
+            current: "ขอบคุณครับ",
+            languageID: "th"
+        )
+        XCTAssertTrue(thai.hasPrefix("สวัสดีครับ ต่อไปวัดนะ\n"))
     }
 
     func testPreferConfirmationRejectsANearMatchWhenLiveLeftoverIsEmpty() {

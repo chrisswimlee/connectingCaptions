@@ -431,17 +431,25 @@ enum SpokenScriptDetector {
             guard let family = Self.family(of: scalar) else { continue }
             scores[family, default: 0] += 1
         }
-        let ranked = scores.filter { $0.value >= 2 }.sorted { $0.value > $1.value }
-        guard let top = ranked.first else { return nil }
-        if let second = ranked.dropFirst().first, second.value * 2 >= top.value {
-            return nil
+        if (scores[.kana] ?? 0) >= 1, allowedIDs.contains("ja") {
+            scores[.kana, default: 0] += scores[.han] ?? 0
+            scores[.han] = nil
         }
-        if top.key == .han, (scores[.kana] ?? 0) >= 2, allowedIDs.contains("ja") {
-            return "ja"
+        if allowedIDs.contains("zh"), allowedIDs.contains("ja"),
+           (scores[.han] ?? 0) >= 2, (scores[.kana] ?? 0) == 0
+        {
+            return "zh"
+        }
+        let ranked = scores.filter { $0.value >= 2 }.sorted { $0.value > $1.value }
+        guard let top = ranked.first else {
+            return Self.functionWordLanguage(in: text, allowed: allowedIDs)
+        }
+        if let second = ranked.dropFirst().first, second.value * 2 >= top.value {
+            return Self.functionWordLanguage(in: text, allowed: allowedIDs)
         }
         let matches = Self.languages(in: top.key, allowed: allowedIDs)
-        guard matches.count == 1 else { return nil }
-        return matches[0]
+        if matches.count == 1 { return matches[0] }
+        return Self.functionWordLanguage(in: text, allowed: allowedIDs)
     }
 
     /// English–French and Russian–Ukrainian cannot be told apart by script.
@@ -509,7 +517,47 @@ enum SpokenScriptDetector {
     }
 
     private static func isLatinLetter(_ scalar: Unicode.Scalar) -> Bool {
-        CharacterSet.letters.contains(scalar) && scalar.value < 0x0250
+        if (0x1E00...0x1EFF).contains(scalar.value) { return true }
+        return CharacterSet.letters.contains(scalar) && scalar.value < 0x0250
+    }
+
+    /// Short function words for Latin and Cyrillic pairs that share one script.
+    private static let functionWords: [String: Set<String>] = [
+        "en": ["the", "and", "to", "of", "is", "that", "for", "with"],
+        "fr": ["le", "la", "les", "des", "une", "est", "dans", "pour"],
+        "de": ["der", "die", "das", "und", "ist", "nicht", "ein"],
+        "es": ["el", "los", "las", "una", "que", "por", "con", "para"],
+        "pt": ["os", "uma", "não", "para", "com", "que", "em"],
+        "it": ["che", "non", "una", "per", "con", "sono", "della"],
+        "nl": ["het", "een", "van", "niet", "voor", "met"],
+        "vi": ["không", "một", "của", "và", "là", "cho", "trong"],
+        "id": ["dan", "yang", "untuk", "ini", "dengan", "tidak", "adalah"],
+        "pl": ["nie", "jest", "się", "że", "dla", "tego", "ale"],
+        "tr": ["için", "değil", "bir", "çok", "ama", "bu"],
+        "ru": ["и", "в", "не", "что", "это", "на", "как"],
+        "uk": ["і", "не", "що", "це", "на", "як", "та"],
+    ]
+
+    private static func functionWordLanguage(in text: String, allowed: Set<String>) -> String? {
+        let tokens = text.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        guard !tokens.isEmpty else { return nil }
+        var bestID: String?
+        var bestHits = 0
+        var tied = false
+        for id in allowed.sorted() {
+            guard let words = Self.functionWords[id] else { continue }
+            let hits = tokens.reduce(0) { $0 + (words.contains($1) ? 1 : 0) }
+            if hits > bestHits {
+                bestHits = hits
+                bestID = id
+                tied = false
+            } else if hits > 0, hits == bestHits {
+                tied = true
+            }
+        }
+        // One shared word ("le") is not enough to flip Either Way.
+        guard bestHits >= 2, !tied else { return nil }
+        return bestID
     }
 
     private static func isHangul(_ scalar: Unicode.Scalar) -> Bool {

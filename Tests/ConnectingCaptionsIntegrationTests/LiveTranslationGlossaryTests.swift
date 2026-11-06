@@ -37,6 +37,43 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         )
     }
 
+    func testPartialLockTokensRestoreAndBareDigitsNeedUnlockedFallback() {
+        let protected = TranslationGlossaryLock.protect(
+            "We are demoing connectingCaptions today",
+            terms: ["connectingCaptions"]
+        )
+        let token = protected.tokens.keys.first ?? ""
+        XCTAssertFalse(token.isEmpty)
+        let padded = token.replacingOccurrences(of: "\u{FFF9}", with: "\u{FFF9} ")
+        let paddedRestored = TranslationGlossaryLock.restore(padded, tokens: protected.tokens)
+        XCTAssertEqual(paddedRestored, "We are demoing connectingCaptions today")
+        XCTAssertFalse(
+            TranslationGlossaryLock.needsUnlockedFallback(
+                source: "We are demoing connectingCaptions today",
+                rawTranslated: padded,
+                restored: paddedRestored,
+                tokens: protected.tokens
+            )
+        )
+        let stripped = protected.text.replacingOccurrences(of: token, with: "0")
+        let restored = TranslationGlossaryLock.restore(stripped, tokens: protected.tokens)
+        XCTAssertTrue(
+            TranslationGlossaryLock.needsUnlockedFallback(
+                source: "We are demoing connectingCaptions today",
+                rawTranslated: stripped,
+                restored: restored,
+                tokens: protected.tokens
+            )
+        )
+        XCTAssertFalse(
+            TranslationGlossaryLock.containsLockArtifact(
+                LiveTranslationCommitContext.contextClauseStart + "hello"
+                    + LiveTranslationCommitContext.contextClauseEnd
+            )
+        )
+        XCTAssertTrue(TranslationGlossaryLock.containsLockArtifact("\u{FFF9}0"))
+    }
+
     func testEmptyTermsLeaveTextAlone() {
         let protected = TranslationGlossary.protect("hello", terms: [])
         XCTAssertEqual(protected.text, "hello")
@@ -660,6 +697,22 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertEqual(SpokenScriptDetector.languageID(in: "สวัสดีครับ", among: ["en", "th"]), "th")
         XCTAssertEqual(SpokenScriptDetector.languageID(in: "你好大家好", among: ["en", "zh"]), "zh")
         XCTAssertNil(SpokenScriptDetector.languageID(in: "Bonjour tout le monde", among: ["en", "fr"]))
+        XCTAssertEqual(
+            SpokenScriptDetector.languageID(in: "le monde est dans la ville", among: ["en", "fr"]),
+            "fr"
+        )
+        XCTAssertEqual(
+            SpokenScriptDetector.languageID(in: "saya dan yang untuk ini", among: ["en", "id"]),
+            "id"
+        )
+        XCTAssertEqual(
+            SpokenScriptDetector.languageID(in: "to nie jest tak", among: ["en", "pl"]),
+            "pl"
+        )
+        XCTAssertEqual(
+            SpokenScriptDetector.languageID(in: "bu bir şey için değil", among: ["en", "tr"]),
+            "tr"
+        )
         XCTAssertNil(SpokenScriptDetector.languageID(in: "Hi 안녕", among: ["en", "ko"]))
         XCTAssertNil(SpokenScriptDetector.languageID(in: "A", among: ["en", "ko"]))
         XCTAssertTrue(SpokenScriptDetector.pairSharesOneScript("en", "fr"))
@@ -1249,6 +1302,33 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertFalse(document.terms.contains("EvilToken"))
     }
 
+    func testTalkPackReadsKeynoteSlideText() throws {
+        let sentence = Data("Nemotron hears Nemotron".utf8)
+        var snappy = Data([0x17, 0x58])
+        snappy.append(sentence)
+        XCTAssertEqual(KeynoteSlideText.decompressSnappy(snappy, maxOutput: 100), sentence)
+        var archive = Data([0x00, UInt8(snappy.count), 0x00, 0x00])
+        archive.append(snappy)
+        XCTAssertEqual(
+            KeynoteSlideText.plainText(inIWA: archive),
+            "Nemotron hears Nemotron"
+        )
+        let copied = Data([0x06, 0x08, 0x61, 0x62, 0x63, 0x0A, 0x03, 0x00])
+        XCTAssertEqual(KeynoteSlideText.decompressSnappy(copied, maxOutput: 20), Data("abcabc".utf8))
+
+        let data = try Self.zipArchive(files: [
+            "Index/Slide.iwa": archive,
+            "preview.jpg": Data([0x00, 0x01]),
+        ])
+        let document = try TheaterTalkPack.document(from: data, fileName: "deck.key")
+        XCTAssertTrue(document.terms.contains("Nemotron"), "terms=\(document.terms)")
+
+        let apxl = Data("<sf:p>PyTorch ships PyTorch</sf:p>".utf8)
+        let notes = try Self.zipArchive(files: ["index.apxl": apxl])
+        let fromNotes = try TheaterTalkPack.document(from: notes, fileName: "notes.key")
+        XCTAssertTrue(fromNotes.terms.contains("PyTorch"), "terms=\(fromNotes.terms)")
+    }
+
     func testTalkPackRejectsAnOversizedPowerPoint() {
         let data = Data(repeating: 0, count: 32)
         XCTAssertThrowsError(
@@ -1280,6 +1360,32 @@ final class LiveTranslationGlossaryTests: XCTestCase {
             try body.write(to: url, atomically: true, encoding: .utf8)
         }
         let zip = root.appendingPathComponent("deck.pptx")
+        let roots = Array(Set(files.keys.compactMap { ($0 as NSString).pathComponents.first })).sorted()
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        process.currentDirectoryURL = root
+        process.arguments = ["-r", "-X", zip.lastPathComponent] + roots
+        try process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        return try Data(contentsOf: zip)
+    }
+
+    private static func zipArchive(files: [String: Data]) throws -> Data {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("connectingCaptions-key-test-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        for (path, body) in files {
+            let url = root.appendingPathComponent(path)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try body.write(to: url)
+        }
+        let zip = root.appendingPathComponent("deck.key")
         let roots = Array(Set(files.keys.compactMap { ($0 as NSString).pathComponents.first })).sorted()
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")

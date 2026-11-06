@@ -170,6 +170,8 @@ struct TheaterTalkPackCard: View {
             .pdf,
             UTType(filenameExtension: "pptx") ?? .data,
             UTType(filenameExtension: "pptm") ?? .data,
+            UTType("com.apple.iwork.keynote.key") ?? UTType(filenameExtension: "key") ?? .data,
+            UTType(filenameExtension: "key") ?? .data,
             .json,
             .rtf,
         ]

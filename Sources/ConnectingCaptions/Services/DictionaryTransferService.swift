@@ -281,7 +281,7 @@ final class DictionaryTransferService {
     func suggestedFilename(for date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd_HH-mm"
-        return "connectingCaptions_Dictionary_\(formatter.string(from: date)).json"
+        return "\(ConnectingCaptionsProduct.displayName) Dictionary \(formatter.string(from: date)).json"
     }
 
     static func importState(

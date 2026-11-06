@@ -16,7 +16,7 @@ enum MicrophoneAccess {
         "The microphone prompt did not finish. Open Settings and turn the microphone on."
 
     static let moveToApplicationsCopy =
-        "Move Connecting Captions into Applications, then open that copy. Allow cannot stick while the app is still the downloaded copy."
+        "Move \(ConnectingCaptionsProduct.displayName) into Applications, then open that copy. Allow cannot stick while the app is still the downloaded copy."
 
     /// A notarized app opened from the zip runs from a temporary path.
     /// Microphone Allow is granted to that path, then the next launch asks again.

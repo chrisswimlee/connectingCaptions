@@ -1,5 +1,51 @@
 import Foundation
+#if canImport(SQLCipher)
+import SQLCipher
+#else
 import SQLite3
+#endif
+
+enum HistoryKeyError: LocalizedError {
+    case unavailable
+
+    var errorDescription: String? {
+        "History is locked on this Mac."
+    }
+}
+
+enum HistoryKeySource {
+    nonisolated(unsafe) static var testingKey: Data?
+    nonisolated(unsafe) static var forceUnavailable = false
+
+    static var current: Data? {
+        if self.forceUnavailable { return nil }
+        if let testingKey { return testingKey }
+        #if canImport(SQLCipher)
+        if AppTestEnvironment.isRunning { return nil }
+        return TranscriptKey.load()
+        #else
+        return nil
+        #endif
+    }
+
+    /// Production builds must not open history without a key. Tests and the
+    /// standalone SQLite harness stay on plaintext unless they pass a key.
+    static var required: Bool {
+        if self.forceUnavailable { return true }
+        #if canImport(SQLCipher)
+        if AppTestEnvironment.isRunning { return testingKey != nil }
+        return true
+        #else
+        return false
+        #endif
+    }
+}
+
+enum HistoryKeyResolution {
+    case plaintext
+    case key(Data)
+    case unavailable
+}
 
 // swiftlint:disable type_body_length function_body_length file_length
 
@@ -124,8 +170,13 @@ final class TranscriptionHistoryDatabase {
 
     private let connection: OpaquePointer
 
-    init(url: URL) throws {
+    init(url: URL, key: Data? = nil) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        #if canImport(SQLCipher)
+        if let key {
+            try HistorySQLCipher.migratePlaintextIfNeeded(at: url, key: key)
+        }
+        #endif
         var handle: OpaquePointer?
         let status = sqlite3_open_v2(url.path, &handle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil)
         guard status == SQLITE_OK, let handle else {
@@ -135,6 +186,12 @@ final class TranscriptionHistoryDatabase {
         }
         self.connection = handle
         do {
+            #if canImport(SQLCipher)
+            if let key {
+                try HistorySQLCipher.apply(key: key, connection: handle)
+            }
+            #endif
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
             try self.execute("PRAGMA busy_timeout=2000")
             try self.execute("PRAGMA journal_mode=WAL")
             try self.execute("PRAGMA synchronous=FULL")
@@ -537,7 +594,7 @@ final class TranscriptionHistoryDatabase {
 
     static func ftsQuery(from raw: String) -> String? {
         let tokens = raw.split(whereSeparator: \.isWhitespace).compactMap { token -> String? in
-            let cleaned = token.filter { $0.isLetter || $0.isNumber || $0 == "'" }
+            let cleaned = token.filter { TranslationClauseSegmenter.keepsWordCharacter($0) || $0 == "'" }
             guard !cleaned.isEmpty else { return nil }
             return "\"\(cleaned)\""
         }
@@ -663,10 +720,21 @@ final nonisolated class TranscriptionHistoryWriter: @unchecked Sendable {
     private let defaults: UserDefaults
     private let url: URL
     private let legacyKey = "TranscriptionHistoryEntries"
+    private let keyResolution: () -> HistoryKeyResolution
 
-    init(defaults: UserDefaults = .standard, url: URL? = nil) {
+    init(defaults: UserDefaults = .standard, url: URL? = nil, key: Data? = nil) {
         self.defaults = defaults
         self.url = url ?? AppSupportDirectory.url().appendingPathComponent("TranscriptionHistory.sqlite3")
+        if let key {
+            self.keyResolution = { .key(key) }
+        } else if HistoryKeySource.required {
+            self.keyResolution = {
+                guard let key = HistoryKeySource.current else { return .unavailable }
+                return .key(key)
+            }
+        } else {
+            self.keyResolution = { .plaintext }
+        }
     }
 
     func load(retention: HistoryRetentionPolicy = .unlimited) async throws -> [TranscriptionHistoryEntry] {
@@ -767,7 +835,16 @@ final nonisolated class TranscriptionHistoryWriter: @unchecked Sendable {
     }
 
     private func openDatabase() throws -> TranscriptionHistoryDatabase {
-        let database = try self.database ?? TranscriptionHistoryDatabase(url: self.url)
+        if let database = self.database { return database }
+        let database: TranscriptionHistoryDatabase
+        switch self.keyResolution() {
+        case .unavailable:
+            throw HistoryKeyError.unavailable
+        case .plaintext:
+            database = try TranscriptionHistoryDatabase(url: self.url)
+        case let .key(key):
+            database = try TranscriptionHistoryDatabase(url: self.url, key: key)
+        }
         self.database = database
         if try !database.isMigrated {
             let legacy = try self.defaults.data(forKey: self.legacyKey).map {
