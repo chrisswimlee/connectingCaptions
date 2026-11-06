@@ -44,7 +44,7 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         )
         let token = protected.tokens.keys.first ?? ""
         XCTAssertFalse(token.isEmpty)
-        let padded = token.replacingOccurrences(of: "\u{FFF9}", with: "\u{FFF9} ")
+        let padded = protected.text.replacingOccurrences(of: "\u{FFF9}", with: "\u{FFF9} ")
         let paddedRestored = TranslationGlossaryLock.restore(padded, tokens: protected.tokens)
         XCTAssertEqual(paddedRestored, "We are demoing connectingCaptions today")
         XCTAssertFalse(

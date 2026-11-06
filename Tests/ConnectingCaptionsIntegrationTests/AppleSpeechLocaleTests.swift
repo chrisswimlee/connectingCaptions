@@ -305,8 +305,8 @@ final class VoiceEngineLanguageReadinessTests: XCTestCase {
         XCTAssertEqual(VoiceEngineLanguageReadiness.current(model: .appleSpeechAnalyzer, languageID: "en"), .checking)
         XCTAssertTrue(VoiceEngineLanguageReadiness.offeredLanguages(for: .appleSpeechAnalyzer).contains { $0.id == "en" })
         XCTAssertFalse(VoiceEngineLanguageReadiness.supportedLanguages(for: .appleSpeechAnalyzer).contains { $0.id == "en" })
-        // No static route at all stays hidden even while unknown.
-        XCTAssertEqual(VoiceEngineLanguageCatalog.supportStatus(.appleSpeechAnalyzer, languageID: "vi"), false)
+        // No static Analyzer route stays hidden even while the cache is unknown.
+        XCTAssertEqual(VoiceEngineLanguageCatalog.supportStatus(.appleSpeechAnalyzer, languageID: "ca"), false)
 
         AppleSpeechLiveCapability.setAnalyzerLanguagePrefixesForTesting(["en"])
         XCTAssertEqual(VoiceEngineLanguageCatalog.supportStatus(.appleSpeechAnalyzer, languageID: "en"), true)

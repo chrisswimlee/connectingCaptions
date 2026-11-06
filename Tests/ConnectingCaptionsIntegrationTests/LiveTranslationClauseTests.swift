@@ -2345,6 +2345,14 @@ final class TheaterSentenceEndCommitTests: XCTestCase {
         }
         settings.translationSourceLanguageID = "en"
         settings.translationTargetLanguageID = "ko"
+        let originalDictionary = settings.customDictionaryEntries
+        let originalPack = settings.theaterTalkPackTerms
+        defer {
+            settings.customDictionaryEntries = originalDictionary
+            settings.theaterTalkPackTerms = originalPack
+        }
+        settings.customDictionaryEntries = []
+        settings.theaterTalkPackTerms = []
         let engine = FakeTranslationEngine()
         engine.result = .success("환영합니다.")
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")

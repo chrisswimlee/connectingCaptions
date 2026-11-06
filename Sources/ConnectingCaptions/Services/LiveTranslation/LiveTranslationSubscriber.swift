@@ -1109,15 +1109,21 @@ final class LiveTranslationSubscriber: ObservableObject {
                     incoming: next.unit,
                     languageID: languageID
                 )
-            guard Self.confirmedSentenceAgreed(
+            let agreed = Self.confirmedSentenceAgreed(
                 unit: next.unit,
                 confirmed: horizon,
                 languageID: languageID
-            ) || (hasConfirmedBaseline && Self.followingSpeechConfirms(
+            )
+            let continued = hasConfirmedBaseline && Self.followingSpeechConfirms(
                 unit: next.unit,
                 rest: next.rest,
                 languageID: languageID
-            )) || revisedHold else {
+            )
+            // "model then we applied it" is still one line. A lowercase or
+            // capital Then does not print the head while the talk is going.
+            let unpunctuatedEnglish = languageID.hasPrefix("en")
+                && !TranslationClauseSegmenter.looksComplete(next.unit, languageID: languageID)
+            guard agreed || (continued && !unpunctuatedEnglish) || revisedHold else {
                 break
             }
             horizon = TranslationClauseSegmenter.leftoverTail(
@@ -1806,6 +1812,11 @@ final class LiveTranslationSubscriber: ObservableObject {
     ) {
         let cleaned = source.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleaned.isEmpty else { return }
+        let identity = TranslationClauseSegmenter.clauseIdentity(cleaned)
+        let alreadyQueued = self.commitOrder.contains { TranslationClauseSegmenter.isSameClause($0, cleaned) }
+        if alreadyQueued, !allowTrailingFragment, !self.recognizedSpeech.reservedKeys.contains(identity) {
+            return
+        }
         self.rememberDetectedLanguage(cleaned, languageID: SpokenLanguageResolver.listenLanguageID(for: cleaned))
         if allowTrailingFragment {
             let key = TranslationClauseSegmenter.clauseIdentity(cleaned)
@@ -2287,7 +2298,7 @@ final class LiveTranslationSubscriber: ObservableObject {
                 source: "LiveTranslation"
             )
             if (error as? TranslationEngineError)?.isCaptionRejected == true {
-                self.skipFailedCommitSlot(cleaned, generation: generation)
+                self.dropRejectedCaptionSlot(cleaned, generation: generation)
                 return
             }
             let retryAlreadySpent = self.retriedFailedSources.contains(cleaned)
@@ -2432,10 +2443,16 @@ final class LiveTranslationSubscriber: ObservableObject {
             guard self.appleEngine.isMailboxReady else { return }
         }
         guard let unit else { return }
+        // A finished sentence is translated once, on the commit. Prefetching it
+        // on the tick before that commit asks Apple Translation twice.
+        guard !TranslationClauseSegmenter.looksComplete(unit, languageID: languageID) else { return }
         guard LiveTranslationPrefetch.canPrefetch(
             unit: unit,
             inFlightSources: self.inFlightSources
         ) else { return }
+        let alreadyQueued = self.commitOrder.contains { TranslationClauseSegmenter.isSameClause($0, unit) }
+            || self.printedSources.contains { TranslationClauseSegmenter.isSameClause($0, unit) }
+        guard !alreadyQueued else { return }
         // One in-flight commit is fine: live waits behind it. A pile of
         // finished sentences would make this leftover stale.
         guard self.inFlightSources.count <= 1 else { return }
@@ -2843,6 +2860,23 @@ final class LiveTranslationSubscriber: ObservableObject {
         if waiting, !cleaned.isEmpty {
             self.readyTranslations[cleaned] = TheaterCaptionFailure.line
         }
+        self.publishReadyCommits(generation: generation)
+    }
+
+    /// An engine status string is not a caption. Drop the slot so the next
+    /// sentence can print, and leave the failure on Retry instead of the board.
+    private func dropRejectedCaptionSlot(_ source: String, generation: UInt64) {
+        guard generation == self.generation else { return }
+        let cleaned = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+        for index in self.commitOrder.indices
+            where index >= self.nextCommitToPublish
+            && !self.skippedCommitIndexes.contains(index)
+            && self.commitOrder[index] == cleaned
+        {
+            self.skippedCommitIndexes.insert(index)
+        }
+        self.readyTranslations[cleaned] = nil
         self.publishReadyCommits(generation: generation)
     }
 
