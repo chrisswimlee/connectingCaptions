@@ -73,6 +73,7 @@
 		SPFC00000000000000000002 /* SpokenPunctuationFormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SPFC00000000000000000001 /* SpokenPunctuationFormattingTests.swift */; };
 		SUPS00000000000000000002 /* SimpleUpdaterSignatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SUPS00000000000000000001 /* SimpleUpdaterSignatureTests.swift */; };
 		UIT10000000000000000008 /* TheaterSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = UIT10000000000000000001 /* TheaterSmokeTests.swift */; };
+		PIUT00000000000000000008 /* ProIOSSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PIUT00000000000000000001 /* ProIOSSmokeTests.swift */; };
 		PIOS00000000000000000012 /* ProDirectLicenseTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PIOS00000000000000000011 /* ProDirectLicenseTests.swift */; };
 		PIOS00000000000000000008 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = PIOS0000000000000000000A /* FluidAudio */; };
 		PIOS00000000000000000009 /* ConnectingCaptionsCore in Frameworks */ = {isa = PBXBuildFile; productRef = PIOS0000000000000000000B /* ConnectingCaptionsCore */; };
@@ -93,6 +94,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 7C078D8E2E3B339200FB7CAC;
 			remoteInfo = connectingCaptions;
+		};
+		PIUT0000000000000000000A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7C078D872E3B339200FB7CAC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = PIOS00000000000000000004;
+			remoteInfo = ConnectingCaptionsProIOS;
 		};
 		IOSK00000000000000000009 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -192,6 +200,8 @@
 		SPFC00000000000000000001 /* SpokenPunctuationFormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpokenPunctuationFormattingTests.swift; sourceTree = "<group>"; };
 		SUPS00000000000000000001 /* SimpleUpdaterSignatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimpleUpdaterSignatureTests.swift; sourceTree = "<group>"; };
 		UIT10000000000000000001 /* TheaterSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TheaterSmokeTests.swift; sourceTree = "<group>"; };
+		PIUT00000000000000000001 /* ProIOSSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProIOSSmokeTests.swift; sourceTree = "<group>"; };
+		PIUT00000000000000000002 /* ConnectingCaptionsProIOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ConnectingCaptionsProIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		UIT10000000000000000002 /* ConnectingCaptionsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ConnectingCaptionsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		XC0C00000000000000000001 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		XC0C00000000000000000002 /* Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = Local.xcconfig.example; sourceTree = "<group>"; };
@@ -270,6 +280,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		PIUT00000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		PIOS00000000000000000006 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -308,6 +325,7 @@
 				7C078D8F2E3B339200FB7CAC /* Connecting Captions Debug.app */,
 				PIOS00000000000000000001 /* Connecting Captions Pro.app */,
 				IOSK00000000000000000001 /* ConnectingCaptionsProIOSKeyboard.appex */,
+				PIUT00000000000000000002 /* ConnectingCaptionsProIOSUITests.xctest */,
 				7CDB0A202F3C4D5600FB7CAD /* ConnectingCaptionsIntegrationTests.xctest */,
 				UIT10000000000000000002 /* ConnectingCaptionsUITests.xctest */,
 			);
@@ -319,6 +337,7 @@
 			children = (
 				7CDB0A252F3C4D5600FB7CAD /* ConnectingCaptionsIntegrationTests */,
 				UIT10000000000000000003 /* ConnectingCaptionsUITests */,
+				PIUT00000000000000000003 /* ConnectingCaptionsProIOSUITests */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -423,6 +442,14 @@
 			path = ConnectingCaptionsUITests;
 			sourceTree = "<group>";
 		};
+		PIUT00000000000000000003 /* ConnectingCaptionsProIOSUITests */ = {
+			isa = PBXGroup;
+			children = (
+				PIUT00000000000000000001 /* ProIOSSmokeTests.swift */,
+			);
+			path = ConnectingCaptionsProIOSUITests;
+			sourceTree = "<group>";
+		};
 		XC0C00000000000000000003 /* xcconfig */ = {
 			isa = PBXGroup;
 			children = (
@@ -484,6 +511,24 @@
 			productName = ConnectingCaptionsIntegrationTests;
 			productReference = 7CDB0A202F3C4D5600FB7CAD /* ConnectingCaptionsIntegrationTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		PIUT00000000000000000004 /* ConnectingCaptionsProIOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = PIUT0000000000000000000D /* Build configuration list for PBXNativeTarget "ConnectingCaptionsProIOSUITests" */;
+			buildPhases = (
+				PIUT00000000000000000005 /* Sources */,
+				PIUT00000000000000000006 /* Frameworks */,
+				PIUT00000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				PIUT00000000000000000009 /* PBXTargetDependency */,
+			);
+			name = ConnectingCaptionsProIOSUITests;
+			productName = ConnectingCaptionsProIOSUITests;
+			productReference = PIUT00000000000000000002 /* ConnectingCaptionsProIOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 		UIT10000000000000000004 /* ConnectingCaptionsUITests */ = {
 			isa = PBXNativeTarget;
@@ -569,6 +614,10 @@
 						CreatedOnToolsVersion = 26.0;
 						TestTargetID = 7C078D8E2E3B339200FB7CAC;
 					};
+					PIUT00000000000000000004 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = PIOS00000000000000000004;
+					};
 					PIOS00000000000000000004 = {
 						CreatedOnToolsVersion = 26.0;
 					};
@@ -602,6 +651,7 @@
 				7CDB0A1F2F3C4D5600FB7CAD /* ConnectingCaptionsIntegrationTests */,
 				UIT10000000000000000004 /* ConnectingCaptionsUITests */,
 				PIOS00000000000000000004 /* ConnectingCaptionsProIOS */,
+				PIUT00000000000000000004 /* ConnectingCaptionsProIOSUITests */,
 				IOSK00000000000000000004 /* ConnectingCaptionsProIOSKeyboard */,
 			);
 		};
@@ -620,6 +670,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				7CDB0A2F2F3C4D5600FB7CAD /* dictation_fixture.wav in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		PIUT00000000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -757,6 +814,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		PIUT00000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				PIUT00000000000000000008 /* ProIOSSmokeTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		UIT10000000000000000005 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -772,6 +837,11 @@
 			isa = PBXTargetDependency;
 			target = 7C078D8E2E3B339200FB7CAC /* connectingCaptions */;
 			targetProxy = 7CDB0A322F3C4D5600FB7CAD /* PBXContainerItemProxy */;
+		};
+		PIUT00000000000000000009 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = PIOS00000000000000000004 /* ConnectingCaptionsProIOS */;
+			targetProxy = PIUT0000000000000000000A /* PBXContainerItemProxy */;
 		};
 		UIT10000000000000000009 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -1283,11 +1353,58 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		PIUT0000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = XC0C00000000000000000001 /* Shared.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.ios.pro.uitests;
+				PRODUCT_NAME = ConnectingCaptionsProIOSUITests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ConnectingCaptionsProIOS;
+			};
+			name = Debug;
+		};
+		PIUT0000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = XC0C00000000000000000001 /* Shared.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "$(DEVELOPMENT_TEAM)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.connectingcaptions.ios.pro.uitests;
+				PRODUCT_NAME = ConnectingCaptionsProIOSUITests;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ConnectingCaptionsProIOS;
+			};
+			name = Release;
+		};
 		UIT1000000000000000000D /* Build configuration list for PBXNativeTarget "ConnectingCaptionsUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				UIT1000000000000000000B /* Debug */,
 				UIT1000000000000000000C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		PIUT0000000000000000000D /* Build configuration list for PBXNativeTarget "ConnectingCaptionsProIOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				PIUT0000000000000000000B /* Debug */,
+				PIUT0000000000000000000C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

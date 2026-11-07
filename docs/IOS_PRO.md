@@ -29,4 +29,12 @@ xcodebuild -project connectingCaptions.xcodeproj -scheme ConnectingCaptionsProIO
   -destination 'platform=iOS Simulator,name=iPhone 17' build
 ```
 
+The UI smoke does not start Listen:
+
+```bash
+xcodebuild test -project connectingCaptions.xcodeproj -scheme ConnectingCaptionsProIOS \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:ConnectingCaptionsProIOSUITests
+```
+
 Hosted CI cannot prove a live Listen.

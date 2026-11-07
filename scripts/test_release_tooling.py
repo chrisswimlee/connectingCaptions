@@ -46,7 +46,8 @@ class ReleaseSigningTests(unittest.TestCase):
             env = dict(os.environ, PATH=folder + os.pathsep + os.environ.get("PATH", ""),
                        CONNECTINGCAPTIONS_DEVELOPMENT_TEAM="TESTTEAM00",
                        CONNECTINGCAPTIONS_CODESIGN_IDENTITY=identity,
-                       FLUIDSUBTITLES_CODESIGN_IDENTITY=legacy_identity, TEST_IDENTITIES=discovered)
+                       FLUIDSUBTITLES_CODESIGN_IDENTITY=legacy_identity, TEST_IDENTITIES=discovered,
+                       EARLY_INSTALL_SEAL_KEY="ab" * 32)
             return subprocess.run(["bash", str(ROOT / "build.sh"), "release"], env=env,
                                   capture_output=True, text=True)
 
@@ -72,6 +73,27 @@ class ReleaseSigningTests(unittest.TestCase):
         result = self.run_build(discovered='1) DDDD "Developer ID Application: Fixture (TESTTEAM00)"')
         self.assertEqual(result.returncode, 73)
         self.assertIn("Developer ID identity: DDDD", result.stdout)
+
+    def test_missing_seal_fails_before_the_build(self):
+        with tempfile.TemporaryDirectory() as folder:
+            for name, script in {
+                "security": '#!/bin/sh\nprintf "%s\\n" "$TEST_IDENTITIES"\n',
+                "xcodebuild": '#!/bin/sh\necho "TEST: xcodebuild invoked"\nexit 73\n',
+            }.items():
+                executable = Path(folder, name)
+                executable.write_text(script)
+                executable.chmod(0o755)
+            env = dict(os.environ, PATH=folder + os.pathsep + os.environ.get("PATH", ""),
+                       CONNECTINGCAPTIONS_DEVELOPMENT_TEAM="TESTTEAM00",
+                       CONNECTINGCAPTIONS_CODESIGN_IDENTITY="A" * 40,
+                       EARLY_INSTALL_SEAL_KEY="")
+            sealed = subprocess.run(["bash", str(ROOT / "build.sh"), "release"], env=env,
+                                    capture_output=True, text=True)
+        if sealed.returncode == 73 and "TEST: xcodebuild invoked" in sealed.stdout:
+            self.skipTest("This Mac's xcconfig supplies the seal, so an empty environment still releases.")
+        self.assertEqual(sealed.returncode, 1, sealed.stderr)
+        self.assertIn("EARLY_INSTALL_SEAL_KEY", sealed.stderr)
+        self.assertNotIn("TEST: xcodebuild invoked", sealed.stdout)
 
     def test_missing_identity_fails_with_actionable_message_before_build(self):
         result = self.run_build()
