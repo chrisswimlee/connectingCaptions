@@ -149,26 +149,26 @@ final class LiveTranslationMidTalkRuleTests: XCTestCase {
         let hindi = "हमने आज सुबह कक्षा में इस नए मॉडल को बहुत ध्यान से तैयार किया है"
         let chinese = "我们今天把这个语音模型训练完成了"
         let plain = "今日のポイントはモデルの再学習だ"
-        let rows: [(id: String, splits: String, head: String, holds: String, pause: Bool)] = [
-            ("en", "We trained the model. Then we applied it today.", "We trained the model.", "We meet at 9 a.m. we start the class today", false),
-            ("ko", "지금 갈까요 다음으로 갑니다", "지금 갈까요", "오늘 모델을 학습하고", false),
-            ("ja", "見てください それから行きます", "見てください", "そうだ", false),
-            ("th", "เราฝึกโมเดลครับ จากนั้นเราทดสอบ", "เราฝึกโมเดลครับ", "ดีนะ", false),
-            ("zh", chinese + "然後接下來會測試", chinese, "模型然後", false),
-            ("de", "Wir treffen uns am 3. Oktober. Dann kam der Test.", "Wir treffen uns am 3. Oktober.", "Das gilt z.B. für das Modell heute", false),
-            ("hi", hindi + " और फिर हम आगे बढ़ेंगे", hindi, "यह है", false),
-            ("tr", "Modeli eğittik. Sonra test ettik bugün.", "Modeli eğittik.", "Modeli eğittik sonra bugün", false),
-            ("ar", "هذا النموذج جاهز؟ ثم نبدأ اليوم.", "هذا النموذج جاهز؟", "هذا النموذج جاهز اليوم", false),
-            ("nl", "We hebben het model getraind. Daarna testen we het.", "We hebben het model getraind.", "We hebben het model getraind vandaag", false),
-            ("fr", "Nous avons formé le modèle. Puis nous l'avons appliqué.", "Nous avons formé le modèle.", "Nous avons formé le modèle et nous continuons", false),
-            ("id", "Kami melatih modelnya hari ini. Lalu kami mengujinya.", "Kami melatih modelnya hari ini.", "Kami melatih modelnya hari ini juga", false),
-            ("it", "Abbiamo addestrato il modello. Poi lo abbiamo provato.", "Abbiamo addestrato il modello.", "Abbiamo addestrato il modello oggi", false),
-            ("pl", "Wytrenowaliśmy model dzisiaj. Potem go sprawdziliśmy.", "Wytrenowaliśmy model dzisiaj.", "Wytrenowaliśmy model dzisiaj rano", false),
-            ("pt", "Treinámos o modelo hoje. Depois testámos o resultado.", "Treinámos o modelo hoje.", "Treinámos o modelo hoje de manhã", false),
-            ("ru", "Мы обучили модель сегодня. Потом мы проверили её.", "Мы обучили модель сегодня.", "Мы обучили модель сегодня утром", false),
-            ("es", "Hoy entrenamos el modelo ¿lo aplicamos ahora?", "Hoy entrenamos el modelo", "Hoy entrenamos el modelo lo aplicamos ahora", false),
-            ("uk", "Ми навчили модель сьогодні. Потім ми перевірили її.", "Ми навчили модель сьогодні.", "Ми навчили модель сьогодні вранці", false),
-            (
+        let rows: [OfferedLanguageRow] = [
+            OfferedLanguageRow("en", "We trained the model. Then we applied it today.", "We trained the model.", "We meet at 9 a.m. we start the class today", false),
+            OfferedLanguageRow("ko", "지금 갈까요 다음으로 갑니다", "지금 갈까요", "오늘 모델을 학습하고", false),
+            OfferedLanguageRow("ja", "見てください それから行きます", "見てください", "そうだ", false),
+            OfferedLanguageRow("th", "เราฝึกโมเดลครับ จากนั้นเราทดสอบ", "เราฝึกโมเดลครับ", "ดีนะ", false),
+            OfferedLanguageRow("zh", chinese + "然後接下來會測試", chinese, "模型然後", false),
+            OfferedLanguageRow("de", "Wir treffen uns am 3. Oktober. Dann kam der Test.", "Wir treffen uns am 3. Oktober.", "Das gilt z.B. für das Modell heute", false),
+            OfferedLanguageRow("hi", hindi + " और फिर हम आगे बढ़ेंगे", hindi, "यह है", false),
+            OfferedLanguageRow("tr", "Modeli eğittik. Sonra test ettik bugün.", "Modeli eğittik.", "Modeli eğittik sonra bugün", false),
+            OfferedLanguageRow("ar", "هذا النموذج جاهز؟ ثم نبدأ اليوم.", "هذا النموذج جاهز؟", "هذا النموذج جاهز اليوم", false),
+            OfferedLanguageRow("nl", "We hebben het model getraind. Daarna testen we het.", "We hebben het model getraind.", "We hebben het model getraind vandaag", false),
+            OfferedLanguageRow("fr", "Nous avons formé le modèle. Puis nous l'avons appliqué.", "Nous avons formé le modèle.", "Nous avons formé le modèle et nous continuons", false),
+            OfferedLanguageRow("id", "Kami melatih modelnya hari ini. Lalu kami mengujinya.", "Kami melatih modelnya hari ini.", "Kami melatih modelnya hari ini juga", false),
+            OfferedLanguageRow("it", "Abbiamo addestrato il modello. Poi lo abbiamo provato.", "Abbiamo addestrato il modello.", "Abbiamo addestrato il modello oggi", false),
+            OfferedLanguageRow("pl", "Wytrenowaliśmy model dzisiaj. Potem go sprawdziliśmy.", "Wytrenowaliśmy model dzisiaj.", "Wytrenowaliśmy model dzisiaj rano", false),
+            OfferedLanguageRow("pt", "Treinámos o modelo hoje. Depois testámos o resultado.", "Treinámos o modelo hoje.", "Treinámos o modelo hoje de manhã", false),
+            OfferedLanguageRow("ru", "Мы обучили модель сегодня. Потом мы проверили её.", "Мы обучили модель сегодня.", "Мы обучили модель сегодня утром", false),
+            OfferedLanguageRow("es", "Hoy entrenamos el modelo ¿lo aplicamos ahora?", "Hoy entrenamos el modelo", "Hoy entrenamos el modelo lo aplicamos ahora", false),
+            OfferedLanguageRow("uk", "Ми навчили модель сьогодні. Потім ми перевірили її.", "Ми навчили модель сьогодні.", "Ми навчили модель сьогодні вранці", false),
+            OfferedLanguageRow(
                 "vi",
                 Array(repeating: "từ", count: 20).joined(separator: " "),
                 Array(repeating: "từ", count: 18).joined(separator: " "),
@@ -242,5 +242,22 @@ final class LiveTranslationMidTalkRuleTests: XCTestCase {
             self.s.nextCommitUnit(syllables, languageID: "vi", allowPauseFinalize: true)?.unit.count,
             LiveTranslationTiming.maxLineCharacters
         )
+    }
+}
+
+/// One offered language in `testEachOfferedLanguageCutsAndHolds`.
+private struct OfferedLanguageRow {
+    let id: String
+    let splits: String
+    let head: String
+    let holds: String
+    let pause: Bool
+
+    init(_ id: String, _ splits: String, _ head: String, _ holds: String, _ pause: Bool) {
+        self.id = id
+        self.splits = splits
+        self.head = head
+        self.holds = holds
+        self.pause = pause
     }
 }
