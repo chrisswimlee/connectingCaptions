@@ -22,6 +22,9 @@ IOS_CORE="$IOS_REPO/Packages/ConnectingCaptionsCore/Sources/ConnectingCaptionsCo
 ALLOWED_DIFF="LiveTranslation/ConnectingCaptionsProduct.swift Persistence/AppSupportDirectory.swift LiveTranslation/TheaterQualityScore.swift"
 
 [ -d "$IOS_CORE" ] || { echo "App Store core not found: $IOS_CORE (set IOS_REPO)"; exit 2; }
+# The drift loop runs from inside PRO_CORE. A relative IOS_REPO would then
+# point nowhere, every file would be skipped, and the check would pass.
+IOS_CORE=$(CDPATH= cd -- "$IOS_CORE" && pwd)
 
 if [ "${1:-}" = "--sync" ]; then
   shift

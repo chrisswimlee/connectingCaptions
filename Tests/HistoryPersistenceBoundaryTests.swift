@@ -45,6 +45,24 @@ enum ConnectingCaptionsProduct {
     static let priorSupportFolderNames = [String]()
 }
 
+/// History search keeps the same word characters as the caption segmenter.
+/// Compiling the real segmenter here would pull in most of the core, so this is
+/// a copy of `TranslationClauseSegmenter.keepsWordCharacter`.
+enum TranslationClauseSegmenter {
+    static func keepsWordCharacter(_ character: Character) -> Bool {
+        character.unicodeScalars.contains { scalar in
+            switch scalar.properties.generalCategory {
+            case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,
+                 .decimalNumber, .letterNumber, .otherNumber,
+                 .nonspacingMark, .spacingMark, .enclosingMark:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+}
+
 @main struct HistoryPersistenceBoundaryTests {
     @MainActor static func main() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("fluid-history-tests-\(UUID())")

@@ -9,7 +9,7 @@ task_test_dir=$(mktemp -d /tmp/connectingcaptions-history-tests.XXXXXX)
 trap 'rm -rf "$task_test_dir"' EXIT
 
 sdk_path=$(xcrun --sdk macosx --show-sdk-path)
-xcrun swiftc -O -sdk "$sdk_path" -framework AppKit -framework Foundation \
+xcrun swiftc -Onone -sdk "$sdk_path" -framework AppKit -framework Foundation \
     "$task_repo_dir/Sources/ConnectingCaptionsCore/Platform/CoreLog.swift" \
     "$task_repo_dir/Sources/ConnectingCaptionsCore/Persistence/AppSupportDirectory.swift" \
     "$task_repo_dir/Sources/ConnectingCaptionsCore/LiveTranslation/CaptionSpeechTiming.swift" \

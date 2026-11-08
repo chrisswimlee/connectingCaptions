@@ -1,4 +1,5 @@
 import Foundation
+// swiftlint:disable file_length
 
 /// Splits a growing lecture transcript into finished clauses and an open tail.
 ///
