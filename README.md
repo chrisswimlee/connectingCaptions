@@ -1,12 +1,21 @@
-# Connecting Captions
+# Connecting Captions Pro
+
+This repository is Connecting Captions Pro, the direct-download Mac app. iPhone, iPad, and the Mac App Store app are Connecting Captions, in the private `connectingCaptions-iOS` project.
+
+| App | Project | Speech |
+| --- | --- | --- |
+| Connecting Captions Pro | This repo, Mac | FluidVoice, including when Apple Speech is selected |
+| Connecting Captions Pro for iPhone and iPad | This repo, scheme `ConnectingCaptionsProIOS` | FluidVoice (Parakeet on the microphone) |
+| Connecting Captions for iPhone and iPad | `connectingCaptions-iOS` | Apple Speech |
+| Connecting Captions for Mac | `connectingCaptions-iOS`, Mac Catalyst | Apple Speech |
 
 <p align="center">
-  <img src="docs/screenshots/app-icon.png" width="96" alt="Connecting Captions icon">
+  <img src="docs/screenshots/app-icon.png" width="96" alt="Connecting Captions Pro icon">
 </p>
 
 **Each sentence appears when it is ready.**
 
-Connecting Captions is live subtitles for macOS, with translation on the machine. Choose **I speak** and **Show as** from the compatible language choices. Voice Engine shows which languages each model supports and which are ready on this Mac. Translate follows I speak into Show as. The same language needs no translation pack. A sentence appears when it is ready. Best with one speaker and a close mic. It listens through any input device you pick — the built-in microphone, a wired, USB, or line-in mic, a Bluetooth headset in call mode, or a virtual loopback input (BlackHole or Loopback) when you route other audio into it.
+Connecting Captions Pro is live subtitles for macOS, with translation on the machine. Choose **I speak** and **Show as** from the compatible language choices. Voice Engine shows which languages each model supports and which are ready on this Mac. Translate follows I speak into Show as. The same language needs no translation pack. A sentence appears when it is ready. Best with one speaker and a close mic. It listens through any input device you pick — the built-in microphone, a wired, USB, or line-in mic, a Bluetooth headset in call mode, or a virtual loopback input (BlackHole or Loopback) when you route other audio into it.
 
 ![Translate home](docs/screenshots/translate-home.png)
 
@@ -16,9 +25,9 @@ Open **Theater**, set **I speak** and **Show as**, then press **Open Theater** a
 
 By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
-[Download](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://chrisswimlee.com/connectingCaptions/license/)
+[Download](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://local-host.ai/connectingCaptions/license/)
 
-**For work:** a named license is $60 per Mac per year, five Macs minimum. Prices are on the [license page](https://chrisswimlee.com/connectingCaptions/license/). The app stays free for everyone, work use included.
+**License:** The Mac download is free until the App Store app is available. This repository stays GPLv3. Release 1.6.16 does not ask for a key. A work license, for Macs an organization owns, is on the [pricing page](https://local-host.ai/connectingCaptions/pricing/).
 
 ---
 
@@ -90,7 +99,7 @@ checks and download behavior.
 
 ## Install
 
-**Preferred.** Download [Connecting-Captions.zip](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip). That name tracks the latest release. A notarized Developer ID zip should stay quiet in Gatekeeper. Drag **Connecting Captions** to Applications, open Theater, allow the microphone, and press **Listen**.
+**Preferred.** Download [Connecting Captions Pro](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip). That link tracks the latest release. A notarized Developer ID zip should stay quiet in Gatekeeper. Drag **Connecting Captions Pro** to Applications, open Theater, allow the microphone, and press **Listen**.
 
 **Homebrew.**
 
@@ -203,7 +212,7 @@ The paste-key and history harnesses are **not** XCTest targets — they compile 
 
 ## Privacy
 
-Connecting Captions is **local-first**. Your voice, audio, and transcribed text never leave your machine. Theater does not send captions to a cloud API. The app goes online only to download Apple Translation packs, speech assets, and Voice Engine models, and, when automatic update checks are on, to check GitHub Releases for a new version.
+Connecting Captions Pro is **local-first**. Your voice, audio, and transcribed text never leave your machine. Theater does not send captions to a cloud API. The app goes online only to download Apple Translation packs, speech assets, and Voice Engine models, and, when automatic update checks are on, to check GitHub Releases for a new version.
 
 This release does not send analytics, feedback, or update checks to a third-party analytics host. Voice Engine weights stay in this app's folder. A model already in the shared FluidAudio cache is copied once, and that cache is not deleted. A FluidVoice install on the same Mac is left alone: this app does not read or delete that app's Keychain or Application Support folder.
 
@@ -217,14 +226,12 @@ This release does not send analytics, feedback, or update checks to a third-part
 
 ## Commercial license
 
-connectingCaptions is free for everyone under GPLv3, work use included. Theater Listen stays unlocked. A commercial license is optional.
+The Mac download is free until the App Store app is available. Release 1.6.16 does not ask for a key. Organizations buy a work license when the organization owns the Mac:
 
-Firms that need a vendor they can sanction — a named license, a security contact, or a written SLA — buy at the published price:
+- [local-host.ai/connectingCaptions/pricing](https://local-host.ai/connectingCaptions/pricing/) — work license $240 / Mac / year ($120 for schools), five Macs minimum; written SLA $3,000 / organization / year; installer package $2,500 once
+- Email [support@local-host.ai](mailto:support@local-host.ai?subject=Connecting%20Captions%20commercial%20license) with the organization and Mac count for a work license
 
-- [chrisswimlee.com/connectingCaptions/license](https://chrisswimlee.com/connectingCaptions/license/) — $60 / Mac / year, five Macs minimum; SLA +$90 / Mac / year; MDM pkg $1,500 once
-- Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com?subject=Connecting%20Captions%20commercial%20license) with the organization and Mac count
-
-A paid key is air-gapped. It replaces the in-app work notice with **Licensed to** your organization. It does not phone home. A written SLA and a signed seat list are optional. A Jamf or Fleet package can install the key, the seat list, and caption settings. The on-device audit log stores no captions. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
+A work key is air-gapped. It shows **Licensed to** your organization. It does not phone home. A written SLA and a signed seat list are optional. A Mac outside that list does not listen. An installer package can install the key, the seat list, and caption settings. The on-device audit log stores no captions. The source for a version is its git tag. See [docs/COMMERCIAL.md](docs/COMMERCIAL.md).
 
 This is not consulting. Consulting is [Engage](https://chrisswimlee.com/engage/).
 

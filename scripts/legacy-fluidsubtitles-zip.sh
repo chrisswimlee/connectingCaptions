@@ -4,7 +4,7 @@
 # Captions zip under that name fails that check. Re-sign a copy as the old identifier.
 set -euo pipefail
 
-source_app="${1:?path to Connecting Captions.app}"
+source_app="${1:?path to Connecting Captions Pro.app}"
 dest_zip="${2:?path to fluidsubtitles-version.zip}"
 legacy_id="com.fluidsubtitles.app"
 

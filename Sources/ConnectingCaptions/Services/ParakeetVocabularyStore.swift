@@ -298,7 +298,7 @@ final class ParakeetVocabularyStore {
           "minTermLength": 3,
           "terms": [
             {
-              "text": "connectingCaptions",
+              "text": "Connecting Captions Pro",
               "aliases": ["fluid subtitles", "fluid subtitle"],
               "weight": 10.0
             }

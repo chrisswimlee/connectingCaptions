@@ -4,7 +4,7 @@ import Foundation
 /// Air-gapped commercial license token: `base64url(json).base64url(ed25519)`.
 nonisolated enum CommercialLicense {
     static let productID = "connectingCaptions"
-    static let productionPublicKeyBase64 = "RN2najSvCJkPkRf1fR5s+bfdAo0QXXLLR/C2AWLfhhA="
+    static let productionPublicKeyBase64 = "6nbqb139VJ4xw6MbtwejD0I3fa3Ej7ILAqMuNZtHHPk="
 
     static let productionPublicKey: Curve25519.Signing.PublicKey = {
         guard let data = Data(base64Encoded: productionPublicKeyBase64),
@@ -23,11 +23,21 @@ nonisolated enum CommercialLicense {
         var expires: Date
         /// Written response window. Omitted keys stay false so older tokens still verify.
         var sla: Bool = false
-        /// When true, Licensed to requires this Mac on a signed seat list. Listen stays unlocked either way.
+        /// When true, Licensed to requires this Mac on a signed seat list. Listen stays off when this Mac is outside that list.
         var enforceSeats: Bool = false
+        /// Sold once, for one person. The organization line stays empty of a company name.
+        var personal: Bool = false
+        /// Personal keys include updates through this major version. Organization keys omit it.
+        var updatesThroughMajor: Int? = nil
+        /// Hardware UUIDs for a personal key. Empty means the key is not tied to a Mac.
+        var macs: [String] = []
 
         var licensedToLine: String {
             "Licensed to \(self.org)"
+        }
+
+        var coverageTitle: String {
+            self.personal ? "Personal license" : self.licensedToLine
         }
 
         func expiryLine(formatter: DateFormatter = Record.displayFormatter) -> String {
@@ -48,23 +58,32 @@ nonisolated enum CommercialLicense {
         case badSignature
         case wrongProduct
         case expired
+        case notYetValid
         case invalidRecord
         case notSaved
+        case outsideVersion(Int)
+        case wrongMac
 
         var errorDescription: String? {
             switch self {
             case .malformed:
-                return "That is not a connectingCaptions license key."
+                return "That is not a Connecting Captions Pro license key."
             case .badSignature:
                 return "That key is not signed for this app."
             case .wrongProduct:
-                return "That key is not for connectingCaptions."
+                return "That key is not for Connecting Captions Pro."
             case .expired:
                 return "That key has expired."
+            case .notYetValid:
+                return "That key is not active yet."
             case .invalidRecord:
                 return "That key is missing an organization, seats, or dates."
             case .notSaved:
                 return "The key checked out, but Keychain would not save it."
+            case let .outsideVersion(major):
+                return "That key includes updates for version \(major)."
+            case .wrongMac:
+                return "That key is for a different Mac."
             }
         }
     }
@@ -77,6 +96,9 @@ nonisolated enum CommercialLicense {
         var expires: String
         var sla: Bool?
         var enforceSeats: Bool?
+        var personal: Bool?
+        var major: Int?
+        var macs: [String]?
 
         enum CodingKeys: String, CodingKey {
             case product
@@ -86,6 +108,9 @@ nonisolated enum CommercialLicense {
             case expires
             case sla
             case enforceSeats
+            case personal
+            case major
+            case macs
         }
 
         func encode(to encoder: Encoder) throws {
@@ -97,6 +122,9 @@ nonisolated enum CommercialLicense {
             try container.encode(self.expires, forKey: .expires)
             try container.encodeIfPresent(self.sla, forKey: .sla)
             try container.encodeIfPresent(self.enforceSeats, forKey: .enforceSeats)
+            try container.encodeIfPresent(self.personal, forKey: .personal)
+            try container.encodeIfPresent(self.major, forKey: .major)
+            try container.encodeIfPresent(self.macs, forKey: .macs)
         }
 
         init(from decoder: Decoder) throws {
@@ -108,6 +136,9 @@ nonisolated enum CommercialLicense {
             self.expires = try container.decode(String.self, forKey: .expires)
             self.sla = try container.decodeIfPresent(Bool.self, forKey: .sla)
             self.enforceSeats = try container.decodeIfPresent(Bool.self, forKey: .enforceSeats)
+            self.personal = try container.decodeIfPresent(Bool.self, forKey: .personal)
+            self.major = try container.decodeIfPresent(Int.self, forKey: .major)
+            self.macs = try container.decodeIfPresent([String].self, forKey: .macs)
         }
 
         init(
@@ -117,7 +148,10 @@ nonisolated enum CommercialLicense {
             issued: String,
             expires: String,
             sla: Bool? = nil,
-            enforceSeats: Bool? = nil
+            enforceSeats: Bool? = nil,
+            personal: Bool? = nil,
+            major: Int? = nil,
+            macs: [String]? = nil
         ) {
             self.product = product
             self.org = org
@@ -126,6 +160,9 @@ nonisolated enum CommercialLicense {
             self.expires = expires
             self.sla = sla
             self.enforceSeats = enforceSeats
+            self.personal = personal
+            self.major = major
+            self.macs = macs
         }
     }
 
@@ -141,7 +178,9 @@ nonisolated enum CommercialLicense {
     static func verify(
         _ token: String,
         publicKey: Curve25519.Signing.PublicKey = productionPublicKey,
-        now: Date = Date()
+        now: Date = Date(),
+        appVersion: String = CommercialLicense.runningAppVersion,
+        machineID: String? = nil
     ) -> Result<Record, Failure> {
         let parts = token.trimmingCharacters(in: .whitespacesAndNewlines)
             .split(separator: ".", omittingEmptySubsequences: false)
@@ -157,10 +196,10 @@ nonisolated enum CommercialLicense {
         guard let wire = try? JSONDecoder().decode(Wire.self, from: payload) else {
             return .failure(.malformed)
         }
-        return self.record(from: wire, now: now)
+        return self.record(from: wire, now: now, appVersion: appVersion, machineID: machineID)
     }
 
-    static func record(from wire: Wire, now: Date = Date()) -> Result<Record, Failure> {
+    static func record(from wire: Wire, now: Date = Date(), appVersion: String = CommercialLicense.runningAppVersion, machineID: String? = nil) -> Result<Record, Failure> {
         let org = wire.org.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !org.isEmpty, wire.seats >= 1,
               let issued = self.day(from: wire.issued),
@@ -171,6 +210,26 @@ nonisolated enum CommercialLicense {
         guard wire.product == self.productID else {
             return .failure(.wrongProduct)
         }
+        let personal = wire.personal == true
+        if personal, !(1 ... 2).contains(wire.seats) || wire.sla == true || wire.enforceSeats == true {
+            return .failure(.invalidRecord)
+        }
+        let updatesThroughMajor = personal ? (wire.major ?? 1) : wire.major
+        if let updatesThroughMajor, updatesThroughMajor < 1 {
+            return .failure(.invalidRecord)
+        }
+        if personal, self.majorVersion(of: appVersion) > (updatesThroughMajor ?? 1) {
+            return .failure(.outsideVersion(updatesThroughMajor ?? 1))
+        }
+        let macs = (wire.macs ?? []).map(CommercialSeat.normalize)
+        if personal, !macs.isEmpty {
+            guard (1 ... 2).contains(macs.count), macs.count <= wire.seats, macs.allSatisfy(CommercialSeat.isSeatID) else {
+                return .failure(.invalidRecord)
+            }
+            if let machineID, !macs.contains(CommercialSeat.normalize(machineID)) {
+                return .failure(.wrongMac)
+            }
+        }
         let record = Record(
             product: wire.product,
             org: org,
@@ -178,8 +237,14 @@ nonisolated enum CommercialLicense {
             issued: issued,
             expires: expires,
             sla: wire.sla == true,
-            enforceSeats: wire.enforceSeats == true
+            enforceSeats: wire.enforceSeats == true,
+            personal: personal,
+            updatesThroughMajor: personal ? updatesThroughMajor : nil,
+            macs: personal ? macs : []
         )
+        if now < issued {
+            return .failure(.notYetValid)
+        }
         if now >= self.endOfDay(expires) {
             return .failure(.expired)
         }
@@ -194,8 +259,19 @@ nonisolated enum CommercialLicense {
             issued: self.dayString(record.issued),
             expires: self.dayString(record.expires),
             sla: record.sla ? true : nil,
-            enforceSeats: record.enforceSeats ? true : nil
+            enforceSeats: record.enforceSeats ? true : nil,
+            personal: record.personal ? true : nil,
+            major: record.personal ? (record.updatesThroughMajor ?? 1) : nil,
+            macs: record.macs.isEmpty ? nil : record.macs
         )
+    }
+
+    static var runningAppVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+    }
+
+    static func majorVersion(of version: String) -> Int {
+        Int(version.split(separator: ".").first ?? "") ?? 1
     }
 
     static func encodePayload(_ wire: Wire) throws -> Data {

@@ -277,6 +277,19 @@ final class TheaterSetupWizardTests: XCTestCase {
 
         XCTAssertTrue(TheaterReadiness.boardIdle.contains("Listen"))
         XCTAssertTrue(TheaterReadiness.boardListening.contains("Listening"))
+        XCTAssertEqual(TheaterReadiness.boardListeningTitle, "Listening")
+        XCTAssertEqual(
+            TheaterSecondShowAsChoice.resolved(stored: "ja", sourceID: "en", targetID: "ko"),
+            "ja"
+        )
+        XCTAssertEqual(
+            TheaterSecondShowAsChoice.resolved(stored: "ko", sourceID: "en", targetID: "ko"),
+            ""
+        )
+        XCTAssertEqual(
+            TheaterSecondShowAsChoice.resolved(stored: "en", sourceID: "en", targetID: "ko"),
+            ""
+        )
     }
 
     func testAppLanguageDefaultsToEnglishUntilTheWizardChooses() {

@@ -855,6 +855,26 @@ final class LiveTranslationQualityTests: XCTestCase {
                 sourceText: "안녕하세요."
             )
         )
+        XCTAssertEqual(
+            LiveTranslationCaptionGate.captionSafeForBoard(
+                "English: the model trained today.",
+                sourceText: source
+            ),
+            "English: the model trained today."
+        )
+        XCTAssertEqual(
+            LiveTranslationCaptionGate.captionSafeForBoard(
+                "\"Fuente: hola.\"",
+                sourceText: source
+            ),
+            "\"Fuente: hola.\""
+        )
+        XCTAssertNil(
+            LiveTranslationCaptionGate.captionSafeForBoard(
+                "Hello \u{FFF9}0\u{FFFA}",
+                sourceText: source
+            )
+        )
         XCTAssertFalse(
             LiveTranslationCaptionGate.looksLikeEngineError("The API key is stored locally on this Mac.")
         )

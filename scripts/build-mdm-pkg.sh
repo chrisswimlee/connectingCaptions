@@ -6,8 +6,8 @@ set -euo pipefail
 usage() {
     cat <<'EOF'
 Usage:
-  ./scripts/build-mdm-pkg.sh --app dist/Connecting Captions.app --output dist/connectingCaptions-mdm.pkg
-  ./scripts/build-mdm-pkg.sh --app dist/Connecting Captions.app --license ./license.key \
+  ./scripts/build-mdm-pkg.sh --app "dist/Connecting Captions Pro.app" --output dist/connectingCaptions-mdm.pkg
+  ./scripts/build-mdm-pkg.sh --app "dist/Connecting Captions Pro.app" --license ./license.key \
       --roster ./seats.roster --settings ./settings.fleet.json --output dist/connectingCaptions-mdm.pkg
 
 Installs the app in /Applications and, when given, these root-owned files:

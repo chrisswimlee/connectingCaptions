@@ -177,6 +177,7 @@ final class VoiceEngineSettingsViewModel: ObservableObject {
             if shouldRestore {
                 self.suppressSpeechProviderSync = true
                 self.settings.selectedSpeechModel = model
+                SpokenLanguageResolver.pinSpokenEngineToSource(settings: self.settings)
                 self.asr.resetTranscriptionProvider()
             }
             let granted = await MicrophoneAccess.authorize(updating: self.asr)

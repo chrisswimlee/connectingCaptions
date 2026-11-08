@@ -219,7 +219,7 @@ final class BackupService {
     func suggestedFilename(for date: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd_HH-mm"
-        return "connectingCaptions_Backup_\(formatter.string(from: date)).json"
+        return "\(ConnectingCaptionsProduct.displayName) Backup \(formatter.string(from: date)).json"
     }
 
     private func validate(_ document: AppBackupDocument) throws {

@@ -137,7 +137,22 @@ public enum LiveTranslationMT {
             engine: translator,
             kind: kind
         )
-        return TranslationGlossaryLock.restore(translated, tokens: protected.tokens)
+        let restored = TranslationGlossaryLock.restore(translated, tokens: protected.tokens)
+        if TranslationGlossaryLock.needsUnlockedFallback(
+            source: text,
+            rawTranslated: translated,
+            restored: restored,
+            tokens: protected.tokens
+        ) {
+            return try await self.translateWithRetry(
+                text,
+                source: source,
+                target: target,
+                engine: translator,
+                kind: kind
+            )
+        }
+        return restored
     }
 
     public static func translateWithRetry(

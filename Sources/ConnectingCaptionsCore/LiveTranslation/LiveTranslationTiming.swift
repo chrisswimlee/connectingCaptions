@@ -37,6 +37,8 @@ nonisolated public enum LiveTranslationTiming {
     public static let followAlongWords = 8
     /// Pause-finalize only this much so a long unpunctuated talk is not one dump.
     public static let maxLineWords = 12
+    /// Vietnamese tokens are syllables. Twelve of them is a short caption.
+    public static let maxLineWordsVietnamese = 18
     public static let maxLineCharacters = 80
     public static let contextSentenceCount = 4
     /// Recent lines the board can still show. A tall window fills from this

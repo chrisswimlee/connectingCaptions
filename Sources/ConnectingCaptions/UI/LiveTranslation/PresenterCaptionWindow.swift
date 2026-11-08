@@ -129,6 +129,7 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         if self.model.inboxOpenTail != inboxOpenTail {
             self.model.inboxOpenTail = inboxOpenTail
         }
+        TheaterSecondShowAs.shared.refresh()
     }
 
     func documentTextForDelivery() -> String {
@@ -150,6 +151,10 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
         if let pid = self.lastExternalAppPID {
             TypingService.activateApp(pid: pid)
         }
+    }
+
+    func clearExternalAppTarget() {
+        self.lastExternalAppPID = nil
     }
 
     func performChromeAction(_ action: () -> Void) {

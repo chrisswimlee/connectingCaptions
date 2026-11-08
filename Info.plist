@@ -2,14 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CCSeal</key>
+	<string>$(EARLY_INSTALL_SEAL_KEY)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Connecting Captions</string>
+	<string>Connecting Captions Pro</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleName</key>
-	<string>Connecting Captions</string>
+	<string>Connecting Captions Pro</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -23,14 +25,14 @@
 	<key>LSUIElement</key>
 	<false/>
 	<key>NSAccessibilityUsageDescription</key>
-	<string>Connecting Captions needs Accessibility permission to type Transcription into other apps. Theater captions on your screen do not require this.</string>
+	<string>Connecting Captions Pro needs Accessibility permission to type Transcription into other apps. Theater captions on your screen do not require this.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>Connecting Captions needs permission to control system events for managing launch at startup settings.</string>
+	<string>Connecting Captions Pro needs permission to control system events for managing launch at startup settings.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>© Chris Swim Lee. Licensed under GPLv3.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Connecting Captions needs microphone access to caption speech on this Mac. Audio stays on this Mac unless you opt in to a cloud AI provider.</string>
+	<string>Connecting Captions Pro needs microphone access to caption speech on this Mac. Audio stays on this Mac unless you opt in to a cloud AI provider.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Connecting Captions uses on-device speech recognition to transcribe your voice and translate it locally.</string>
+	<string>Connecting Captions Pro uses on-device speech recognition to transcribe your voice and translate it locally.</string>
 </dict>
 </plist>

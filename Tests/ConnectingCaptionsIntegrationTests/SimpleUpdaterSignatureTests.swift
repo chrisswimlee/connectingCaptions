@@ -107,7 +107,7 @@ final class SimpleUpdaterSignatureTests: XCTestCase {
 
     func testParsesCodesignTeamAndRejectsZipSlip() throws {
         let output = """
-        Executable=/tmp/Connecting Captions.app/Contents/MacOS/Connecting Captions
+        Executable=/tmp/Connecting Captions Pro.app/Contents/MacOS/Connecting Captions Pro
         Identifier=com.connectingcaptions.app
         Format=app bundle with Mach-O thin (arm64)
         TeamIdentifier=ABCD123456
@@ -125,12 +125,12 @@ final class SimpleUpdaterSignatureTests: XCTestCase {
 
         let work = FileManager.default.temporaryDirectory.appendingPathComponent("update-extract-\(UUID())")
         try FileManager.default.createDirectory(
-            at: work.appendingPathComponent("Connecting Captions.app"), withIntermediateDirectories: true
+            at: work.appendingPathComponent("Connecting Captions Pro.app"), withIntermediateDirectories: true
         )
         defer { try? FileManager.default.removeItem(at: work) }
         XCTAssertTrue(
             UpdateSignaturePolicy.isSafeExtractedApp(
-                work.appendingPathComponent("Connecting Captions.app"),
+                work.appendingPathComponent("Connecting Captions Pro.app"),
                 workDirectory: work
             )
         )
@@ -149,7 +149,7 @@ final class SimpleUpdaterSignatureTests: XCTestCase {
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        let app = work.appendingPathComponent("Connecting Captions.app")
+        let app = work.appendingPathComponent("Connecting Captions Pro.app")
         try FileManager.default.createSymbolicLink(at: app, withDestinationURL: target)
         XCTAssertFalse(UpdateSignaturePolicy.isSafeExtractedApp(app, workDirectory: work))
         XCTAssertNil(UpdateSignaturePolicy.selectSoleTopLevelApp(in: work))
@@ -166,8 +166,8 @@ final class SimpleUpdaterSignatureTests: XCTestCase {
     }
 
     func testRollbackPreservesInstalledAppPathWhileUpdatesCanRename() {
-        let installed = URL(fileURLWithPath: "/Applications/Connecting Captions.app")
-        let backup = URL(fileURLWithPath: "/tmp/Connecting Captions-1.6.10-123456.app")
+        let installed = URL(fileURLWithPath: "/Applications/Connecting Captions Pro.app")
+        let backup = URL(fileURLWithPath: "/tmp/Connecting Captions Pro-1.6.10-123456.app")
         XCTAssertEqual(
             SimpleUpdater.installationDestination(installedAppURL: installed, downloadedAppURL: backup, isRollback: true),
             installed

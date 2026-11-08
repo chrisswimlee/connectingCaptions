@@ -8,7 +8,7 @@ Please report vulnerabilities against the current `main` branch of connectingCap
 
 Do not open a public issue for a security report.
 
-Email [suyoung.lee99@gmail.com](mailto:suyoung.lee99@gmail.com) with:
+Email [support@local-host.ai](mailto:support@local-host.ai) with:
 
 - A description of the issue and its impact
 - Steps to reproduce, or a proof of concept if you have one
@@ -41,7 +41,7 @@ The app is **unsandboxed**. Theater and dictation need the microphone — that i
 Automatic updates only install a zip that:
 
 - matches `SHA256SUMS` on the GitHub Release
-- contains a single top-level `Connecting Captions.app`
+- contains a single top-level `Connecting Captions Pro.app`
 - passes `codesign --verify --deep --strict`
 - uses bundle id `com.connectingcaptions.app`
 - is signed with a usable Developer ID team, not ad-hoc or `not set`

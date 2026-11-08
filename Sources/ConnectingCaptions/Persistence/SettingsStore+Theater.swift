@@ -32,6 +32,16 @@ extension SettingsStore {
         static let setupWizardCompleted = "TheaterSetupWizardCompleted"
         static let setupWizardStep = "TheaterSetupWizardStep"
         static let setupWizardOpened = "TheaterSetupWizardOpened"
+        static let secondShowAs = "TheaterSecondShowAsLanguageID"
+        static let secondShowAsFrame = "TheaterSecondShowAsFrame"
+        static let pasteTranslateFrame = "TheaterPasteTranslateFrame"
+    }
+
+    /// The board snapshot was written and never read back. Drop a leftover once.
+    func removeTheaterBoardSnapshot() {
+        guard self.defaults.object(forKey: Keys.theaterBoardSnapshot) != nil else { return }
+        objectWillChange.send()
+        self.defaults.removeObject(forKey: Keys.theaterBoardSnapshot)
     }
 
     var theaterSessionMode: TheaterSessionMode {
@@ -50,6 +60,60 @@ extension SettingsStore {
             objectWillChange.send()
             self.defaults.set(newValue, forKey: TheaterDefaults.lastTranslateTarget)
         }
+    }
+
+    /// A second Show-as window. Empty means off. A stored language that matches
+    /// I speak or Show as stays stored and reads as off until the pair moves.
+    var theaterSecondShowAsLanguageID: String {
+        get {
+            TheaterSecondShowAsChoice.resolved(
+                stored: self.defaults.string(forKey: TheaterDefaults.secondShowAs) ?? "",
+                sourceID: self.translationSourceLanguageID,
+                targetID: self.translationTargetLanguageID
+            )
+        }
+        set {
+            let id = TranslationLanguageCatalog.language(id: newValue)?.id ?? ""
+            let stored = self.defaults.string(forKey: TheaterDefaults.secondShowAs) ?? ""
+            if stored == id { return }
+            objectWillChange.send()
+            if id.isEmpty {
+                self.defaults.removeObject(forKey: TheaterDefaults.secondShowAs)
+            } else {
+                self.defaults.set(id, forKey: TheaterDefaults.secondShowAs)
+            }
+        }
+    }
+
+    /// Last frame of the second Show-as window, as `x,y,width,height`.
+    var theaterSecondShowAsFrame: String {
+        get { self.defaults.string(forKey: TheaterDefaults.secondShowAsFrame) ?? "" }
+        set {
+            if self.defaults.string(forKey: TheaterDefaults.secondShowAsFrame) == newValue { return }
+            self.defaults.set(newValue, forKey: TheaterDefaults.secondShowAsFrame)
+        }
+    }
+
+    /// Last frame of the Paste & Translate window, as `x,y,width,height`.
+    var theaterPasteTranslateFrame: String {
+        get { self.defaults.string(forKey: TheaterDefaults.pasteTranslateFrame) ?? "" }
+        set {
+            if self.defaults.string(forKey: TheaterDefaults.pasteTranslateFrame) == newValue { return }
+            self.defaults.set(newValue, forKey: TheaterDefaults.pasteTranslateFrame)
+        }
+    }
+
+    /// Drops a second language that has become I speak or Show as.
+    func clearCollidingSecondShowAs() {
+        let stored = self.defaults.string(forKey: TheaterDefaults.secondShowAs) ?? ""
+        guard TranslationLanguageCatalog.language(id: stored) != nil else { return }
+        let resolved = TheaterSecondShowAsChoice.resolved(
+            stored: stored,
+            sourceID: self.translationSourceLanguageID,
+            targetID: self.translationTargetLanguageID
+        )
+        guard resolved.isEmpty else { return }
+        self.theaterSecondShowAsLanguageID = ""
     }
 
     var theaterMinimized: Bool {

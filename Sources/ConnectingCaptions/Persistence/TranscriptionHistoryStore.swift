@@ -768,9 +768,13 @@ final class TranscriptionHistoryStore: ObservableObject {
             NSLocale.currentLocaleDidChangeNotification, NSApplication.didBecomeActiveNotification,
         ]
         self.calendarObservers = names.map { name in
-            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] notification in
                 Task { @MainActor [weak self] in
-                    self?.refreshTodaySummaryForCalendarChange()
+                    guard let self else { return }
+                    if notification.name == NSApplication.didBecomeActiveNotification, self.persistenceError != nil {
+                        self.retryPersistence()
+                    }
+                    self.refreshTodaySummaryForCalendarChange()
                 }
             }
         }

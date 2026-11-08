@@ -4,6 +4,12 @@ All notable changes to connectingCaptions are documented in this file.
 
 ## [Unreleased]
 
+- A pause no longer keeps the speech model running. A late microphone packet was counted as speech that just started, so Listen kept decoding through the quiet.
+- Release 1.6.16 does not ask for a key. Listen is not limited to 14 days, and the first Listen does not start that clock. A work license can still be pasted in Settings when an organization owns the Mac. A Mac outside that key's seat list does not listen. An earlier download can still say the copy is free and offer Share and Donate. That seal is not required for Listen.
+- An empty board says Listening at caption size while the microphone is on.
+- Also show puts this Listen on another screen in one more language.
+- Talk notes can import a Keynote file.
+
 ## [1.6.16] — 2026-10-16
 
 ### Theater and setup

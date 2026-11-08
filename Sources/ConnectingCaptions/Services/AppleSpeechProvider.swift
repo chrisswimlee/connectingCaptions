@@ -96,6 +96,7 @@ final class AppleSpeechProvider: TranscriptionProvider {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = false // We want the final result for this chunk
         request.requiresOnDeviceRecognition = true
+        request.contextualStrings = Array(TranslationGlossary.protectedTerms().prefix(100))
         request.append(buffer)
         request.endAudio() // Signal that this buffer is the complete utterance for this request
 
@@ -109,9 +110,12 @@ final class AppleSpeechProvider: TranscriptionProvider {
 
                 if let error = error {
                     hasResumed = true
-                    // Ignore "No speech detected" errors often returned for silent chunks
-                    DebugLogger.shared.warning("Apple transcribed error: \(DiagnosticMetadata.error(error))", source: "AppleSpeechProvider")
-                    continuation.resume(returning: ASRTranscriptionResult(text: "", confidence: 0.0))
+                    if Self.isBenignNoSpeech(error) {
+                        continuation.resume(returning: ASRTranscriptionResult(text: "", confidence: 0.0))
+                    } else {
+                        DebugLogger.shared.warning("Apple transcribed error: \(DiagnosticMetadata.error(error))", source: "AppleSpeechProvider")
+                        continuation.resume(throwing: error)
+                    }
                     return
                 }
 
@@ -130,6 +134,13 @@ final class AppleSpeechProvider: TranscriptionProvider {
     }
 
     // MARK: - Helpers
+
+    private static func isBenignNoSpeech(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        let nsError = error as NSError
+        guard nsError.domain == "kAFAssistantErrorDomain" else { return false }
+        return nsError.code == 1110 || nsError.code == 203 || nsError.code == 216
+    }
 
     private func updateRecognizerIfNeeded() -> SFSpeechRecognizer? {
         let locale = self.theaterSpeechLocale()

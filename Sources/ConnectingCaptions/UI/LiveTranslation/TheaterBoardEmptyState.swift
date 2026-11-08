@@ -20,6 +20,7 @@ struct TheaterBoardEmptyState: View {
     var spokenOpacity: Double = 0.5
     var isWarning: Bool = false
     var accessibilityIdentifier: String = "theater.board.empty"
+    var accessibilityText: String? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -53,7 +54,7 @@ struct TheaterBoardEmptyState: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(self.accessibilityIdentifier)
-        .accessibilityLabel(self.message)
+        .accessibilityLabel(self.accessibilityText ?? self.message)
     }
 }
 

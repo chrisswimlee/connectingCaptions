@@ -10,6 +10,9 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
     @Published private(set) var isSessionActive = false
     @Published private(set) var isPaused = false
     @Published private(set) var listenKind: TranslationListenKind?
+    /// Where this caption Listen should appear. Home and menus store `.theater`.
+    /// The shortcut stores the user's Caption Listen setting.
+    @Published private(set) var captionPresentation: CaptionPresentation = .theater
     /// Bumps when Copy writes the pasteboard, so chrome can say Copied.
     @Published private(set) var copyFlashToken = 0
     @Published private(set) var packAvailability: TranslationPackAvailability = .unknown
@@ -104,6 +107,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.isSessionActive = true
         self.isPaused = false
         self.listenKind = kind
+        KeywordAnchorSession.shared.capture()
         let trace = LiveTranslationSessionTrace(
             token: self.sessionToken,
             kind: kind.rawValue,
@@ -125,9 +129,13 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.warmAppleTranslation()
         TheaterHaptics.alignment()
         // A minimized (hidden) panel must come back for a new talk.
-        if kind == .captions,
-           !SettingsStore.shared.theaterWindowEnabled || SettingsStore.shared.theaterMinimized
-        {
+        // Quick capture stays on the chip and does not open Theater.
+        if CaptionListenRoute.shouldOpenTheaterOnBegin(
+            kind: kind,
+            presentation: self.captionPresentation,
+            windowEnabled: SettingsStore.shared.theaterWindowEnabled,
+            minimized: SettingsStore.shared.theaterMinimized
+        ) {
             PresenterCaptionController.shared.setVisible(true)
         }
         self.refreshPresenter()
@@ -181,7 +189,9 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
     func handlePartial(_ text: String) {
         guard self.isSessionActive else { return }
         self.updateTrace { $0.partials += 1 }
-        self.subscriber.handlePartial(text)
+        let languageID = SpokenLanguageResolver.listenLanguageID(for: text)
+        let anchored = KeywordAnchorSession.shared.apply(text, languageID: languageID)
+        self.subscriber.handlePartial(anchored)
         if self.listenKind == .insert {
             NotchOverlayManager.shared.updateTranscriptionText(self.overlayText)
         }
@@ -500,9 +510,15 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.trace("translation warm done pair=\(source.id)>\(target.id) elapsedMs=\(elapsedMs)")
     }
 
-    func startCaptionListening() {
+    func startCaptionListening(presentation: CaptionPresentation = .theater) {
+        self.captionPresentation = presentation
         if self.isSessionActive, self.listenKind == .captions {
             self.trace(LiveTranslationTrace.event("listen skip", token: self.sessionToken, "reason=alreadyActive kind=captions"), level: .debug)
+            return
+        }
+        if let blocked = SettingsStore.shared.blockListenStart() {
+            self.trace("listen blocked reason=license", level: .info)
+            self.reportListenFailure(blocked)
             return
         }
         guard !self.isStartingListen else {
@@ -539,8 +555,15 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
     }
 
     func startInsertListening() {
+        self.captionPresentation = .theater
         if self.isSessionActive, self.listenKind == .insert {
             self.trace(LiveTranslationTrace.event("listen skip", token: self.sessionToken, "reason=alreadyActive kind=insert"), level: .debug)
+            return
+        }
+        if let blocked = SettingsStore.shared.blockListenStart() {
+            self.trace("listen blocked reason=license kind=insert", level: .info)
+            self.reportListenFailure(blocked)
+            QuickTranslateInsertController.presentNotice(blocked)
             return
         }
         guard !self.isStartingListen else {
@@ -557,6 +580,16 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
     }
 
     func toggleCaptionListening() {
+        self.toggleCaptionListening(fromShortcut: false)
+    }
+
+    /// Caption Listen shortcut, including Control-Option-L.
+    /// Home, the menu bar, and the Theater menu keep `toggleCaptionListening()`.
+    func toggleCaptionListeningFromShortcut() {
+        self.toggleCaptionListening(fromShortcut: true)
+    }
+
+    private func toggleCaptionListening(fromShortcut: Bool) {
         if self.isFinishingSession {
             self.trace(LiveTranslationTrace.event("listen skip", token: self.sessionToken, "reason=finishing"), level: .debug)
             return
@@ -565,14 +598,26 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
             self.stopListening()
             return
         }
+        let presentation = CaptionListenRoute.presentation(
+            invokedFromShortcut: fromShortcut,
+            setting: SettingsStore.shared.captionListenOpens
+        )
+        self.captionPresentation = presentation
         guard TheaterAvailability.isSupported else {
             self.trace("listen failed reason=unsupported", level: .warning)
             self.subscriber.reportFailure(TheaterAvailability.unsupportedCopy)
             self.refreshPresenter()
+            if presentation == .quickCapture {
+                QuickCaptureController.shared.arm()
+            }
             return
         }
-        PresenterCaptionController.shared.setVisible(true)
-        self.startCaptionListening()
+        if CaptionListenRoute.showsTheaterWindow(presentation) {
+            PresenterCaptionController.shared.setVisible(true)
+        } else {
+            QuickCaptureController.shared.arm()
+        }
+        self.startCaptionListening(presentation: presentation)
     }
 
     func ensureReadyToListen() async -> Bool {
@@ -672,6 +717,9 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.trace("listen failed \(message)", level: .warning)
         self.subscriber.reportFailure(message)
         self.refreshPresenter()
+        if self.captionPresentation == .quickCapture, self.listenKind != .insert {
+            QuickCaptureController.shared.arm()
+        }
     }
 
     func reportListenStatus(_ message: String, kind: TheaterStatusKind) {
@@ -768,8 +816,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
 
     func persistBoard() {
         self.subscriber.flushArchive()
-        let snapshot = self.subscriber.snapshot()
-        SettingsStore.shared.theaterBoardSnapshot = snapshot.entries.isEmpty ? nil : snapshot
+        SettingsStore.shared.removeTheaterBoardSnapshot()
         self.subscriber.persistLastLatency()
     }
 

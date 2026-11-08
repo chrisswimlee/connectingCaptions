@@ -12,9 +12,7 @@ import Foundation
 public enum LiveTranslationCaptionGate {
     /// Empty or provider-error text must never become a Theater line.
     public static func captionSafeForBoard(_ candidate: String, sourceText: String) -> String? {
-        let cleaned = Self.strippingCaptionPrefix(
-            candidate.trimmingCharacters(in: .whitespacesAndNewlines)
-        )
+        let cleaned = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
         if cleaned.isEmpty { return nil }
         if Self.looksLikeEngineError(cleaned) { return nil }
         if LiveTranslationCommitContext.containsContextClauseMark(cleaned),
@@ -22,6 +20,7 @@ public enum LiveTranslationCaptionGate {
         {
             return nil
         }
+        if TranslationGlossaryLock.containsLockArtifact(cleaned) { return nil }
         return cleaned
     }
 

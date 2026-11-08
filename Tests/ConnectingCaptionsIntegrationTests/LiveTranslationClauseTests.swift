@@ -1362,7 +1362,7 @@ final class LiveTranslationClauseTests: XCTestCase {
         controller.subscriber.seedCommittedForTesting(source: "Hello.", translated: "안녕.")
         controller.persistBoard()
         XCTAssertEqual(controller.subscriber.committedLines, ["안녕."])
-        XCTAssertNotNil(SettingsStore.shared.theaterBoardSnapshot)
+        XCTAssertNil(SettingsStore.shared.theaterBoardSnapshot)
         XCTAssertTrue(controller.hasClearableBoard)
 
         controller.clearBoard()
@@ -1387,7 +1387,7 @@ final class LiveTranslationClauseTests: XCTestCase {
         controller.subscriber.seedCommittedForTesting(source: "Yesterday.", translated: "어제.")
         controller.persistBoard()
         XCTAssertEqual(controller.subscriber.committedLines, ["어제."])
-        XCTAssertNotNil(SettingsStore.shared.theaterBoardSnapshot)
+        XCTAssertNil(SettingsStore.shared.theaterBoardSnapshot)
 
         controller.beginSession(kind: .captions)
         XCTAssertTrue(controller.subscriber.committedLines.isEmpty)
@@ -1409,7 +1409,7 @@ final class LiveTranslationClauseTests: XCTestCase {
         controller.subscriber.reset()
         controller.subscriber.seedCommittedForTesting(source: "Crash leftover.", translated: "남은 자막.")
         controller.persistBoard()
-        XCTAssertNotNil(SettingsStore.shared.theaterBoardSnapshot)
+        XCTAssertNil(SettingsStore.shared.theaterBoardSnapshot)
 
         controller.startFreshTheaterBoard()
         XCTAssertTrue(controller.subscriber.committedLines.isEmpty)
@@ -1500,28 +1500,49 @@ final class LiveTranslationClauseTests: XCTestCase {
         )
 
         let andRun = "Today we trained the model and then we applied it to production data today"
+        XCTAssertNil(
+            TranslationClauseSegmenter.nextCommitUnit(
+                andRun,
+                languageID: "en",
+                allowPauseFinalize: false
+            )
+        )
         let andCut = TranslationClauseSegmenter.nextCommitUnit(
             andRun,
             languageID: "en",
-            allowPauseFinalize: false
+            allowPauseFinalize: true
         )
         XCTAssertTrue(andCut?.unit.contains(" and ") ?? false)
         XCTAssertFalse(andCut?.rest.hasPrefix("and") ?? true)
 
         let butRun = "Today we trained the model but then we applied it to production data today"
+        XCTAssertNil(
+            TranslationClauseSegmenter.nextCommitUnit(
+                butRun,
+                languageID: "en",
+                allowPauseFinalize: false
+            )
+        )
         let butCut = TranslationClauseSegmenter.nextCommitUnit(
             butRun,
             languageID: "en",
-            allowPauseFinalize: false
+            allowPauseFinalize: true
         )
         XCTAssertTrue(butCut?.unit.contains(" but ") ?? false)
         XCTAssertFalse(butCut?.rest.hasPrefix("but") ?? true)
 
         let soRun = "Today we trained the model so then we applied it to production data today"
+        XCTAssertNil(
+            TranslationClauseSegmenter.nextCommitUnit(
+                soRun,
+                languageID: "en",
+                allowPauseFinalize: false
+            )
+        )
         let soCut = TranslationClauseSegmenter.nextCommitUnit(
             soRun,
             languageID: "en",
-            allowPauseFinalize: false
+            allowPauseFinalize: true
         )
         XCTAssertTrue(soCut?.unit.contains(" so ") ?? false)
         XCTAssertFalse(soCut?.rest.hasPrefix("so") ?? true)
@@ -1683,6 +1704,21 @@ final class LiveTranslationClauseTests: XCTestCase {
         XCTAssertFalse(TranslationClauseSegmenter.looksComplete("ไปเลยจ้ะ", languageID: "th"))
         XCTAssertFalse(TranslationClauseSegmenter.looksComplete("เอาล่ะ", languageID: "th"))
         XCTAssertTrue(TranslationClauseSegmenter.isInternalBoundary("ไปเลยจ้ะ", languageID: "th"))
+        XCTAssertTrue(TranslationClauseSegmenter.looksComplete("ไปด้วยกันไหม", languageID: "th"))
+        XCTAssertTrue(TranslationClauseSegmenter.endsWithTerminalPunctuation("هل فهمت؟"))
+        XCTAssertTrue(TranslationClauseSegmenter.endsWithTerminalPunctuation("समझ गए।"))
+        XCTAssertTrue(TranslationClauseSegmenter.isVerbFinalLanguage("hi"))
+        XCTAssertTrue(TranslationClauseSegmenter.isVerbFinalLanguage("tr"))
+        XCTAssertFalse(
+            TranslationClauseSegmenter.continuesAsNewSentence("Der Mann kam heute.", languageID: "de")
+        )
+        XCTAssertTrue(
+            TranslationClauseSegmenter.continuesAsNewSentence(
+                "Der Mann kam heute.",
+                languageID: "de",
+                prefix: "Wir gingen."
+            )
+        )
     }
 
     func testCompleteKoreanSentenceIsNotLineCut() {
@@ -2309,6 +2345,14 @@ final class TheaterSentenceEndCommitTests: XCTestCase {
         }
         settings.translationSourceLanguageID = "en"
         settings.translationTargetLanguageID = "ko"
+        let originalDictionary = settings.customDictionaryEntries
+        let originalPack = settings.theaterTalkPackTerms
+        defer {
+            settings.customDictionaryEntries = originalDictionary
+            settings.theaterTalkPackTerms = originalPack
+        }
+        settings.customDictionaryEntries = []
+        settings.theaterTalkPackTerms = []
         let engine = FakeTranslationEngine()
         engine.result = .success("환영합니다.")
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")

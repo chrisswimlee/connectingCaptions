@@ -18,7 +18,9 @@ enum TheaterCaptionFlow {
                 source: failed ? "" : row.source.trimmingCharacters(in: .whitespacesAndNewlines),
                 isCurrent: index == history.last?.offset,
                 isDraft: false,
-                failed: failed
+                failed: failed,
+                sourceLanguageID: row.sourceLanguageID,
+                targetLanguageID: row.targetLanguageID
             )
         }
         guard let limit, limit > 0, mapped.count > limit else { return mapped }

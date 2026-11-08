@@ -128,7 +128,9 @@ struct WelcomeView: View {
                     }
                 }
 
-                if self.settings.isCommerciallyLicensed || self.settings.commercialLicenseRecord != nil {
+                if self.settings.isCommerciallyLicensed
+                    || self.settings.commercialLicenseRecord != nil
+                    || self.settings.keepsEarlierCopy {
                     CommercialLicenseStatusCard()
                 }
             }

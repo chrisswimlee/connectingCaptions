@@ -261,14 +261,34 @@ final class TheaterSpokenDelivery {
 
     static func lookupVoice(for languageID: String) -> AVSpeechSynthesisVoice? {
         let code = TranslationLanguageCatalog.language(id: languageID)?.appleLanguageCode ?? languageID
+        let prefix = TranslationClauseSegmenter.languageCode(from: code)
+        let preferences = Self.preferredVoiceIdentifiers[prefix] ?? [code]
+        for identifier in preferences {
+            if let voice = AVSpeechSynthesisVoice(language: identifier) {
+                return voice
+            }
+        }
         if let voice = AVSpeechSynthesisVoice(language: code) {
             return voice
         }
-        let prefix = code.lowercased()
-        return AVSpeechSynthesisVoice.speechVoices().first {
-            $0.language.lowercased().hasPrefix(prefix)
+        return AVSpeechSynthesisVoice.speechVoices().first { voice in
+            let language = voice.language.lowercased()
+            if prefix == "zh" {
+                return language.hasPrefix("zh-cn") || language.hasPrefix("zh-tw")
+            }
+            return language.hasPrefix(prefix)
         }
     }
+
+    private static let preferredVoiceIdentifiers: [String: [String]] = [
+        "zh": ["zh-CN", "zh-TW"],
+        "pt": ["pt-BR", "pt-PT"],
+        "en": ["en-US", "en-GB"],
+        "es": ["es-ES", "es-MX", "es-US"],
+        "fr": ["fr-FR", "fr-CA"],
+        "de": ["de-DE", "de-AT"],
+        "ar": ["ar-SA"],
+    ]
 
     private func pump() {
         guard !self.isDrainingPlayback,

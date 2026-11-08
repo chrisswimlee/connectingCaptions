@@ -58,9 +58,10 @@ struct LiveTranslationHomeView: View {
                         .accessibilityIdentifier("theater.home.advanced")
                     }
                 }
-                if self.settings.isCommerciallyLicensed || self.settings.commercialLicenseRecord != nil {
-                    CommercialLicenseStatusCard(compact: true)
-                }
+                CommercialLicenseStatusCard(
+                    showsKeyField: ListenAccess.releaseAsksForKey && !self.settings.isCommerciallyLicensed,
+                    compact: self.settings.isCommerciallyLicensed
+                )
             }
             .fluidPageContent()
             .onAppear {
@@ -154,10 +155,12 @@ struct LiveTranslationHomeView: View {
         ) {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 8) {
+                    OpenPasteTranslateButton()
                     OpenTheaterButton()
                     TheaterListenButton()
                 }
                 VStack(alignment: .trailing, spacing: 6) {
+                    OpenPasteTranslateButton()
                     OpenTheaterButton()
                     TheaterListenButton()
                 }
@@ -622,6 +625,9 @@ struct TranslationLanguagePairCard: View {
             FluidSectionHeader(title: AppLanguage.text("Languages"), systemImage: "globe")
                 .accessibilityIdentifier("theater.languages")
             self.languagePairRow
+            if self.settings.theaterSessionMode == .translation {
+                TheaterSecondShowAsMenu()
+            }
             self.engineHint
             if self.settings.theaterSessionMode == .translation {
                 Label(AppLanguage.format("{0} · {1}", SpokenLanguageResolver.pairLabel(), self.pairStatus.title),
@@ -874,6 +880,31 @@ struct TranslateListenShortcutCard: View {
                     .disabled(self.settings.captionListenHotkeyShortcut == nil && !self.settings.captionListenHotkeyEnabled)
                     .accessibilityLabel(AppLanguage.text("Enable Theater Listen shortcut"))
                 }
+
+                TheaterSettingRow(
+                    title: AppLanguage.text("Caption Listen shortcut opens"),
+                    detail: AppLanguage.text("Quick capture is a small caption chip. It does not open Theater.")
+                ) {
+                    Picker(AppLanguage.text("Caption Listen shortcut opens"), selection: Binding(
+                        get: { self.settings.captionListenOpens },
+                        set: { self.settings.captionListenOpens = $0 }
+                    )) {
+                        Text(AppLanguage.text("Theater")).tag(CaptionPresentation.theater)
+                        Text(AppLanguage.text("Quick capture")).tag(CaptionPresentation.quickCapture)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .accessibilityLabel(AppLanguage.text("Caption Listen shortcut opens"))
+                }
+
+                AppText("Put one keyword on each line in a text file. Use -> when a mishearing should become a specific word.")
+                    .font(self.theme.typography.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                AppButton("Show Keywords folder") {
+                    KeywordAnchorFolder.reveal()
+                }
+                .buttonStyle(.theaterText)
 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 10) {

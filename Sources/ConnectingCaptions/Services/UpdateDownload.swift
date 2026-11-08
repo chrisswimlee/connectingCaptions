@@ -8,7 +8,7 @@ enum UpdateAssetSelection {
     static let legacyBundleIdentifier = "com.fluidsubtitles.app"
 
     /// That build is already at the latest version number and still has the old identifier.
-    /// Install the Connecting Captions zip anyway so the next launch is the current app.
+    /// Install the Connecting Captions Pro zip anyway so the next launch is the current app.
     static func installsDespiteSameVersion(runningBundleIdentifier: String?) -> Bool {
         runningBundleIdentifier == self.legacyBundleIdentifier
     }

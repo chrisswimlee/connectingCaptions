@@ -203,7 +203,7 @@ enum SettingsSearchIndex {
                 "menu bar theater font size plate theme position overlay tools",
                 "screen share screenshots zoom meet slides window capture projector OBS",
                 "high contrast show original text window style",
-                "talk notes notes pdf pptx powerpoint deck rtf markdown json glossary names",
+                "talk notes notes pdf pptx powerpoint keynote deck rtf markdown json glossary names",
                 "pace cue teleprompter behind caught up last print",
                 "voice transcription translate mode",
             ]
@@ -240,7 +240,7 @@ enum SettingsSearchIndex {
         .init(
             target: .launchAtStartup,
             title: AppLanguage.text("Launch at startup"),
-            terms: ["Automatically start connectingCaptions when you log in", "login startup boot open"]
+            terms: ["Automatically start Connecting Captions Pro when you log in", "login startup boot open"]
         ),
         .init(
             target: .showWindowAtLogin,
@@ -264,7 +264,7 @@ enum SettingsSearchIndex {
             terms: [
                 "license commercial enterprise SLA IT legal procurement named organization",
                 "for work email to buy licensed to activation key air-gapped",
-                "price $60 seat Mac year SLA MDM Jamf Fleet pkg",
+                "price $49 $240 $120 school seat Mac year SLA MDM Jamf Fleet pkg buy personal key",
                 "seat list Jamf Fleet MDM pkg audit log caption policy activity log backup restore",
             ]
         ),

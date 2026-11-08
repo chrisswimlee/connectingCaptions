@@ -19,11 +19,17 @@ extension SettingsStore {
             license: record,
             rosterToken: FleetManagedDirectory.rosterToken(),
             seatID: self.commercialSeatID,
-            publicKey: Self.licenseVerifyingKey
+            publicKey: Self.licenseVerifyingKey,
+            now: self.licenseClockNow
         )
     }
 
     func commercialCoverageLine(for record: CommercialLicense.Record) -> String {
+        if record.personal {
+            let macs = record.seats == 1 ? "One Mac you own." : "Up to two Macs you own."
+            let major = record.updatesThroughMajor ?? 1
+            return "\(macs) Updates for version \(major)."
+        }
         var line = "\(record.seats) seats. \(record.expiryLine())"
         if record.sla {
             line += " Written SLA."

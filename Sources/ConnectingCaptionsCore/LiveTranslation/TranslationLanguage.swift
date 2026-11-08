@@ -28,7 +28,7 @@ public enum TranslationLanguageCatalog {
     public static let japanese = TranslationLanguage(id: "ja", displayName: "Japanese", appleLanguageCode: "ja")
     public static let thai = TranslationLanguage(id: "th", displayName: "Thai", appleLanguageCode: "th")
     public static let arabic = TranslationLanguage(id: "ar", displayName: "Arabic", appleLanguageCode: "ar")
-    public static let chinese = TranslationLanguage(id: "zh", displayName: "Chinese", appleLanguageCode: "zh")
+    public static let chinese = TranslationLanguage(id: "zh", displayName: "Chinese (Mandarin)", appleLanguageCode: "zh")
     public static let dutch = TranslationLanguage(id: "nl", displayName: "Dutch", appleLanguageCode: "nl")
     public static let french = TranslationLanguage(id: "fr", displayName: "French", appleLanguageCode: "fr")
     public static let german = TranslationLanguage(id: "de", displayName: "German", appleLanguageCode: "de")
@@ -46,8 +46,10 @@ public enum TranslationLanguageCatalog {
     /// Languages both Apple Translation and a Voice Engine can use.
     /// Korean and Japanese work with Apple Speech, Cohere, or Whisper.
     /// Thai works best with Apple Speech or Whisper; Nemotron Thai is experimental.
-    /// Chinese is Apple's Simplified `zh`. Traditional locales share that language.
-    /// Danish, Finnish, Hebrew, Malay, Norwegian, and Swedish are deliberately absent:
+    /// Chinese is Apple's Mandarin `zh`. Traditional locales share that language.
+    /// Cantonese is absent: offering it as Chinese would transcribe and translate
+    /// the wrong language. Danish, Finnish, Hebrew, Malay, Norwegian, and Swedish
+    /// are deliberately absent:
     /// Apple's on-device Translation framework reports every pairing for these as
     /// unsupported (verified against `LanguageAvailability`), even though Apple Speech
     /// can transcribe them. Advertising them as caption/translation languages would be

@@ -25,6 +25,22 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
 
     private(set) var isReady: Bool = false
     var shouldClearCacheAfterCancellation: Bool { false }
+    var streamingPreviewMode: StreamingPreviewMode { .incrementalDelta }
+    var acceptedStreamingSampleCount: Int? { self.streamedSampleCount }
+
+    private var streamedSampleCount = 0
+    private var streamingAnalyzer: SpeechAnalyzer?
+    private var streamingContinuation: AsyncStream<AnalyzerInput>.Continuation?
+    private var streamingResultsTask: Task<Void, Never>?
+    private var streamingCommitted = ""
+    private var streamingVolatile = ""
+    private var streamingText = ""
+    private var streamingResultGeneration = 0
+    private var streamingFailure: Error?
+    private var streamingLocaleID = ""
+    private var streamingEpoch: UInt64 = 0
+    private var streamingResultsOpen = false
+    private let streamingLock = NSLock()
 
     /// Buffer converter for audio format conversion
     private var converter: BufferConverter?
@@ -62,11 +78,7 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
         // 3. Check if model is installed, download if needed
         let installedLocales = await SpeechTranscriber.installedLocales
         try Task.checkCancellation()
-        let isInstalled = installedLocales.contains {
-            self.normalizedIdentifier(for: $0).caseInsensitiveCompare(localeID) == .orderedSame
-                || VoiceEngineLanguageCatalog.languagePrefix(self.normalizedIdentifier(for: $0))
-                    == VoiceEngineLanguageCatalog.languagePrefix(localeID)
-        }
+        let isInstalled = self.localeIsInstalled(localeID, in: installedLocales)
 
         if !isInstalled {
             DebugLogger.shared.info("Downloading speech model for locale: \(localeID)", source: "AppleSpeechAnalyzerProvider")
@@ -121,6 +133,93 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
 
     func invalidateIfListeningLanguageChanged() {
         self.discardPreparedLocaleIfItDoesNotMatchISpeak()
+        self.streamingLocaleID = ""
+    }
+
+    func resetStreamingSession() async {
+        self.streamingLock.lock()
+        self.streamingEpoch += 1
+        self.streamingResultsOpen = false
+        self.streamingLock.unlock()
+        self.streamingContinuation?.finish()
+        self.streamingContinuation = nil
+        let results = self.streamingResultsTask
+        self.streamingResultsTask = nil
+        results?.cancel()
+        if let analyzer = self.streamingAnalyzer {
+            await analyzer.cancelAndFinishNow()
+        }
+        self.streamingAnalyzer = nil
+        _ = await results?.value
+        self.streamedSampleCount = 0
+        self.streamingLock.lock()
+        self.streamingCommitted = ""
+        self.streamingVolatile = ""
+        self.streamingText = ""
+        self.streamingResultGeneration = 0
+        self.streamingFailure = nil
+        self.streamingLock.unlock()
+        self.streamingLocaleID = ""
+    }
+
+    /// Confirmation and other one-shot buffers. The live cursor stays where the
+    /// ring left it; this call does not feed the incremental session.
+    func transcribeStreaming(_ samples: [Float]) async throws -> ASRTranscriptionResult {
+        try await self.transcribe(samples)
+    }
+
+    func transcribeStreamingDelta(
+        _ newSamples: [Float],
+        totalSampleCount: Int
+    ) async throws -> ASRTranscriptionResult {
+        if self.streamingAnalyzer != nil, !self.streamingResultsAreOpen() {
+            throw NSError(
+                domain: "AppleSpeechAnalyzerProvider",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "Speech Analyzer session ended."]
+            )
+        }
+        try await self.ensureStreamingSession()
+        let generation = self.streamingGeneration()
+        if !newSamples.isEmpty, let buffer = self.convertedBuffer(from: newSamples) {
+            self.streamingContinuation?.yield(AnalyzerInput(buffer: buffer))
+            self.streamedSampleCount = totalSampleCount
+            await self.waitForStreamingResult(after: generation)
+        }
+        let snapshot = self.streamingSnapshot()
+        if snapshot.text.isEmpty, let failure = snapshot.failure, !Self.isCancellation(failure) {
+            throw failure
+        }
+        return ASRTranscriptionResult(text: snapshot.text, confidence: snapshot.text.isEmpty ? 0 : 1)
+    }
+
+    func transcribeFinalDelta(
+        _ newSamples: [Float],
+        totalSampleCount: Int
+    ) async throws -> ASRTranscriptionResult {
+        try await self.ensureStreamingSession()
+        var finishError: Error?
+        do {
+            if !newSamples.isEmpty, let buffer = self.convertedBuffer(from: newSamples) {
+                self.streamingContinuation?.yield(AnalyzerInput(buffer: buffer))
+                self.streamedSampleCount = totalSampleCount
+            }
+            self.streamingContinuation?.finish()
+            self.streamingContinuation = nil
+            if let analyzer = self.streamingAnalyzer {
+                try await analyzer.finalizeAndFinishThroughEndOfInput()
+            }
+            await self.streamingResultsTask?.value
+        } catch {
+            finishError = error
+        }
+        let snapshot = self.streamingSnapshot()
+        let failure = finishError ?? snapshot.failure
+        await self.resetStreamingSession()
+        if snapshot.text.isEmpty, let failure, !Self.isCancellation(failure) {
+            throw failure
+        }
+        return ASRTranscriptionResult(text: snapshot.text, confidence: snapshot.text.isEmpty ? 0 : 1)
     }
 
     func markPreparedLocaleForTesting(_ identifier: String) {
@@ -169,10 +268,7 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
         } else {
             localeID = self.normalizedIdentifier(for: self.selectedSpeechLocale())
         }
-        let isInstalled = installedLocales.contains {
-            VoiceEngineLanguageCatalog.languagePrefix(self.normalizedIdentifier(for: $0))
-                == VoiceEngineLanguageCatalog.languagePrefix(localeID)
-        }
+        let isInstalled = self.localeIsInstalled(localeID, in: installedLocales)
 
         self._cacheQueue.sync { self._modelsInstalledCache = isInstalled }
 
@@ -219,6 +315,7 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
 
         // 3. Create a fresh analyzer with the fresh transcriber
         let analyzer = SpeechAnalyzer(modules: [freshTranscriber])
+        await self.applyGlossaryContext(to: analyzer)
 
         // 4. Convert samples to AVAudioPCMBuffer
         guard let buffer = createPCMBuffer(from: samples) else {
@@ -282,10 +379,12 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
         DebugLogger.shared.debug("AppleSpeechAnalyzer: Audio fed and input finished", source: "AppleSpeechAnalyzerProvider")
 
         // 9. Finalize - this tells the analyzer to process remaining audio and complete the results stream
+        var recognitionError: Error?
         do {
             try await analyzer.finalizeAndFinishThroughEndOfInput()
             DebugLogger.shared.debug("AppleSpeechAnalyzer: Analyzer finalized", source: "AppleSpeechAnalyzerProvider")
         } catch {
+            recognitionError = error
             DebugLogger.shared.warning("Analyzer finalize error: \(DiagnosticMetadata.error(error))", source: "AppleSpeechAnalyzerProvider")
         }
 
@@ -293,7 +392,11 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
         do {
             try await resultsTask.value
         } catch {
+            recognitionError = recognitionError ?? error
             DebugLogger.shared.warning("Speech recognition error: \(DiagnosticMetadata.error(error))", source: "AppleSpeechAnalyzerProvider")
+        }
+        if finalText.isEmpty, let recognitionError, !Self.isCancellation(recognitionError) {
+            throw recognitionError
         }
 
         DebugLogger.shared.debug("AppleSpeechAnalyzer: Transcription complete - characters: \(finalText.count)", source: "AppleSpeechAnalyzerProvider")
@@ -359,6 +462,163 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
         )
         guard current.caseInsensitiveCompare(localeID) != .orderedSame else { return }
         SettingsStore.shared.selectedAppleSpeechLocaleIdentifier = localeID
+    }
+
+    private func localeIsInstalled(_ localeID: String, in installedLocales: [Locale]) -> Bool {
+        installedLocales.contains {
+            self.normalizedIdentifier(for: $0).caseInsensitiveCompare(localeID) == .orderedSame
+        }
+    }
+
+    private func ensureStreamingSession() async throws {
+        let locale = self.preparedLocale ?? self.selectedSpeechLocale()
+        let localeID = self.normalizedIdentifier(for: locale)
+        if self.streamingAnalyzer != nil,
+           self.streamingLocaleID == localeID,
+           self.streamingResultsAreOpen()
+        {
+            return
+        }
+        await self.resetStreamingSession()
+        guard self.isReady else {
+            throw NSError(
+                domain: "AppleSpeechAnalyzerProvider",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Speech Analyzer not ready"]
+            )
+        }
+        let transcriber = SpeechTranscriber(
+            locale: locale,
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults],
+            attributeOptions: [.audioTimeRange]
+        )
+        let (stream, continuation) = AsyncStream<AnalyzerInput>.makeStream()
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        await self.applyGlossaryContext(to: analyzer)
+        self.streamingContinuation = continuation
+        self.streamingAnalyzer = analyzer
+        self.streamingLocaleID = localeID
+        let epoch = self.streamingEpoch
+        self.streamingLock.lock()
+        self.streamingResultsOpen = true
+        self.streamingLock.unlock()
+        self.streamingResultsTask = Task {
+            defer { self.markStreamingResultsClosed(epoch) }
+            do {
+                for try await result in transcriber.results {
+                    let text = String(result.text.characters)
+                    self.noteStreamingResult(text, isFinal: result.isFinal, epoch: epoch)
+                }
+            } catch {
+                self.noteStreamingFailure(error, epoch: epoch)
+            }
+        }
+        do {
+            try await analyzer.start(inputSequence: stream)
+        } catch {
+            await self.resetStreamingSession()
+            throw error
+        }
+    }
+
+    /// Final segments accumulate. A volatile result is the unstable tail, or
+    /// the whole hypothesis when it already starts with the committed text.
+    private func noteStreamingResult(_ text: String, isFinal: Bool, epoch: UInt64) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        guard epoch == self.streamingEpoch else { return }
+        if isFinal {
+            if !trimmed.isEmpty {
+                self.streamingCommitted = Self.joiningCaption(self.streamingCommitted, trimmed)
+            }
+            self.streamingVolatile = ""
+        } else if !trimmed.isEmpty {
+            self.streamingVolatile = trimmed
+        }
+        self.streamingText = Self.joiningCaption(self.streamingCommitted, self.streamingVolatile)
+        self.streamingResultGeneration += 1
+    }
+
+    private func noteStreamingFailure(_ error: Error, epoch: UInt64) {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        guard epoch == self.streamingEpoch else { return }
+        self.streamingFailure = error
+        self.streamingResultGeneration += 1
+    }
+
+    private func markStreamingResultsClosed(_ epoch: UInt64) {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        guard epoch == self.streamingEpoch else { return }
+        self.streamingResultsOpen = false
+    }
+
+    private func streamingResultsAreOpen() -> Bool {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        return self.streamingResultsOpen
+    }
+
+    private func streamingGeneration() -> Int {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        return self.streamingResultGeneration
+    }
+
+    private func streamingSnapshot() -> (text: String, failure: Error?) {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        return (self.streamingText, self.streamingFailure)
+    }
+
+    /// One short wait after new audio. A quiet tick returns the text already held.
+    private func waitForStreamingResult(after generation: Int) async {
+        let deadline = Date().addingTimeInterval(0.12)
+        while Date() < deadline {
+            if self.streamingGeneration() != generation { return }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+    }
+
+    private static func joiningCaption(_ committed: String, _ next: String) -> String {
+        if next.isEmpty { return committed }
+        if committed.isEmpty { return next }
+        if next == committed || next.hasPrefix(committed) { return next }
+        return RecognizedSegmentJoin.join(committed, next)
+    }
+
+    private func convertedBuffer(from samples: [Float]) -> AVAudioPCMBuffer? {
+        guard let buffer = self.createPCMBuffer(from: samples) else { return nil }
+        guard let analyzerFormat = self.analyzerFormat, let converter = self.converter else {
+            return buffer
+        }
+        return (try? converter.convertBuffer(buffer, to: analyzerFormat)) ?? buffer
+    }
+
+    private func applyGlossaryContext(to analyzer: SpeechAnalyzer) async {
+        let phrases = await MainActor.run {
+            TranslationGlossary.protectedTerms().prefix(100).map { String($0) }
+        }
+        guard !phrases.isEmpty else { return }
+        let context = AnalysisContext()
+        context.contextualStrings = [.general: phrases]
+        do {
+            try await analyzer.setContext(context)
+        } catch {
+            DebugLogger.shared.warning(
+                "Speech Analyzer context: \(DiagnosticMetadata.error(error))",
+                source: "AppleSpeechAnalyzerProvider"
+            )
+        }
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError { return true }
+        let nsError = error as NSError
+        return nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled
     }
 
     private func normalizedIdentifier(for locale: Locale) -> String {

@@ -12,6 +12,7 @@ xcuserdata/
 ## compatibility with Xcode 3 and earlier (ignoring not required starting Xcode 4)
 build/
 DerivedData/
+DerivedData-iOS/
 
 ## Swift Package Manager
 .build/
@@ -230,3 +231,6 @@ brag-output*/
 
 # Local release evidence can include transcripts and diagnostic logs.
 release-evidence/
+
+checkout-worker/.wrangler/
+checkout-worker/node_modules/

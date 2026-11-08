@@ -4,7 +4,7 @@ import IOKit
 
 /// This Mac's seat id is its hardware UUID, the same id Jamf and Fleet already inventory.
 /// A signed roster says which of those Macs the organization paid for.
-/// Refusal does not lock Listen.
+/// Refusal keeps Listen off on this Mac.
 nonisolated enum CommercialSeat {
     #if DEBUG
     nonisolated(unsafe) static var machineIDOverride: String?
@@ -46,7 +46,7 @@ nonisolated enum CommercialSeat {
             case .notRequired, .accepted:
                 return nil
             case let .refused(reason):
-                return "\(reason.explanation) The app stays free under GPLv3. Listen stays unlocked."
+                return "\(reason.explanation) Listen stays off until the seat list includes this Mac."
             }
         }
     }

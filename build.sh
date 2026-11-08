@@ -15,7 +15,7 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROFILE="${1:-${BUILD_PROFILE:-public}}"
 DERIVED_DATA_PATH="${CONNECTINGCAPTIONS_DERIVED_DATA_PATH:-${PROJECT_DIR}/DerivedData}"
-RELEASE_APP_BUNDLE_NAME="${CONNECTINGCAPTIONS_RELEASE_APP_BUNDLE_NAME:-Connecting Captions.app}"
+RELEASE_APP_BUNDLE_NAME="${CONNECTINGCAPTIONS_RELEASE_APP_BUNDLE_NAME:-Connecting Captions Pro.app}"
 RELEASE_ZIP_PREFIX="${CONNECTINGCAPTIONS_RELEASE_ZIP_PREFIX:-Connecting-Captions}"
 
 resolve_development_team() {
@@ -51,6 +51,18 @@ resolve_development_team() {
     security find-certificate -c "${identity}" -p 2>/dev/null \
         | openssl x509 -noout -subject -nameopt RFC2253 2>/dev/null \
         | sed -n 's/.*OU=\([^,]*\).*/\1/p'
+}
+
+# 64 hex characters. Release only. A missing key would treat an early download as a trial.
+resolve_early_install_seal_key() {
+    local key="${EARLY_INSTALL_SEAL_KEY:-}"
+    if [ -z "${key}" ]; then
+        key="$(awk -F= '/^[[:space:]]*EARLY_INSTALL_SEAL_KEY[[:space:]]*=/{gsub(/[[:space:]]/, "", $2); print $2; exit}' \
+            "${PROJECT_DIR}/xcconfig/Local.xcconfig" 2>/dev/null || true)"
+    fi
+    if printf '%s' "${key}" | grep -Eq '^[0-9A-Fa-f]{64}$'; then
+        printf '%s\n' "${key}"
+    fi
 }
 
 run_public_build() {
@@ -113,7 +125,7 @@ write_drag_dmg() {
     ln -s /Applications "${stage}/Applications"
     rm -f "${dmg_path}"
     hdiutil create \
-        -volname "Connecting Captions" \
+        -volname "Connecting Captions Pro" \
         -srcfolder "${stage}" \
         -ov \
         -format UDZO \
@@ -219,13 +231,22 @@ run_release_build() {
     fi
     echo "Developer ID identity: ${identity}"
 
+    local seal_key
+    seal_key="$(resolve_early_install_seal_key)"
+    if [ -z "${seal_key}" ]; then
+        echo "A release needs EARLY_INSTALL_SEAL_KEY: 64 hex characters in the environment or xcconfig/Local.xcconfig." >&2
+        echo "Without it, a Mac that already had the app is not recognized and Listen asks for a key." >&2
+        exit 1
+    fi
+
     echo "Running signed Release connectingCaptions build..."
     # Ad-hoc compile. SPM package targets reject a project-wide Developer ID
     # identity. Hosted CI only imports the Developer ID .p12. Re-sign below.
     xcodebuild "${build_args[@]}" \
         DEVELOPMENT_TEAM="${development_team}" \
         CODE_SIGN_IDENTITY=- \
-        CODE_SIGNING_REQUIRED=NO
+        CODE_SIGNING_REQUIRED=NO \
+        EARLY_INSTALL_SEAL_KEY="${seal_key}"
 
     app_path="${DERIVED_DATA_PATH}/Build/Products/Release/${RELEASE_APP_BUNDLE_NAME}"
     if [ ! -d "${app_path}" ]; then
@@ -233,6 +254,11 @@ run_release_build() {
     fi
     if [ -z "${app_path}" ] || [ ! -d "${app_path}" ]; then
         echo "Release app was not found in ${DERIVED_DATA_PATH}/Build/Products/Release." >&2
+        exit 1
+    fi
+
+    if ! /usr/libexec/PlistBuddy -c 'Print :CCSeal' "${app_path}/Contents/Info.plist" | grep -Eq '^[0-9A-Fa-f]{64}$'; then
+        echo "The release app is missing the early-download seal. Set EARLY_INSTALL_SEAL_KEY and rebuild." >&2
         exit 1
     fi
 

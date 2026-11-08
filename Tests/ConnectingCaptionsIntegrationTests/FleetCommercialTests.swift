@@ -73,10 +73,10 @@ final class FleetCommercialTests: XCTestCase {
             publicKey: self.privateKey.publicKey
         )
         XCTAssertEqual(outside, CommercialSeat.Decision.refused(.notOnRoster))
-        XCTAssertTrue(outside.refusalLine?.contains("Listen stays unlocked") == true)
+        XCTAssertTrue(outside.refusalLine?.contains("Listen stays off") == true)
     }
 
-    func testOverCapacityAndMissingListRefuseWithoutLockingListen() throws {
+    func testOverCapacityAndMissingListKeepListenOff() throws {
         let license = self.license(seats: 1, enforceSeats: true)
         let crowded = CommercialSeat.decide(
             license: license,
@@ -94,7 +94,7 @@ final class FleetCommercialTests: XCTestCase {
         )
         XCTAssertEqual(missing, CommercialSeat.Decision.refused(.missingRoster))
         XCTAssertFalse(missing.coversThisMac)
-        XCTAssertTrue(missing.refusalLine?.contains("Listen stays unlocked") == true)
+        XCTAssertTrue(missing.refusalLine?.contains("Listen stays off") == true)
     }
 
     func testUnenforcedKeyStaysLicensedWithoutASeatList() throws {
@@ -125,7 +125,7 @@ final class FleetCommercialTests: XCTestCase {
         XCTAssertTrue(settings.commercialCoverageLine(for: record).contains("on the seat list"))
     }
 
-    func testEnforcedKeyOutsideTheListKeepsListenUnlocked() throws {
+    func testEnforcedKeyOutsideTheListKeepsListenOff() throws {
         let settings = SettingsStore.shared
         let token = try CommercialLicense.makeToken(
             record: self.license(org: "Harbor Law", enforceSeats: true),
@@ -134,7 +134,7 @@ final class FleetCommercialTests: XCTestCase {
         _ = settings.activateCommercialLicense(token)
         XCTAssertFalse(settings.isCommerciallyLicensed)
         XCTAssertEqual(settings.commercialLicenseRecord?.org, "Harbor Law")
-        XCTAssertTrue(settings.commercialSeatRefusal?.contains("Listen stays unlocked") == true)
+        XCTAssertTrue(settings.commercialSeatRefusal?.contains("Listen stays off") == true)
     }
 
     func testManagedLicenseWinsOverAPastedKey() throws {

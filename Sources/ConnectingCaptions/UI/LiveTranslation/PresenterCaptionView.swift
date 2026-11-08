@@ -368,6 +368,7 @@ struct PresenterCaptionView: View {
                             .layoutPriority(1)
                     }
                     if self.showsStatusCluster {
+                        self.eitherWaySpeakerLegend
                         self.paceCueReadout
                         self.talkPackChip
                         self.statusSlot
@@ -420,6 +421,7 @@ struct PresenterCaptionView: View {
             || !self.model.latencyReadout.isEmpty
             || !self.model.status.isEmpty
             || (self.settings.theaterSessionMode.showsTranslation && self.settings.hasTheaterTalkPack)
+            || SpokenLanguageResolver.isDynamicPairingEnabled(settings: self.settings)
     }
 
     private var chromeRule: some View {
@@ -823,6 +825,8 @@ struct PresenterCaptionView: View {
                     languages: self.targetLanguages
                 )
 
+                TheaterSecondShowAsMenu(compact: true)
+
                 if SpokenLanguageResolver.showsEitherWayControl() {
                     TheaterEitherWaySection(
                         accessibilityIdentifier: "theater.window.eitherWay",
@@ -942,6 +946,40 @@ struct PresenterCaptionView: View {
             image
         } else {
             image.symbolEffect(.pulse, options: .nonRepeating, value: self.pacePulseToken)
+        }
+    }
+
+    @ViewBuilder
+    private var eitherWaySpeakerLegend: some View {
+        if SpokenLanguageResolver.isDynamicPairingEnabled(settings: self.settings) {
+            let source = SpokenLanguageResolver.sourceLanguage(settings: self.settings)
+            let target = SpokenLanguageResolver.targetLanguage(settings: self.settings)
+            let forwardColor = Color(nsColor: self.captionColors.lineColors(reversePair: false).translated)
+            let reverseColor = Color(nsColor: self.captionColors.lineColors(reversePair: true).translated)
+            HStack(spacing: 8) {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(forwardColor)
+                        .frame(width: 6, height: 6)
+                        .accessibilityHidden(true)
+                    Text("\(source.displayName) → \(target.displayName)")
+                        .foregroundStyle(forwardColor)
+                }
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(reverseColor)
+                        .frame(width: 6, height: 6)
+                        .accessibilityHidden(true)
+                    Text("\(target.displayName) → \(source.displayName)")
+                        .foregroundStyle(reverseColor)
+                }
+            }
+            .font(self.theme.typography.caption)
+            .lineLimit(1)
+            .theaterReadoutPlate()
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(source.displayName) ↔ \(target.displayName)")
+            .accessibilityIdentifier("theater.eitherWay.legend")
         }
     }
 
@@ -1301,7 +1339,15 @@ struct PresenterCaptionView: View {
 
             Divider()
 
+            AppButton("Paste & Translate") {
+                PresenterCaptionController.shared.clearExternalAppTarget()
+                TheaterPasteTranslate.shared.open()
+            }
+            .help(AppLanguage.text("Open a separate window to paste or type text and translate it."))
+            .accessibilityIdentifier("theater.window.pasteTranslate")
+
             AppButton("Open History") {
+                PresenterCaptionController.shared.clearExternalAppTarget()
                 AppNavigationRouter.shared.request(.history)
                 if let window = MainWindowReveal.preferred(in: NSApp.windows) {
                     MainWindowReveal.bringToFront(window)
@@ -1468,27 +1514,43 @@ struct PresenterCaptionView: View {
                                 session: self.settings.theaterSessionMode,
                                 spokenMode: self.settings.theaterSpokenLineMode
                             )
+                            let roomListening = self.model.isListening
+                                && !self.model.isPaused
+                                && self.model.status.isEmpty
+                                && !self.model.statusKind.usesWarningColor
+                                && !self.model.isPlacingOverlay
                             TheaterBoardEmptyState(
-                                message: self.emptyStateText,
-                                titlePreview: preview.title,
-                                spokenPreview: preview.spoken,
+                                message: roomListening ? TheaterReadiness.boardListeningDetail : self.emptyStateText,
+                                titlePreview: roomListening ? TheaterReadiness.boardListeningTitle : preview.title,
+                                spokenPreview: roomListening ? nil : preview.spoken,
                                 titleColor: Color(nsColor: self.translatedNS),
                                 spokenColor: Color(nsColor: self.spokenNS),
                                 messageColor: self.captionColors.empty,
                                 titleFont: self.typeface.font(size: translatedSize, weight: .semibold),
                                 spokenFont: self.typeface.font(size: spokenSize, weight: .medium),
-                                messageFont: self.theme.typography.body,
-                                isWarning: self.model.statusKind.usesWarningColor
+                                messageFont: roomListening
+                                    ? self.typeface.font(size: max(22, translatedSize * 0.42), weight: .medium)
+                                    : self.theme.typography.body,
+                                titleOpacity: roomListening ? 1 : 0.4,
+                                isWarning: self.model.statusKind.usesWarningColor,
+                                accessibilityText: roomListening ? TheaterReadiness.boardListening : nil
                             )
                             .frame(minHeight: openingHeight, alignment: .topLeading)
                         } else {
+                            let configuredSourceID = SpokenLanguageResolver.sourceLanguage(settings: self.settings).id
                             ForEach(layouts) { layout in
+                                let reversePair = TheaterCaptionVisibility.usesReversePairColor(
+                                    sourceLanguageID: layout.line.sourceLanguageID,
+                                    targetLanguageID: layout.line.targetLanguageID,
+                                    configuredSourceID: configuredSourceID
+                                )
+                                let lineColors = self.captionColors.lineColors(reversePair: reversePair)
                                 let titleSize = layout.line.failed
                                     ? max(15, (translatedSize * 0.4).rounded())
                                     : translatedSize
                                 let titleColor = layout.line.failed
-                                    ? self.translatedNS.withAlphaComponent(0.62)
-                                    : self.translatedNS
+                                    ? lineColors.translated.withAlphaComponent(0.62)
+                                    : lineColors.translated
                                 TheaterCaptionLineLabel(
                                     lineID: layout.line.id,
                                     text: layout.line.text,
@@ -1500,7 +1562,7 @@ struct PresenterCaptionView: View {
                                         typeface: self.typeface,
                                         spokenFontSize: spokenSize,
                                         translatedFontSize: titleSize,
-                                        spokenColor: self.spokenNS,
+                                        spokenColor: lineColors.spoken,
                                         translatedColor: titleColor,
                                         shadowColor: layout.line.failed ? nil : self.captionColors.shadowColor,
                                         shadowBlur: layout.line.failed ? 0 : self.captionColors.shadowBlur,
@@ -2146,6 +2208,12 @@ final class TheaterCaptionLineNSView: NSView {
         )
         self.spokenColor = visible.spoken
         self.translatedColor = visible.translated
+        for (index, row) in self.displayRows.enumerated() where index < self.lineViews.count {
+            let field = self.lineViews[index]
+            if !field.stringValue.isEmpty {
+                field.textColor = row.isSpoken ? self.spokenColor : self.translatedColor
+            }
+        }
         if let shadowColor, shadowBlur > 0 {
             let shadow = NSShadow()
             shadow.shadowColor = shadowColor

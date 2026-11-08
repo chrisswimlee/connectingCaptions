@@ -113,6 +113,31 @@ final class LiveTranslationLatencyTests: XCTestCase {
         )
     }
 
+    func testLateSpeechPacketDoesNotReopenTheSilenceEdge() {
+        let nowHost = LiveTranslationHostClock.ticks(forSeconds: 10)
+        let staleHost = nowHost - LiveTranslationHostClock.ticks(forSeconds: 2)
+        let voicedAt = LiveTranslationHostClock.uptime(
+            fromHostTime: staleHost,
+            nowUptime: 10,
+            nowHostTime: nowHost
+        )
+        XCTAssertEqual(voicedAt, 8, accuracy: 0.02)
+        XCTAssertFalse(
+            LiveTranslationSilenceGate.speechReopensSilenceEdge(voicedAt: voicedAt, now: 10),
+            "a packet from two seconds ago must not start another ASR tick"
+        )
+        XCTAssertEqual(LiveTranslationSilenceGate.laterVoicedUptime(9.5, voicedAt: voicedAt), 9.5)
+
+        let recentHost = nowHost - LiveTranslationHostClock.ticks(forSeconds: 0.1)
+        let recent = LiveTranslationHostClock.uptime(
+            fromHostTime: recentHost,
+            nowUptime: 10,
+            nowHostTime: nowHost
+        )
+        XCTAssertTrue(LiveTranslationSilenceGate.speechReopensSilenceEdge(voicedAt: recent, now: 10))
+        XCTAssertEqual(LiveTranslationSilenceGate.laterVoicedUptime(9.5, voicedAt: recent), recent, accuracy: 0.02)
+    }
+
     func testSilenceGateLeavesNominalAndFairTicksUnchanged() {
         XCTAssertFalse(
             LiveTranslationSilenceGate.shouldSkipASRTick(

@@ -104,7 +104,7 @@ nonisolated public enum TheaterCaptionExport {
 
     public static func savePanelName(extension fileExtension: String, date: Date = Date()) -> String {
         let stamp = Self.fileStamp.string(from: date).replacingOccurrences(of: ":", with: "-")
-        return "connectingCaptions-\(stamp).\(fileExtension)"
+        return "\(ConnectingCaptionsProduct.displayName)-\(stamp).\(fileExtension)"
     }
 
     private static let fileStamp: ISO8601DateFormatter = {

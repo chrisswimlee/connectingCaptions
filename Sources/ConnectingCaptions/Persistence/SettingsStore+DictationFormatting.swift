@@ -424,7 +424,7 @@ extension SettingsStore {
     // MARK: - Custom Dictionary
 
     /// A custom dictionary entry that maps multiple misheard/alternate spellings to a correct replacement.
-    /// For example: ["fluid subtitles", "fluid subtitle"] -> "connectingCaptions"
+    /// For example: ["fluid subtitles", "fluid subtitle"] -> "Connecting Captions Pro"
     struct CustomDictionaryEntry: Codable, Identifiable, Hashable {
         let id: UUID
         /// Words/phrases to look for (case-insensitive matching)

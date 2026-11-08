@@ -73,6 +73,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          EARLY_INSTALL_SEAL_KEY: ${{ secrets.EARLY_INSTALL_SEAL_KEY }}
           REQUIRE_NOTARIZATION: "1"
         run: ./build.sh release
 
@@ -81,12 +82,12 @@ jobs:
           set -euo pipefail
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Info.plist)"
           zip="dist/Connecting-Captions-${version}.zip"
-          app="$(find dist -maxdepth 2 -name 'Connecting Captions.app' -print -quit)"
+          app="$(find dist -maxdepth 2 -name 'Connecting Captions Pro.app' -print -quit)"
           if [ ! -d "${app:-}" ]; then
             rm -rf "${RUNNER_TEMP}/release-verify"
             mkdir -p "${RUNNER_TEMP}/release-verify"
             ditto -x -k "$zip" "${RUNNER_TEMP}/release-verify"
-            app="$(find "${RUNNER_TEMP}/release-verify" -maxdepth 2 -name 'Connecting Captions.app' -print -quit)"
+            app="$(find "${RUNNER_TEMP}/release-verify" -maxdepth 2 -name 'Connecting Captions Pro.app' -print -quit)"
           fi
           if [ ! -d "${app:-}" ]; then
             echo "Release app was not found for verification." >&2
@@ -111,7 +112,7 @@ jobs:
           rm -rf "${work}"
           mkdir -p "${work}"
           ditto -x -k "${zip}" "${work}"
-          app="$(find "${work}" -maxdepth 2 -name 'Connecting Captions.app' -print -quit)"
+          app="$(find "${work}" -maxdepth 2 -name 'Connecting Captions Pro.app' -print -quit)"
           if [ ! -d "${app:-}" ]; then
             echo "Release app was not found for the fluidSubtitles update." >&2
             exit 1
@@ -140,5 +141,5 @@ jobs:
             exit 1
           fi
           gh release create "${GITHUB_REF_NAME}" "${zip}" "${latest}" "${legacy}" "dist/SHA256SUMS" \
-            --title "Connecting Captions ${version}" \
+            --title "Connecting Captions Pro ${version}" \
             --notes "$notes"

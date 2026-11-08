@@ -1393,9 +1393,24 @@ final class ASRService: ObservableObject {
             onSpeechEnergy: { [weak self] (hostTime: UInt64, voiced: Bool) in
                 guard voiced else { return }
                 DispatchQueue.main.async { [weak self] in
-                    self?.lastVoicedUptime = ProcessInfo.processInfo.systemUptime
-                    self?.didConsumeSilenceEdgeTick = false
-                    self?.speechCapturePolicy?.markSpeechStart(hostTime: hostTime)
+                    guard let self else { return }
+                    let now = ProcessInfo.processInfo.systemUptime
+                    let voicedAt = LiveTranslationHostClock.uptime(
+                        fromHostTime: hostTime,
+                        nowUptime: now,
+                        nowHostTime: mach_absolute_time()
+                    )
+                    self.lastVoicedUptime = LiveTranslationSilenceGate.laterVoicedUptime(
+                        self.lastVoicedUptime,
+                        voicedAt: voicedAt
+                    )
+                    // A decode can block this queue. Stamping "now" made that
+                    // old packet look like speech that just started, so the
+                    // silence skip never stuck and the model kept running.
+                    if LiveTranslationSilenceGate.speechReopensSilenceEdge(voicedAt: voicedAt, now: now) {
+                        self.didConsumeSilenceEdgeTick = false
+                    }
+                    self.speechCapturePolicy?.markSpeechStart(hostTime: hostTime)
                 }
             },
             onCaptureHealth: { [weak self] sessionID, attemptID, audioMs, sampleCount, rms, peak in

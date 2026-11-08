@@ -1007,7 +1007,11 @@ extension ASRService {
                     result = try await self.transcriptionExecutor.run(
                         timeoutNanoseconds: Self.streamingPreviewDecodeTimeoutNanoseconds
                     ) { [provider = self.transcriptionProvider] in
-                        let result = try await provider.transcribeStreaming(retainedWindow)
+                        await provider.resetStreamingSession()
+                        let result = try await provider.transcribeStreamingDelta(
+                            retainedWindow,
+                            totalSampleCount: currentSampleCount
+                        )
                         logStreamingProviderOperationReturn(
                             sessionID: sessionID,
                             operationID: operationID,
@@ -1150,6 +1154,14 @@ extension ASRService {
     func smartDiffUpdate(previous: String, current: String) -> String {
         guard !previous.isEmpty else { return current }
         guard !current.isEmpty else { return previous }
+
+        if TranslationClauseSegmenter.hasUnspacedScript(previous)
+            || TranslationClauseSegmenter.hasUnspacedScript(current)
+        {
+            let common = previous.commonPrefix(with: current)
+            guard !common.isEmpty, common.count * 2 > previous.count else { return current }
+            return common + current.dropFirst(common.count)
+        }
 
         let prevWords = previous.split(separator: " ").map(String.init)
         let currWords = current.split(separator: " ").map(String.init)
@@ -1342,12 +1354,21 @@ extension ASRService {
 
     static func startsWithWordCharacter(_ text: String) -> Bool {
         guard let scalar = text.unicodeScalars.first else { return false }
+        if self.isUnspacedBoundaryScalar(scalar) { return false }
         return self.isWordCharacter(scalar)
     }
 
     static func endsWithWordCharacter(_ text: String) -> Bool {
         guard let scalar = text.unicodeScalars.last else { return false }
+        if self.isUnspacedBoundaryScalar(scalar) { return false }
         return self.isWordCharacter(scalar)
+    }
+
+    static func isUnspacedBoundaryScalar(_ scalar: Unicode.Scalar) -> Bool {
+        (0xAC00...0xD7AF).contains(scalar.value)
+            || (0x3040...0x30FF).contains(scalar.value)
+            || (0x4E00...0x9FFF).contains(scalar.value)
+            || (0x0E00...0x0E7F).contains(scalar.value)
     }
 
     static func isWordCharacter(_ scalar: Unicode.Scalar) -> Bool {

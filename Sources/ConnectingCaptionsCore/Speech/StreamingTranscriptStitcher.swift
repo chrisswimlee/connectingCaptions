@@ -112,12 +112,13 @@ public enum StreamingTranscriptStitcher {
         if confirmed == unit || confirmed.hasPrefix(unit) || confirmed.hasPrefix(unit + " ") {
             return true
         }
-        let stripped = unit.trimmingCharacters(in: CharacterSet(charactersIn: ".?!。！？…"))
+        let marks = TranslationClauseSegmenter.terminalPunctuationCharacters
+        let stripped = unit.trimmingCharacters(in: CharacterSet(charactersIn: marks))
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !stripped.isEmpty, confirmed.hasPrefix(stripped) else { return false }
         let after = confirmed.dropFirst(stripped.count)
         guard let first = after.first else { return true }
-        return ".?!。！？…".contains(first)
+        return marks.contains(first)
     }
 
     private static func tokenSharedPrefix(_ left: String, _ right: String) -> String {
@@ -264,9 +265,10 @@ public enum StreamingTranscriptStitcher {
         let previous: Character = tailStart > trimmed.startIndex
             ? trimmed[trimmed.index(before: tailStart)]
             : " "
-        let startsMidSentence = !previous.isWhitespace && !".!?。！？…".contains(previous)
+        let marks = TranslationClauseSegmenter.terminalPunctuationCharacters
+        let startsMidSentence = !previous.isWhitespace && !marks.contains(previous)
         if startsMidSentence {
-            if let boundary = trimmed[tailStart...].firstIndex(where: { ".!?。！？…".contains($0) }) {
+            if let boundary = trimmed[tailStart...].firstIndex(where: { marks.contains($0) }) {
                 cut = trimmed.index(after: boundary)
             } else if let space = trimmed[tailStart...].firstIndex(where: { $0.isWhitespace }) {
                 cut = trimmed.index(after: space)
@@ -296,6 +298,18 @@ public enum StreamingTranscriptStitcher {
     }
 
     private static func overlapJoin(left: String, right: String) -> String? {
+        if TranslationClauseSegmenter.hasUnspacedScript(left)
+            || TranslationClauseSegmenter.hasUnspacedScript(right)
+        {
+            let maxOverlap = min(left.count, right.count)
+            guard maxOverlap >= 2 else { return nil }
+            for overlap in stride(from: maxOverlap, through: 2, by: -1) {
+                if left.suffix(overlap) == right.prefix(overlap) {
+                    return left + right.dropFirst(overlap)
+                }
+            }
+            return nil
+        }
         let leftWords = left.split(separator: " ").map(String.init)
         let rightWords = right.split(separator: " ").map(String.init)
         guard !leftWords.isEmpty, !rightWords.isEmpty else { return nil }

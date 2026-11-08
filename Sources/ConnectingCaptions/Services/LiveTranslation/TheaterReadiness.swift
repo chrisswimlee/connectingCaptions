@@ -24,6 +24,23 @@ enum TheaterReadiness {
     static let boardListening =
         "Listening. The next sentence appears here."
 
+    static let boardListeningTitle = "Listening"
+
+    static let boardListeningDetail =
+        "The next sentence appears here."
+
+    static let secondShowAsTitle = "Also show"
+
+    static let secondShowAsHelp =
+        "Also show puts this Listen on another screen, in one more language. Drag that window onto the other display."
+
+    static let secondShowAsPack =
+        "Download the language pack for this screen, then try again."
+
+    static let secondShowAsPackButton = "Download the language pack for this pair."
+
+    static let secondShowAsTryAgain = "Try again."
+
     static let talkPackCarryOver = "These names stay for the next talk until you Remove."
 
     static let screenShareTitle = "Who sees this"
@@ -118,10 +135,10 @@ enum TheaterReadiness {
         "This removes every caption. The microphone stays on. Talk notes stay."
 
     static let talkPack =
-        "Lock names from notes, a PDF, a PowerPoint deck, or a JSON list. They stay on this Mac."
+        "Lock names from notes, a PDF, a PowerPoint deck, a Keynote file, or a JSON list. They stay on this Mac."
 
     static let autoExportSession =
-        "When Listen stops, save Markdown and VTT in Application Support/connectingCaptions/Session Exports. Times are when each caption was accepted."
+        "When Listen stops, save Markdown and VTT in Application Support/connectingCaptions/Session Exports. The files are saved unencrypted. Times are when each caption was accepted."
 
     static let paceCue =
         "Behind means keep talking slower. Caught up means the last sentence is on screen."
