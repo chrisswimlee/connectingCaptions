@@ -65,7 +65,10 @@ The systems write-up is [docs/APPLE_SILICON_STREAMING.md](docs/APPLE_SILICON_STR
 - **Theater captions** — a floating window you turn on and close. Use **Pop-up** for a solid board or **Overlay** so only caption text sits on slides. Change Overlay font, size, and plate from the menu-bar Theater menu. On-screen `mic · e2e · ASR · MT` clock. Screenshots and a whole-screen Zoom or Meet share include Theater. Share the slides window when remote viewers should not see captions. Pause holds capture and drops a leftover; Resume does not bring that leftover back. Minimize hides Theater; Listen stays. Clear wipes the board. Talk notes stay. Lines past the latest 48 leave the board. Translate shows Behind or Caught up so you do not outrun the caption. A sentence appears once when it is accepted. The board is not a text field.
 - **Any input device** — capture works with any Mac input, not just the built-in microphone: wired, USB, or line-in gear, Bluetooth headsets in call (HFP) mode, and virtual loopback devices (BlackHole, Loopback) when audio is routed to them. Choose devices in Settings → **Audio Devices**: the **Input Device Priority** list can be dragged to reorder, and a cleared list falls back to the last device you used if it is still connected, otherwise the system default input. A newly connected device becomes the fallback at once and takes over as soon as the top choice is unplugged.
 - **Original language / Translate** — both use the selected Voice Engine. Translate uses Apple Translation on this Mac for the pair you set. Press the mode control to switch. Both use the selected input device.
-- **Translate into an app** — a separate shortcut from dictation; types this listen’s translation into the app you clicked, including a trailing fragment. Korean, Japanese, and Thai depend on that app’s input method. Accessibility is required.
+- **Translate into an app** — **Speak & Type** has its own shortcut and Settings section; it types this listen’s translation into the app you clicked, including a trailing fragment. Korean, Japanese, and Thai depend on that app’s input method. Accessibility is required.
+- **Speak captions** — when you translate, Theater can read each translated caption aloud through the output you pick. It needs a macOS voice for the Show-as language.
+- **History and export** — past listens stay in History on this Mac. Export a listen as SRT, VTT, or a bilingual text file.
+- **App language** — Settings → General → **App language** offers all 19 setup languages for interface copy. Extra interface translations run on this Mac and are cached locally; Apple may request a language pack. English stays available while a language is prepared. The app language is independent of I speak and Show as.
 - **On-device translation** — Apple Translation language packs, processed locally
 - **Apple Speech** — Analyzer on macOS 26, otherwise the older Apple Speech. Offline language support varies by Mac; Analyzer may need speech assets.
 - **Local-first** — voice and text stay on your Mac. Theater does not send captions to a cloud API.
@@ -112,7 +115,7 @@ brew install --cask connectingcaptions
 
 The app is unsandboxed (Hardened Runtime on). Theater needs microphone access. Insert-into-another-app needs Accessibility. Apple Translation packs download on first use when I speak and Show as differ; they are not inside the zip.
 
-Maintainers: push a tag like `preview-1.6.12-1` (`git tag preview-1.6.12-1 && git push origin preview-1.6.12-1`) and the Preview workflow publishes that commit as a pre-release (`./build.sh preview`). A signed release needs a Developer ID: `./build.sh release` with `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD`, then a `v*` tag such as `v1.6.12` runs `.github/workflows/release.yml`. Hosted CI cannot prove a live Theater listen.
+Maintainers: push a tag like `preview-1.6.16-1` (`git tag preview-1.6.16-1 && git push origin preview-1.6.16-1`) and the Preview workflow publishes that commit as a pre-release (`./build.sh preview`). A signed release needs a Developer ID: `./build.sh release` with `APPLE_ID`, `APPLE_TEAM_ID`, and `APPLE_APP_SPECIFIC_PASSWORD`, then a `v*` tag such as `v1.6.16` runs `.github/workflows/release.yml`. Hosted CI cannot prove a live Theater listen.
 
 ---
 
@@ -121,7 +124,7 @@ Maintainers: push a tag like `preview-1.6.12-1` (`git tag preview-1.6.12-1 && gi
 - macOS 15.0 (Sequoia) or later. Theater Listen, Voice, Translate, and language swap work on 15. Apple Speech Analyzer needs macOS 26.
 - Apple Silicon Mac for Theater. Apple Speech also runs on Intel, but that is not the Theater path
 - Disk space for an Apple Translation pack when I speak and Show as differ
-- Microphone access for Theater and dictation
+- Microphone access for Theater
 - Accessibility permissions if you want a translation typed into other apps
 - Download the Apple Translation pack once before a cross-language Listen. Same-language captions do not need a pack.
 
@@ -159,7 +162,7 @@ You need an Apple Silicon Mac on macOS 15 or later, **Xcode 26** (CI uses 26.3),
    ./build.sh
    ```
 
-No certificate? `./build.sh unsigned` builds without one, but macOS may ask for Accessibility again after each rebuild. You can also open `connectingCaptions.xcodeproj` and run from Xcode. App Swift packages are pinned in `connectingCaptions.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`; root `Package.swift` only builds the C capture helper.
+No certificate? `./build.sh unsigned` builds without one, but macOS may ask for Accessibility again after each rebuild. You can also open `connectingCaptions.xcodeproj` and run from Xcode. App Swift packages are pinned in `connectingCaptions.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`; root `Package.swift` builds the C capture helper and the shared `ConnectingCaptionsCore` library (caption timing, board, clause segmenter, glossary lock, and export), which compiles for macOS 15 and iOS 18.
 
 Architecture notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Latency budgets and the Theater HUD are in [docs/LIVE_TRANSLATION_LATENCY.md](docs/LIVE_TRANSLATION_LATENCY.md). Score a recorded talk with [docs/STAGE_SCORE.md](docs/STAGE_SCORE.md). Signing and notarization are in [docs/SIGNING.md](docs/SIGNING.md). The systems write-up is [docs/APPLE_SILICON_STREAMING.md](docs/APPLE_SILICON_STREAMING.md).
 
@@ -180,11 +183,6 @@ The [release validation guide](docs/RELEASE_VALIDATION.md) covers real microphon
 IME, offline, installer and demo checks. Export **Quality review (JSONL)** from
 Theater to prepare human-reviewed recognition and translation measurements.
 
-Settings → General → **App language** offers all setup languages for interface
-copy. Additional interface translations run on this Mac and are cached locally;
-Apple may request a language pack. English remains available during preparation.
-The app language is independent of I speak and Show as.
-
 Full local run, matching the `Build and Test` CI gate (CI skips the Theater smoke and
 the flaky Tiny Whisper E2E because hosted runners can't prove either):
 
@@ -195,7 +193,7 @@ xcodebuild test -project connectingCaptions.xcodeproj -scheme connectingCaptions
   -skip-testing:ConnectingCaptionsIntegrationTests/DictationE2ETests/testDictationEndToEnd_whisperTiny_transcribesFixture
 ```
 
-CI runs the guard chain before that test command, in this order: test wiring, team ID, UI copy, quality-scorer vectors, interface catalog, Python tooling tests, SwiftLint strict, then the two standalone harnesses and `xcodebuild test` with the two skips above:
+CI runs the guard chain before that test command, in this order: test wiring, team ID, UI copy, quality-scorer vectors, interface catalog, Python tooling tests, SwiftLint strict, then the two standalone harnesses and `xcodebuild test` with the two skips above. A separate docs job runs `sh scripts/test-docs-copy.sh` (banned words and broken relative links in Markdown) on every PR, including docs-only ones:
 
 ```bash
 sh scripts/test-omitted-tests.sh
@@ -214,7 +212,7 @@ The paste-key and history harnesses are **not** XCTest targets — they compile 
 
 ## Privacy
 
-Connecting Captions Pro is **local-first**. Your voice, audio, and transcribed text never leave your machine unless you explicitly opt in to a cloud AI provider.
+Connecting Captions Pro is **local-first**. Your voice, audio, and transcribed text never leave your machine. Theater does not send captions to a cloud API. The app goes online only to download Apple Translation packs, speech assets, and Voice Engine models, and, when automatic update checks are on, to check GitHub Releases for a new version.
 
 This release does not send analytics, feedback, or update checks to a third-party analytics host. Voice Engine weights stay in this app's folder. A model already in the shared FluidAudio cache is copied once, and that cache is not deleted. A FluidVoice install on the same Mac is left alone: this app does not read or delete that app's Keychain or Application Support folder.
 
