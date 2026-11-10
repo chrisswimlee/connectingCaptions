@@ -182,7 +182,7 @@ nonisolated public enum TranslationClauseSegmenter {
         // digit is still that language. The two-character floor stays. A line
         // that is only English ("It.") keeps the English thin-starter rule.
         if self.isCompactScript(languageID) {
-            if self.stripped(trimmed).filter { !$0.isWhitespace }.count < 2 { return true }
+            if self.stripped(trimmed).filter({ !$0.isWhitespace }).count < 2 { return true }
             let entirelyASCII = !rawWords.isEmpty && rawWords.allSatisfy { word in
                 word.unicodeScalars.allSatisfy(\.isASCII)
             }
@@ -1723,7 +1723,7 @@ nonisolated public enum TranslationClauseSegmenter {
 }
 
 public extension TranslationClauseSegmenter {
-    public static let terminalPunctuationCharacters = ".!?。！？…؟۔।॥"
+    static let terminalPunctuationCharacters = ".!?。！？…؟۔।॥"
 
     fileprivate static let terminalPunctuation = CharacterSet(charactersIn: Self.terminalPunctuationCharacters)
 
@@ -1835,7 +1835,7 @@ public extension TranslationClauseSegmenter {
         self.englishAbbreviationToken(in: text, at: index) != nil
     }
 
-    public static func isEnglishAbbreviationToken(_ token: String) -> Bool {
+    static func isEnglishAbbreviationToken(_ token: String) -> Bool {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.hasSuffix(".") else { return false }
         let body = String(trimmed.dropLast())
@@ -1892,7 +1892,7 @@ public extension TranslationClauseSegmenter {
     /// Treat that as a sentence break so leftover cannot dump as one line.
     /// "and" / "but" / "so" stay in the sentence. A capital And is still this
     /// caption; only a real period, or Then / Next, opens the next line.
-    public static let englishSentenceStarters: Set<String> = [
+    static let englishSentenceStarters: Set<String> = [
         "then", "now", "next", "also", "after",
         "later", "still", "however", "therefore", "meanwhile", "finally",
         "first", "second", "plus", "afterward", "afterwards",
@@ -1900,7 +1900,7 @@ public extension TranslationClauseSegmenter {
 
     /// Analyzer often starts the next sentence in lowercase. Only `then` /
     /// `next` — lowercase `and` / `but` / `so` are still this caption.
-    public static let englishSoftSentenceStarters: Set<String> = [
+    static let englishSoftSentenceStarters: Set<String> = [
         "then", "next",
     ]
 
@@ -1913,7 +1913,7 @@ public extension TranslationClauseSegmenter {
         "그걸", "그것을", "그게", "그건", "이제", "이번에는",
     ]
 
-    public static let japaneseSentenceStarters: [String] = [
+    static let japaneseSentenceStarters: [String] = [
         "そして", "それから", "次に", "また",
     ]
 
@@ -2906,7 +2906,7 @@ public extension TranslationClauseSegmenter {
         return self.leftoverAfterExactPrefix(leftover, prefix: prefix, languageID: languageID) != nil
     }
 
-    public static func endsWithTerminalPunctuation(_ text: String) -> Bool {
+    static func endsWithTerminalPunctuation(_ text: String) -> Bool {
         self.prefixEndsClause(text)
     }
 
@@ -3023,7 +3023,7 @@ public extension TranslationClauseSegmenter {
         }
     }
 
-    public static func continuesAsNewSentence(
+    static func continuesAsNewSentence(
         _ rest: String,
         languageID: String,
         prefix: String = ""
@@ -3106,14 +3106,14 @@ public extension TranslationClauseSegmenter {
         return (textTokens[index...].joined(separator: " "), consumed)
     }
 
-    public static let thinEnglishStarters: Set<String> = [
+    static let thinEnglishStarters: Set<String> = [
         "a", "an", "and", "as", "at", "because", "but", "for", "from", "he",
         "here", "i", "if", "in", "it", "its", "just", "like", "my", "now",
         "of", "on", "or", "our", "she", "so", "the", "then", "there", "they",
         "this", "that", "to", "uh", "um", "we", "well", "when", "with", "your",
     ]
 
-    public static let thinEnglishAuxiliaries: Set<String> = [
+    static let thinEnglishAuxiliaries: Set<String> = [
         "am", "are", "be", "been", "being", "can", "could", "did", "do", "does",
         "had", "has", "have", "is", "shall", "should", "was", "were", "will", "would",
     ]
@@ -3140,7 +3140,7 @@ public extension TranslationClauseSegmenter {
         )
     }
 
-    public static func isShortSpokenStop(_ text: String, languageID: String) -> Bool {
+    static func isShortSpokenStop(_ text: String, languageID: String) -> Bool {
         if self.isTooThinToCommit(text, languageID: languageID) { return true }
         if self.isCompactScript(languageID) {
             let marks = text.filter { character in
@@ -3176,15 +3176,15 @@ public extension TranslationClauseSegmenter {
     fileprivate static let tokenTrimSet = CharacterSet.punctuationCharacters
         .union(.whitespacesAndNewlines)
 
-    public static func tokens(_ text: String) -> [String] {
+    static func tokens(_ text: String) -> [String] {
         text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
     }
 
-    public static func tokenKey(_ token: String) -> String {
+    static func tokenKey(_ token: String) -> String {
         token.lowercased().trimmingCharacters(in: Self.tokenTrimSet)
     }
 
-    public static func compactKey(_ text: String) -> String {
+    static func compactKey(_ text: String) -> String {
         String(self.stripped(text).filter { !$0.isWhitespace })
     }
 
@@ -3221,7 +3221,7 @@ public extension TranslationClauseSegmenter {
     /// Same letter/number/whitespace key as `normalizedKey`, but diacritic- and
     /// width-insensitive, so echo detection matches a label across scripts
     /// (e.g. "Übersetzung" and "ubersetzung").
-    public static func foldedKey(_ text: String) -> String {
+    static func foldedKey(_ text: String) -> String {
         self.stripped(text, foldingDiacritics: true)
     }
 }

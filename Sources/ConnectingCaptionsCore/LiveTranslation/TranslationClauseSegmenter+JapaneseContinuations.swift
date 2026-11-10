@@ -3,7 +3,7 @@ import Foundation
 public extension TranslationClauseSegmenter {
     /// English and, but, so — or a Japanese ので / けど leftover — stay on
     /// the newest line. Other listen languages are unchanged.
-    public static func rowContinuation(row: String, unit: String, languageID: String) -> String? {
+    static func rowContinuation(row: String, unit: String, languageID: String) -> String? {
         if let english = self.englishRowContinuation(row: row, unit: unit, languageID: languageID) {
             return english
         }
@@ -12,7 +12,7 @@ public extension TranslationClauseSegmenter {
 
     /// "今日は休みです" then "ので家にいます" is still that sentence.
     /// "そして次に適用しました" opens the next caption.
-    public static func japaneseRowContinuation(row: String, unit: String, languageID: String) -> String? {
+    static func japaneseRowContinuation(row: String, unit: String, languageID: String) -> String? {
         guard self.languageCode(from: languageID) == "ja" else { return nil }
         let row = row.trimmingCharacters(in: .whitespacesAndNewlines)
         let unit = unit.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -32,7 +32,7 @@ public extension TranslationClauseSegmenter {
 
     /// Particles and connectives that finish the clause just peeled, not a
     /// new sentence. そして / それから / 次に / また / しかし start the next one.
-    public static func japaneseRemainderContinuesClause(_ rest: String) -> Bool {
+    static func japaneseRemainderContinuesClause(_ rest: String) -> Bool {
         let rest = rest.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let first = rest.first else { return false }
         if Self.japaneseSentenceStarters.contains(where: { rest.hasPrefix($0) }) {
