@@ -2,7 +2,7 @@ import Foundation
 
 public extension TranslationClauseSegmenter {
     /// English-only joins for a newest line. Other listen languages are unchanged.
-    public static func englishRowContinuation(row: String, unit: String, languageID: String) -> String? {
+    static func englishRowContinuation(row: String, unit: String, languageID: String) -> String? {
         guard self.languageCode(from: languageID) == "en" else { return nil }
         if let appended = self.appendedContinuation(row: row, unit: unit) { return appended }
         if let joined = self.abbreviationContinuation(row: row, unit: unit) { return joined }
@@ -12,7 +12,7 @@ public extension TranslationClauseSegmenter {
 
     /// "Epstein files." then "The Epstein Files." is the same line with an article.
     /// "The Epstein files are out." is a longer sentence and stays new.
-    public static func isLeadingArticleRevision(previous: String, incoming: String, languageID: String) -> Bool {
+    static func isLeadingArticleRevision(previous: String, incoming: String, languageID: String) -> Bool {
         guard self.languageCode(from: languageID) == "en" else { return false }
         let previousWords = self.englishWordKeys(previous)
         let incomingWords = self.englishWordKeys(incoming)
@@ -21,7 +21,7 @@ public extension TranslationClauseSegmenter {
         return Array(incomingWords.dropFirst()) == previousWords
     }
 
-    public static func continuesSamePaintedLine(previous: String, incoming: String, languageID: String) -> Bool {
+    static func continuesSamePaintedLine(previous: String, incoming: String, languageID: String) -> Bool {
         if self.isInPlaceGrowth(previous: previous, incoming: incoming) { return true }
         return self.isLeadingArticleRevision(previous: previous, incoming: incoming, languageID: languageID)
     }
@@ -29,7 +29,7 @@ public extension TranslationClauseSegmenter {
     /// "across U.S." then "politics in Hollywood." The abbreviation period was
     /// not the end of the sentence. A lowercase "on the other hand" after a
     /// real period still starts its own line.
-    public static func abbreviationContinuation(row: String, unit: String) -> String? {
+    static func abbreviationContinuation(row: String, unit: String) -> String? {
         let row = row.trimmingCharacters(in: .whitespacesAndNewlines)
         let unit = unit.trimmingCharacters(in: .whitespacesAndNewlines)
         guard self.endsWithEnglishAbbreviation(row), self.startsContinuation(unit) else { return nil }
@@ -41,7 +41,7 @@ public extension TranslationClauseSegmenter {
 
     /// "The Epstein Files." then "Deeply shrouded…". A short verbless line
     /// plus an -ly adverb. "Investigators found more." stays the next line.
-    public static func adverbialContinuation(row: String, unit: String) -> String? {
+    static func adverbialContinuation(row: String, unit: String) -> String? {
         let row = row.trimmingCharacters(in: .whitespacesAndNewlines)
         let unit = unit.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let first = self.tokens(unit).first else { return nil }
@@ -64,7 +64,7 @@ public extension TranslationClauseSegmenter {
 
     /// A long "Despite…" line painted before its main clause arrived.
     /// A short "Because I said so." does not swallow the next sentence.
-    public static func subordinateContinuation(row: String, unit: String) -> String? {
+    static func subordinateContinuation(row: String, unit: String) -> String? {
         let row = row.trimmingCharacters(in: .whitespacesAndNewlines)
         let unit = unit.trimmingCharacters(in: .whitespacesAndNewlines)
         guard self.englishWordKeys(row).count >= 8,
@@ -87,7 +87,7 @@ public extension TranslationClauseSegmenter {
     /// "Because it rained, we stayed home." already has its main clause, so the
     /// next sentence is not its ending. "Despite 250 victims, and clear evidence"
     /// is still waiting for one: a comma before a subject is the signal.
-    public static func subordinateClauseHasMainClause(_ clause: String) -> Bool {
+    static func subordinateClauseHasMainClause(_ clause: String) -> Bool {
         var index = clause.startIndex
         while let comma = clause[index...].firstIndex(of: ",") {
             let after = clause.index(after: comma)
@@ -103,7 +103,7 @@ public extension TranslationClauseSegmenter {
 
     /// The first word after a joined period. A common word loses its capital;
     /// a name ("Biden", "Apple") keeps it.
-    public static func lowercasedJoinedWord(_ word: String) -> String {
+    static func lowercasedJoinedWord(_ word: String) -> String {
         let key = self.tokenKey(word)
         guard Self.mainClauseSubjects.contains(key)
             || Self.thinEnglishStarters.contains(key)

@@ -21,7 +21,7 @@ public protocol TranslationEngine: AnyObject {
 }
 
 public extension TranslationEngine {
-    public func translate(
+    func translate(
         _ text: String,
         source: TranslationLanguage,
         target: TranslationLanguage,

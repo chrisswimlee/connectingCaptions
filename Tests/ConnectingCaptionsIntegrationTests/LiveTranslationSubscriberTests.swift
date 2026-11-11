@@ -167,6 +167,35 @@ final class FakeTranslationEngine: TranslationEngine {
     var failIf: ((String) -> Bool)?
     private(set) var currentInFlight = 0
     private(set) var maxInFlight = 0
+    /// Calls for these texts wait until `releaseHeldCalls()`. A fixed delay
+    /// races a slow CI runner; a hold keeps a translation in flight on purpose.
+    var heldTexts: Set<String> = []
+    private let holdLock = NSLock()
+    private var heldCalls: [CheckedContinuation<Void, Never>] = []
+    private var released = false
+
+    func releaseHeldCalls() {
+        self.holdLock.lock()
+        self.released = true
+        let held = self.heldCalls
+        self.heldCalls = []
+        self.holdLock.unlock()
+        held.forEach { $0.resume() }
+    }
+
+    private func waitIfHeld(_ text: String) async {
+        guard self.heldTexts.contains(text) else { return }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            self.holdLock.lock()
+            if self.released {
+                self.holdLock.unlock()
+                continuation.resume()
+            } else {
+                self.heldCalls.append(continuation)
+                self.holdLock.unlock()
+            }
+        }
+    }
 
     func translate(
         _ text: String,
@@ -177,6 +206,7 @@ final class FakeTranslationEngine: TranslationEngine {
         self.maxInFlight = max(self.maxInFlight, self.currentInFlight)
         defer { self.currentInFlight -= 1 }
         self.calls.append(text)
+        await self.waitIfHeld(text)
         let delay = self.delayByText[text] ?? self.delayNanoseconds
         if delay > 0 {
             try await Task.sleep(nanoseconds: delay)
@@ -484,7 +514,7 @@ final class LiveTranslationSubscriberTests: XCTestCase {
         XCTAssertEqual(subscriber.sourceDraft, "Hello world today")
         XCTAssertTrue(subscriber.committedLines.isEmpty)
 
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await subscriber.waitForLivePrefetchForTesting()
         XCTAssertEqual(engine.calls, ["Hello world today"])
         XCTAssertEqual(subscriber.liveCaptionText, "안녕 세상")
         XCTAssertTrue(subscriber.committedLines.isEmpty)
@@ -506,7 +536,7 @@ final class LiveTranslationSubscriberTests: XCTestCase {
         let subscriber = LiveTranslationSubscriber(translator: engine)
         subscriber.beginListening()
         subscriber.handlePartial("Hello world today")
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await subscriber.waitForLivePrefetchForTesting()
         XCTAssertEqual(engine.calls, ["Hello world today"])
         XCTAssertEqual(subscriber.liveCaptionText, "안녕 세상")
         let output = await subscriber.translateFinal("Hello world today.")
