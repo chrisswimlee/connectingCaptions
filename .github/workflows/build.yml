@@ -146,7 +146,26 @@ jobs:
           -maximum-test-execution-time-allowance 300 \
           -resultBundlePath "${RUNNER_TEMP}/Tests.xcresult" \
           CODE_SIGN_IDENTITY="-" \
+          | tee "${RUNNER_TEMP}/xcodebuild-test.log" \
           | xcpretty
+
+    # xcpretty hides which test failed or hung. Print it in the job log.
+    - name: Show failing tests
+      if: failure()
+      run: |
+        grep -E "error: |Test Case .* failed|exceeded|Restarting after|crashed|Failing tests" "${RUNNER_TEMP}/xcodebuild-test.log" | head -100 || true
+        xcrun xcresulttool get test-results tests --path "${RUNNER_TEMP}/Tests.xcresult" --format json 2>/dev/null \
+          | python3 -c 'import json,sys
+        def walk(n, path=""):
+            name = n.get("name", "")
+            if n.get("nodeType") == "Test Case" and n.get("result") not in ("Passed", "Skipped", "Expected Failure"):
+                print("FAILED:", path + "/" + name, n.get("result"))
+                for c in n.get("children", []):
+                    print("   ", c.get("name", ""))
+            for c in n.get("children", []):
+                walk(c, path + "/" + name if name else path)
+        for t in json.load(sys.stdin).get("testNodes", []):
+            walk(t)' || true
 
     # A hung test fails after its allowance instead of eating the job timeout.
     # The result bundle keeps the failing test name and a spindump.
