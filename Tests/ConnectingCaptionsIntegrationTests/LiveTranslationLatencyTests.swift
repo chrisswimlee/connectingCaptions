@@ -300,7 +300,7 @@ final class LiveTranslationLatencyTests: XCTestCase {
         )
         subscriber.beginListening()
         subscriber.handlePartial("Hello world today")
-        try? await Task.sleep(nanoseconds: 150_000_000)
+        await subscriber.waitForLivePrefetchForTesting()
         XCTAssertEqual(engine.calls, ["Hello world today"])
         XCTAssertEqual(subscriber.liveCaptionText, "안녕 세상")
         XCTAssertTrue(subscriber.committedLines.isEmpty)

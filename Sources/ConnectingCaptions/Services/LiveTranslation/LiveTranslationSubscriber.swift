@@ -759,6 +759,12 @@ final class LiveTranslationSubscriber: ObservableObject {
         }
     }
 
+    /// The live Show-as prefetch only. Settles and commits are left alone, so
+    /// an open line can be checked before a pause would print it.
+    func waitForLivePrefetchForTesting() async {
+        await self.prefetchTask?.value
+    }
+
     func waitForIdleForTesting() async {
         // A failed translation schedules its one retry only after the commit
         // task returns, so drain commits, then the retry, then commits again.

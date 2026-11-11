@@ -60,6 +60,9 @@ final class LiveTranslationMockASRTests: XCTestCase {
             "And we shipped it to production.": "그리고 프로덕션에 올렸습니다.",
         ]
         engine.result = .success("번역")
+        // The first two sentences stay in flight until the stream ends, however
+        // slow the runner is between ticks.
+        engine.heldTexts = ["Today we trained the model.", "Then we applied it."]
         let subscriber = LiveTranslationSubscriber(translator: engine)
         subscriber.beginListening()
 
@@ -79,6 +82,7 @@ final class LiveTranslationMockASRTests: XCTestCase {
         let liveRows = TheaterCaptionFlow.lines(board: .make(translated: subscriber.committedLines, sources: subscriber.committedSourceLines, ids: subscriber.committedLineIDs))
         XCTAssertFalse(liveRows.contains { $0.isDraft })
 
+        engine.releaseHeldCalls()
         await subscriber.waitForIdleForTesting()
         // The last sentence prints once its wording stays still.
         XCTAssertEqual(
