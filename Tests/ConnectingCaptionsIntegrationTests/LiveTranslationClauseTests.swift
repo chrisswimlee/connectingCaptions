@@ -2286,21 +2286,23 @@ final class TheaterSentenceEndCommitTests: XCTestCase {
         settings.translationTargetLanguageID = "ko"
         let engine = FakeTranslationEngine()
         engine.result = .success("번역")
-        engine.delayByText = [
-            "Today we trained the model.": 400_000_000,
-        ]
+        // The first sentence is held open by the test, not by a 400 ms delay
+        // that a slow CI runner can outlast before the second call is seen.
+        engine.heldTexts = ["Today we trained the model."]
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".json")
         let subscriber = LiveTranslationSubscriber(translator: engine, archive: LectureCaptionArchive(url: url))
         subscriber.beginListening()
         let spoken = "Today we trained the model. Then we applied it."
         subscriber.handlePartial(spoken)
         subscriber.handlePartial(spoken)
-        let deadline = ProcessInfo.processInfo.systemUptime + 0.2
+        let deadline = ProcessInfo.processInfo.systemUptime + 5
         while !engine.calls.contains(where: { $0.contains("Then we applied it") }),
               ProcessInfo.processInfo.systemUptime < deadline
         {
             try? await Task.sleep(nanoseconds: 10_000_000)
         }
+        // Released before the check, so a failure cannot leave the first call hanging.
+        engine.releaseHeldCalls()
         XCTAssertTrue(
             engine.calls.contains { $0.contains("Then we applied it") },
             "the next sentence must be sent for translation while the earlier one is still running: \(engine.calls)"
