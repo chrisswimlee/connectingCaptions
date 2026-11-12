@@ -1835,7 +1835,13 @@ final class LiveTranslationSubscriber: ObservableObject {
             if !key.isEmpty { self.trailingFragmentKeys.insert(key) }
         }
         switch self.admissionDecision(cleaned, phase: .propose) {
-        case .skip:
+        case .skip(let reason):
+            if reason == .revisesNewest {
+                _ = self.replaceNewestWithRevision(
+                    cleaned,
+                    languageID: SpokenLanguageResolver.listenLanguageID(for: cleaned)
+                )
+            }
             self.recognizedSpeech.reservedKeys.remove(TranslationClauseSegmenter.clauseIdentity(cleaned))
             self.forgetTrailingFragment(cleaned)
             return
@@ -2690,6 +2696,9 @@ final class LiveTranslationSubscriber: ObservableObject {
 
     private func retainUnreadSpeech(_ incoming: String, languageID: String) -> String {
         let incoming = incoming.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Peel treats a one-word fix as already printed and drops it. Write it
+        // onto the newest row first, so Theater shows the corrected line.
+        self.adoptNewestLineCorrection(incoming, languageID: languageID)
         // "…data." → "…data too." is not a string prefix: the period is where
         // the new words were inserted. Peel then keeps the shorter leftover,
         // and the longer clause never retargets.
@@ -2721,6 +2730,39 @@ final class LiveTranslationSubscriber: ObservableObject {
         // or shrinking. Keep that leftover so the printed sentence cannot
         // come back onto the board.
         return open
+    }
+
+    /// FluidVoice, Apple Speech, and Speech Analyzer all deliver one cumulative
+    /// line. A close fix of the newest sentence updates that row. It does not
+    /// become another caption.
+    private func adoptNewestLineCorrection(_ incoming: String, languageID: String) {
+        guard let newest = self.newestCorrectableSource(),
+              let replacement = TranslationClauseSegmenter.replacementForNewestLine(
+                hypothesis: incoming,
+                newest: newest,
+                languageID: languageID
+              )
+        else { return }
+        if self.replaceNewestWithRevision(replacement, languageID: languageID) { return }
+        if let index = self.newestUnpublishedCommitIndex,
+           TranslationClauseSegmenter.isSameClause(self.commitOrder[index], newest)
+        {
+            self.replaceUnpublishedCommit(at: index, with: replacement)
+            return
+        }
+        guard let last = self.captionLog.entries.last,
+              TranslationClauseSegmenter.isSameClause(
+                self.pendingGrowthSource(for: last.id) ?? last.source,
+                newest
+              )
+        else { return }
+        self.schedulePaintedGrowth(id: last.id, source: replacement)
+    }
+
+    private func newestCorrectableSource() -> String? {
+        if let pending = self.pendingGrowth { return pending.source }
+        if let pending = self.orderedPendingSources.last { return pending }
+        return self.captionLog.entries.last?.source
     }
 
     private func keepsInPlaceGrowth(_ incoming: String, languageID: String) -> Bool {

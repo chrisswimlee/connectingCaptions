@@ -1837,6 +1837,41 @@ final class LiveTranslationClauseTests: XCTestCase {
         }
     }
 
+    func testReplacementForNewestLineRewritesOnlyTheCorrectedCaption() {
+        let wrong = "Today we trained the modal."
+        let fixed = "Today we trained the model."
+        XCTAssertEqual(
+            TranslationClauseSegmenter.replacementForNewestLine(
+                hypothesis: fixed,
+                newest: wrong,
+                languageID: "en"
+            ),
+            fixed
+        )
+        XCTAssertEqual(
+            TranslationClauseSegmenter.replacementForNewestLine(
+                hypothesis: "Please sit down now. \(fixed)",
+                newest: wrong,
+                languageID: "en"
+            ),
+            fixed
+        )
+        XCTAssertNil(
+            TranslationClauseSegmenter.replacementForNewestLine(
+                hypothesis: "\(wrong) \(fixed)",
+                newest: wrong,
+                languageID: "en"
+            )
+        )
+        XCTAssertNil(
+            TranslationClauseSegmenter.replacementForNewestLine(
+                hypothesis: fixed,
+                newest: fixed,
+                languageID: "en"
+            )
+        )
+    }
+
     func testLeftoverTailDropsALongOffscreenPrefixWithoutReprinting() {
         let hidden = (1...40).map { "This is committed sentence number \($0) of the talk." }
         let printed = (41...43).map { "This is committed sentence number \($0) of the talk." }
