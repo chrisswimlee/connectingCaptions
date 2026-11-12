@@ -101,6 +101,10 @@ final class LiveTranslationSubscriber: ObservableObject {
     /// Clause-boundary Show-as. Separate from the commit chain so a pause
     /// can still translate the whole leftover.
     private var prefetchTask: Task<Void, Never>?
+    /// The unfinished sentence is translated about once a second, not on every
+    /// speech tick. A different clause still goes out immediately.
+    private var lastLivePrefetchUptime: TimeInterval = 0
+    private var lastLivePrefetchUnit = ""
     private var generation: UInt64 = 0
     var translatedDraftSource: String = ""
     private let appleEngine: AppleTranslationEngine
@@ -532,6 +536,8 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.heldLiveSpoken = ""
         self.previousPartialLeftover = ""
         self.contextStreak.reset()
+        self.lastLivePrefetchUptime = 0
+        self.lastLivePrefetchUnit = ""
         self.refreshInbox()
     }
 
@@ -549,6 +555,8 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.translatedDraft = self.captionLog.translatedLines.last ?? ""
         self.heldLiveSpoken = ""
         self.previousPartialLeftover = ""
+        self.lastLivePrefetchUptime = 0
+        self.lastLivePrefetchUnit = ""
         TheaterSpokenDelivery.shared.dropPending()
         self.refreshInbox()
     }
@@ -582,6 +590,8 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.heldLiveSpoken = ""
         self.previousPartialLeftover = ""
         self.contextStreak.reset()
+        self.lastLivePrefetchUptime = 0
+        self.lastLivePrefetchUnit = ""
         self.listenBatchStart = self.captionLog.sourceLines.count
         self.listenHistory = []
         self.latencyTracker.resetUtterance()
@@ -606,6 +616,8 @@ final class LiveTranslationSubscriber: ObservableObject {
         self.heldLiveSpoken = ""
         self.previousPartialLeftover = ""
         self.contextStreak.reset()
+        self.lastLivePrefetchUptime = 0
+        self.lastLivePrefetchUnit = ""
         self.listenBatchStart = self.captionLog.sourceLines.count
         self.listenHistory = []
         self.refreshInbox()
@@ -2446,6 +2458,12 @@ final class LiveTranslationSubscriber: ObservableObject {
         // A finished sentence is translated once, on the commit. Prefetching it
         // on the tick before that commit asks Apple Translation twice.
         guard !TranslationClauseSegmenter.looksComplete(unit, languageID: languageID) else { return }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard LiveTranslationPrefetch.shouldRefreshLiveCaption(
+            now: now,
+            lastSent: self.lastLivePrefetchUptime,
+            sameClause: self.livePrefetchIsSameClause(unit)
+        ) else { return }
         guard LiveTranslationPrefetch.canPrefetch(
             unit: unit,
             inFlightSources: self.inFlightSources
@@ -2460,19 +2478,30 @@ final class LiveTranslationSubscriber: ObservableObject {
         let pair = SpokenLanguageResolver.pairForSpokenText(unit, settings: settings)
         let source = pair.source
         let target = pair.target
-        let context = self.livePrefetchContext(incoming: unit)
-        let prior = context.prior
+        // The unfinished line is sent alone. The four earlier sentences stay
+        // on the commit, which runs once when the sentence is finished.
+        let prior = (sources: [String](), translations: [String]())
         let key = LiveTranslationPrefetch.cacheKey(
             unit: unit,
             priorSources: prior.sources,
-            priorIDs: context.priorIDs,
+            priorIDs: [],
             sourceID: source.id,
             targetID: target.id
         )
         guard let token = self.prefetchCache.begin(key) else { return }
+        self.lastLivePrefetchUptime = now
+        self.lastLivePrefetchUnit = unit
         self.prefetchTask = Task { [weak self] in
             await self?.prefetchUnit(unit, key: key, prior: prior, generation: generation, cacheGeneration: token)
         }
+    }
+
+    private func livePrefetchIsSameClause(_ unit: String) -> Bool {
+        let previous = self.lastLivePrefetchUnit
+        guard !previous.isEmpty else { return false }
+        return TranslationClauseSegmenter.isSameClause(previous, unit)
+            || TranslationClauseSegmenter.isGrowingClause(previous, toward: unit)
+            || TranslationClauseSegmenter.isGrowingClause(unit, toward: previous)
     }
 
     private func prefetchUnit(

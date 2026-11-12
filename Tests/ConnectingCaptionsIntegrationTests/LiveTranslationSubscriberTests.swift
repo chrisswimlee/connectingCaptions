@@ -1935,6 +1935,13 @@ final class LiveTranslationSubscriberTests: XCTestCase {
         XCTAssertFalse(output.contains(start))
     }
 
+    func testLivePrefetchWaitsASecondWhileTheSameClauseGrows() {
+        XCTAssertTrue(LiveTranslationPrefetch.shouldRefreshLiveCaption(now: 10, lastSent: 0, sameClause: true))
+        XCTAssertTrue(LiveTranslationPrefetch.shouldRefreshLiveCaption(now: 10, lastSent: 9, sameClause: false))
+        XCTAssertFalse(LiveTranslationPrefetch.shouldRefreshLiveCaption(now: 10.4, lastSent: 10, sameClause: true))
+        XCTAssertTrue(LiveTranslationPrefetch.shouldRefreshLiveCaption(now: 11, lastSent: 10, sameClause: true))
+    }
+
     func testPrefetchPicksACompletedClauseAndKeysByPriorContext() {
         XCTAssertTrue(
             TranslationClauseSegmenter.isGrowingClause(

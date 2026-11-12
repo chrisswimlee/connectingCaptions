@@ -2,6 +2,15 @@ import XCTest
 @testable import ConnectingCaptions_Debug
 
 final class LiveAudioRetentionTests: XCTestCase {
+    func testBatteryDecodeBudgetShortensTheWindowAndSlowsFastTicks() {
+        XCTAssertEqual(SpeechDecodeBudget.theaterPreviewSeconds(onBattery: false), 8)
+        XCTAssertEqual(SpeechDecodeBudget.theaterPreviewSeconds(onBattery: true), 4)
+        XCTAssertEqual(SpeechDecodeBudget.tickSeconds(base: 0.6, trailingWindow: true, onBattery: true), 1.2, accuracy: 0.001)
+        XCTAssertEqual(SpeechDecodeBudget.tickSeconds(base: 0.6, trailingWindow: true, onBattery: false), 0.6, accuracy: 0.001)
+        XCTAssertEqual(SpeechDecodeBudget.tickSeconds(base: 0.6, trailingWindow: false, onBattery: true), 0.6, accuracy: 0.001)
+        XCTAssertEqual(SpeechDecodeBudget.tickSeconds(base: 1.0, trailingWindow: true, onBattery: true), 1.0, accuracy: 0.001)
+    }
+
     func testCaptureTimelinePreservesRealPauseAcrossSyntheticResumeWall() throws {
         var timeline = CaptureAudioTimeline()
         timeline.append(start: 0, count: 16_000, hostTime: LiveTranslationHostClock.ticks(forSeconds: 100))

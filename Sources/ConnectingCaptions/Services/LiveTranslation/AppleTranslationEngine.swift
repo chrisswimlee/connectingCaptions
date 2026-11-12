@@ -486,7 +486,7 @@ final class AppleTranslationEngine: ObservableObject, TranslationEngine {
             }
             racers.supersede = Task.detached {
                 while !Task.isCancelled, !isCancelled() {
-                    try? await Task.sleep(nanoseconds: 20_000_000)
+                    try? await Task.sleep(nanoseconds: 100_000_000)
                 }
                 if Task.isCancelled { return }
                 settle(.failure(TranslationEngineError.superseded))

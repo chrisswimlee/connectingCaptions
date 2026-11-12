@@ -3,6 +3,7 @@ import FluidAudio
 import SwiftUI
 
 struct ProIOSHomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: ProIOSSession
     @EnvironmentObject private var license: ProIOSLicenseStore
     @EnvironmentObject private var settings: ProIOSSettings
@@ -65,6 +66,12 @@ struct ProIOSHomeView: View {
             }
             .onChange(of: self.settings.engine) { _, engine in
                 self.session.selectEngine(engine)
+            }
+            .onChange(of: self.scenePhase) { _, phase in
+                // No Float on this build. Leaving the app stops Listen, the
+                // same as the App Store app when Float is off.
+                guard phase == .background else { return }
+                Task { await self.session.stop() }
             }
         }
     }

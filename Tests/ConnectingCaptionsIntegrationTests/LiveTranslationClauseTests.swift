@@ -1649,6 +1649,8 @@ final class LiveTranslationClauseTests: XCTestCase {
             )
         )
         XCTAssertEqual(LiveTranslationTiming.contextSentenceCount, 4)
+        XCTAssertEqual(LiveTranslationTiming.contextSentenceLimit(languageID: "ko"), 2)
+        XCTAssertEqual(LiveTranslationTiming.contextSentenceLimit(languageID: "en"), 0)
         XCTAssertEqual(LiveTranslationTiming.visibleTheaterLines, 48)
         XCTAssertEqual(LiveTranslationTiming.maxDraftCharacters, 240)
         XCTAssertEqual(LiveTranslationTiming.eouHoldNanoseconds, 400_000_000)

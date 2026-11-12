@@ -19,6 +19,23 @@ nonisolated public enum LiveAudioRetention {
     }
 }
 
+/// How much of a talk a trailing-window engine re-reads. Plugged in, Theater
+/// keeps the 8 s slice. On battery that slice is 4 s and ticks slower than
+/// once a second are doubled, so a 0.6 s model hears each second about three
+/// times instead of about thirteen. Incremental engines are unchanged.
+enum SpeechDecodeBudget {
+    static let batteryPreviewSeconds = 4
+
+    static func theaterPreviewSeconds(onBattery: Bool) -> Int {
+        onBattery ? self.batteryPreviewSeconds : LiveAudioRetention.theaterPreviewSeconds
+    }
+
+    static func tickSeconds(base: Double, trailingWindow: Bool, onBattery: Bool) -> Double {
+        guard trailingWindow, onBattery, base < 1 else { return base }
+        return min(base * 2, 1.5)
+    }
+}
+
 /// Thread-safe PCM ring. `count` is the logical session length; only the newest
 /// retained window stays in RAM.
 final nonisolated public class ThreadSafeAudioBuffer {

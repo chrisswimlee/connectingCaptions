@@ -41,6 +41,10 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
     private var clearPromptQuietUntil = Date.distantPast
     private var packCheck = TranslationPairCheck()
     private var translationWarmTask: Task<Void, Never>?
+    /// Pause keeps the microphone open. After three minutes it stops Listen,
+    /// which is what auto-lock already does on iPhone.
+    private var pauseMicrophoneReleaseTask: Task<Void, Never>?
+    private static let pauseMicrophoneReleaseNanoseconds: UInt64 = 180_000_000_000
 
     var shouldHandleTranslationStop: Bool {
         self.isSessionActive || self.abandonCaptionSession
@@ -106,6 +110,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.abandonCaptionSession = false
         self.isSessionActive = true
         self.isPaused = false
+        self.cancelPauseMicrophoneRelease()
         self.listenKind = kind
         KeywordAnchorSession.shared.capture()
         let trace = LiveTranslationSessionTrace(
@@ -261,6 +266,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         }
         self.isSessionActive = false
         self.isPaused = false
+        self.cancelPauseMicrophoneRelease()
         self.listenKind = nil
         self.clearThermalEngineOverride()
         self.subscriber.endListening()
@@ -281,6 +287,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.isFinishingSession = false
         self.isSessionActive = false
         self.isPaused = false
+        self.cancelPauseMicrophoneRelease()
         self.listenKind = nil
         self.clearThermalEngineOverride()
         TheaterSpeechSession.shared.clear(asr: AppServices.shared.asr)
@@ -308,6 +315,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
             self.stopToken = self.sessionToken
             self.isSessionActive = false
             self.isPaused = false
+            self.cancelPauseMicrophoneRelease()
             self.stopListening()
             PresenterCaptionController.shared.clearDisplay()
             return
@@ -542,16 +550,32 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.trace(LiveTranslationTrace.event("session pause", token: self.sessionToken))
         self.subscriber.holdUnacceptedForPause()
         AppServices.shared.asr.setCapturePaused(true)
+        self.armPauseMicrophoneRelease()
         self.refreshPresenter()
     }
 
     func resumeListening() {
         guard self.isSessionActive, self.isPaused else { return }
+        self.cancelPauseMicrophoneRelease()
         self.isPaused = false
         self.trace(LiveTranslationTrace.event("session resume", token: self.sessionToken))
         self.subscriber.releasePauseHold()
         AppServices.shared.asr.setCapturePaused(false)
         self.refreshPresenter()
+    }
+
+    private func armPauseMicrophoneRelease() {
+        self.cancelPauseMicrophoneRelease()
+        self.pauseMicrophoneReleaseTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.pauseMicrophoneReleaseNanoseconds)
+            guard !Task.isCancelled, let self, self.isPaused, self.isSessionActive else { return }
+            self.stopListening()
+        }
+    }
+
+    private func cancelPauseMicrophoneRelease() {
+        self.pauseMicrophoneReleaseTask?.cancel()
+        self.pauseMicrophoneReleaseTask = nil
     }
 
     func startInsertListening() {

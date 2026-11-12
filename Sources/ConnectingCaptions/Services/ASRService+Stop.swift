@@ -42,6 +42,7 @@ extension ASRService {
         }
         self.isStoppingFinalTranscription = true
         var completedBufferHandoff = false
+        var endStreamingSession = false
         defer {
             if completedBufferHandoff == false {
                 self.recordingBufferHandoffGate.complete(bufferHandoffToken)
@@ -50,6 +51,9 @@ extension ASRService {
             self.finishDeferredStopUIInvalidation()
             if self.benchmarkSessionID == stoppingSessionID {
                 self.isStoppingFinalTranscription = false
+            }
+            if endStreamingSession {
+                await self.transcriptionProvider.resetStreamingSession()
             }
         }
         self.stopStreamingScheduler(sessionID: stoppingSessionID)
@@ -87,6 +91,7 @@ extension ASRService {
         await self.stopActiveAudioCapture(reason: "recording_stop")
         self.benchmarkLog("capture_stop_await_return")
         self.audioCapturePipeline.finishRecording()
+        endStreamingSession = true
         self.benchmarkLog("capture_pipeline_finished")
 
         // A prepared direct IOProc owns only fixed memory and registration; it

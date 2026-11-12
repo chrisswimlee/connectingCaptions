@@ -71,8 +71,13 @@ final nonisolated class DebugLogger: @unchecked Sendable {
             pipelineID: pipelineID
         )
 
-        // Always persist diagnostics so issues can be debugged even if UI debug mode is off.
-        FileLogger.shared.append(line: formattedLine)
+        // Debug and timing lines are the hot path, so they share one write.
+        // Warnings and errors still reach disk before this call returns.
+        if level == .error || level == .warning {
+            FileLogger.shared.appendSync(line: formattedLine)
+        } else {
+            FileLogger.shared.append(line: formattedLine)
+        }
         #if DEBUG
         print(formattedLine)
         #endif

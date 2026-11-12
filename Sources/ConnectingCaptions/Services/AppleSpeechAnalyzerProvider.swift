@@ -584,10 +584,7 @@ final class AppleSpeechAnalyzerProvider: TranscriptionProvider {
     }
 
     private static func joiningCaption(_ committed: String, _ next: String) -> String {
-        if next.isEmpty { return committed }
-        if committed.isEmpty { return next }
-        if next == committed || next.hasPrefix(committed) { return next }
-        return RecognizedSegmentJoin.join(committed, next)
+        RecognizedSegmentJoin.absorb(existing: committed, next: next)
     }
 
     private func convertedBuffer(from samples: [Float]) -> AVAudioPCMBuffer? {

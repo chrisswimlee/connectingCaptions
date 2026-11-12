@@ -41,6 +41,17 @@ nonisolated public enum LiveTranslationTiming {
     public static let maxLineWordsVietnamese = 18
     public static let maxLineCharacters = 80
     public static let contextSentenceCount = 4
+
+    /// Korean, Japanese, and Thai drop subjects, so a commit for those
+    /// languages keeps two earlier sentences. Every other language is sent alone.
+    public static func contextSentenceLimit(languageID: String) -> Int {
+        switch TranslationClauseSegmenter.languageCode(from: languageID) {
+        case "ko", "ja", "th":
+            return 2
+        default:
+            return 0
+        }
+    }
     /// Recent lines the board can still show. A tall window fills from this
     /// list and the presenter can scroll back a few minutes. Older lines stay
     /// in the session record for History and export.
