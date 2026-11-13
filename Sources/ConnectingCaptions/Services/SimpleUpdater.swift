@@ -499,7 +499,6 @@ final class SimpleUpdater {
             throw SimpleUpdateError.notAnAppBundle
         }
 
-        self.clearQuarantine(extractedBundleURL)
         try await self.verifyCodeSignature(for: extractedBundleURL)
         let newInfo = try await self.codeSigningInformation(for: extractedBundleURL)
         let newTeam = UpdateSignaturePolicy.teamID(fromCodesignOutput: newInfo)
@@ -528,6 +527,8 @@ final class SimpleUpdater {
             throw SimpleUpdateError.codesignMismatch
         }
 
+        // Only a bundle that passed the signature and team checks loses its quarantine flag.
+        self.clearQuarantine(extractedBundleURL)
         self.createRollbackBackup(beforeRollback: false)
         self.setUpdateStatus("Installing the update. \(ConnectingCaptionsProduct.displayName) will restart automatically.")
 

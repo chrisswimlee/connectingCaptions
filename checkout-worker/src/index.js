@@ -12,6 +12,8 @@ const PRODUCT_ID = "connectingCaptions";
 const PERSONAL_SEATS = 2;
 const PERSONAL_EXPIRES = "2099-12-31";
 const SIGNATURE_TOLERANCE_SECONDS = 300;
+// Cloudflare KV will not take a TTL under 60 seconds.
+const CLAIM_TTL_SECONDS = 120;
 
 export default {
   async fetch(request, env) {
@@ -62,30 +64,59 @@ export async function handleWebhook(request, env, now = Date.now()) {
   }
 
   // Paddle retries a webhook until it gets a 2xx. Keep one key per transaction.
+  // Without the KV namespace a retry would email a second key, so refuse to issue.
   const store = env.ISSUED_KEYS;
-  if (store && (await store.get(`txn:${transactionId}`))) {
+  if (!store) {
+    return json({ error: "ISSUED_KEYS is not bound" }, 500);
+  }
+  const issuedKey = `txn:${transactionId}`;
+  const claimKey = `claim:${transactionId}`;
+  if (await store.get(issuedKey)) {
     return json({ ok: true, duplicate: true });
   }
-
-  const email = await customerEmail(env, txn.customer_id);
-  if (!email) {
-    // 5xx so Paddle retries; the lookup may succeed on the next attempt.
-    return json({ error: "could not find the buyer's email" }, 502);
+  // A short claim covers a retry that arrives while the first attempt is still
+  // sending. KV is eventually consistent, so this narrows the window; it is not a lock.
+  if (await store.get(claimKey)) {
+    return json({ error: "issuance in progress" }, 503);
   }
+  await store.put(claimKey, String(now), { expirationTtl: CLAIM_TTL_SECONDS });
 
-  const major = parseInt(env.KEY_MAJOR || "1", 10);
-  const issued = utcDay(new Date(now));
-  const token = await issuePersonalToken({ email, major, issued, privateKeyBase64: env.LICENSE_PRIVATE_KEY });
+  let sentKey = false;
+  try {
+    const email = await customerEmail(env, txn.customer_id);
+    if (!email) {
+      // 5xx so Paddle retries; the lookup may succeed on the next attempt.
+      return json({ error: "could not find the buyer's email" }, 502);
+    }
 
-  const sent = await sendKeyEmail(env, { email, token, major, reference: txn.invoice_number || transactionId });
-  if (!sent.ok) {
-    return json({ error: "email failed", detail: sent.detail }, 502);
+    const major = parseInt(env.KEY_MAJOR || "1", 10);
+    const issued = utcDay(new Date(now));
+    const token = await issuePersonalToken({ email, major, issued, privateKeyBase64: env.LICENSE_PRIVATE_KEY });
+
+    const sent = await sendKeyEmail(env, { email, token, major, reference: txn.invoice_number || transactionId });
+    if (!sent.ok) {
+      return json({ error: "email failed", detail: sent.detail }, 502);
+    }
+    sentKey = true;
+
+    // The buyer already has the key. A failed write must not turn into a 5xx,
+    // because Paddle's retry would then email a second key.
+    try {
+      await store.put(issuedKey, JSON.stringify({ email, token, issued }));
+    } catch (error) {
+      console.error(`could not record the key for ${transactionId}: ${error}`);
+    }
+    return json({ ok: true });
+  } finally {
+    if (!sentKey) {
+      // Nothing was sent, so let the retry start clean instead of waiting out the claim.
+      try {
+        await store.delete(claimKey);
+      } catch {
+        // The claim expires by itself.
+      }
+    }
   }
-
-  if (store) {
-    await store.put(`txn:${transactionId}`, JSON.stringify({ email, token, issued }));
-  }
-  return json({ ok: true });
 }
 
 // Paddle-Signature: ts=1671552777;h1=<hex hmac-sha256 of "ts:rawBody">
