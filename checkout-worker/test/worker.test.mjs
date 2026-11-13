@@ -22,7 +22,12 @@ function env(extra = {}) {
     RESEND_API_KEY: "re_test",
     EMAIL_FROM: "Connecting Captions Pro <keys@example.com>",
     KEY_MAJOR: "1",
-    ISSUED_KEYS: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v) },
+    ISSUED_KEYS: {
+      get: async (k) => kv.get(k) ?? null,
+      put: async (k, v) => void kv.set(k, v),
+      delete: async (k) => void kv.delete(k),
+      _map: kv,
+    },
     ...extra,
   };
 }
@@ -150,4 +155,42 @@ test("signature check accepts any h1 during secret rotation", async () => {
 test("KEY_MAJOR sets the version a key covers", async () => {
   const token = await issuePersonalToken({ email: "a@b.co", major: 2, issued: "2026-10-26", privateKeyBase64: PRIVATE_B64 });
   assert.equal(JSON.parse(Buffer.from(token.split(".")[0], "base64url")).major, 2);
+});
+
+test("without the KV namespace nothing is issued", async () => {
+  reset();
+  const response = await worker.fetch(request(transaction()), env({ ISSUED_KEYS: undefined }));
+  assert.equal(response.status, 500);
+  assert.equal(emails.length, 0);
+  assert.equal(customerLookups, 0);
+});
+
+test("a failed record write after the email still answers 200, so Paddle does not retry", async () => {
+  reset();
+  const e = env();
+  const realPut = e.ISSUED_KEYS.put;
+  e.ISSUED_KEYS.put = async (k, v, options) => {
+    if (k.startsWith("txn:")) throw new Error("kv down");
+    return realPut(k, v, options);
+  };
+  const response = await worker.fetch(request(transaction()), e);
+  assert.equal(response.status, 200);
+  assert.equal(emails.length, 1);
+});
+
+test("a retry that arrives while the first attempt holds the claim waits instead of sending", async () => {
+  reset();
+  const e = env();
+  e.ISSUED_KEYS._map.set("claim:txn_01abc", "1");
+  const response = await worker.fetch(request(transaction()), e);
+  assert.equal(response.status, 503);
+  assert.equal(emails.length, 0);
+});
+
+test("a failed attempt releases its claim so the retry is not blocked", async () => {
+  reset();
+  const e = env();
+  resendStatus = 500;
+  assert.equal((await worker.fetch(request(transaction()), e)).status, 502);
+  assert.equal(e.ISSUED_KEYS._map.has("claim:txn_01abc"), false);
 });
