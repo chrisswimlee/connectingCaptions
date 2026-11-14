@@ -856,8 +856,6 @@ final nonisolated class TranscriptionHistoryWriter: @unchecked Sendable {
         self.database = database
         // The transaction is committed and every payload decoded before retiring legacy storage.
         self.defaults.removeObject(forKey: self.legacyKey)
-        // Kept only once the import is in. A failed import must run again on Retry.
-        self.database = database
         return database
     }
 
