@@ -11,23 +11,6 @@ import SwiftUI
 // swiftlint:disable file_length type_body_length function_body_length cyclomatic_complexity
 // Tracked grandfather: existing FluidVoice-era file. New work belongs in a smaller file.
 
-// MARK: - Conditional Drawing Group Modifier
-
-/// Applies drawingGroup() only when enabled, allowing conditional GPU rasterization.
-/// Used for collapsed provider cards to improve scroll performance while
-/// preserving interactive elements in expanded cards.
-private struct ConditionalDrawingGroup: ViewModifier {
-    let enabled: Bool
-
-    func body(content: Content) -> some View {
-        if self.enabled {
-            content.drawingGroup()
-        } else {
-            content
-        }
-    }
-}
-
 extension AIEnhancementSettingsView {
     // MARK: - Helper Functions
 

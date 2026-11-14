@@ -15,6 +15,9 @@ final nonisolated class FileLogger: @unchecked Sendable {
     private let maxLogFileSize: UInt64 = 1 * 1024 * 1024 // 1 MB limit per log file
     private let maxLogFileAge: TimeInterval = 72 * 60 * 60 // Rotate every 72 hours
     private static var crashFileDescriptor: Int32 = -1
+    private var logFileDescriptor: Int32 = -1
+    private var pendingLog = Data()
+    private var flushItem: DispatchWorkItem?
     private static var crashHandlersInstalled = false
     private static let sigAbrtLine = Array("[CRASH] Fatal signal SIGABRT\n".utf8)
     private static let sigIllLine = Array("[CRASH] Fatal signal SIGILL\n".utf8)
@@ -38,6 +41,7 @@ final nonisolated class FileLogger: @unchecked Sendable {
             self.rotateIfNeeded(force: false)
             self.prepareCrashLogging()
             self.appendRunMetadata()
+            self.flushPendingUnlocked()
         }
         self.installCrashHandlersIfNeeded()
     }
@@ -45,13 +49,14 @@ final nonisolated class FileLogger: @unchecked Sendable {
     func append(line: String) {
         self.queue.async { [weak self] in
             guard let self = self else { return }
-            self.appendUnlocked(line: line)
+            self.enqueueUnlocked(line: line)
         }
     }
 
     func appendSync(line: String) {
         self.queue.sync {
-            self.appendUnlocked(line: line)
+            self.enqueueUnlocked(line: line)
+            self.flushPendingUnlocked()
         }
     }
 
@@ -61,13 +66,16 @@ final nonisolated class FileLogger: @unchecked Sendable {
 
     func clear() throws {
         try self.queue.sync {
-            if Self.crashFileDescriptor >= 0 {
-                close(Self.crashFileDescriptor)
-                Self.crashFileDescriptor = -1
+            self.flushItem?.cancel()
+            self.flushItem = nil
+            self.pendingLog.removeAll(keepingCapacity: false)
+            self.closeLogDescriptors()
+            defer {
+                self.prepareCrashLogging()
+                self.appendRunMetadata()
+                self.flushPendingUnlocked()
             }
-            defer { self.prepareCrashLogging() }
             try Self.removeDiagnosticFiles(in: self.logDirectory)
-            self.appendRunMetadata()
         }
     }
 
@@ -104,27 +112,64 @@ final nonisolated class FileLogger: @unchecked Sendable {
         }
     }
 
-    private func appendUnlocked(line: String) {
-        self.createLogDirectoryIfNeeded()
+    private func enqueueUnlocked(line: String) {
+        guard let data = (line + "\n").data(using: .utf8) else { return }
+        self.pendingLog.append(data)
+        if self.pendingLog.count >= 6_144 {
+            self.flushPendingUnlocked()
+        } else {
+            self.scheduleFlushUnlocked()
+        }
+    }
+
+    private func scheduleFlushUnlocked() {
+        guard self.flushItem == nil else { return }
+        let item = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.flushItem = nil
+            self.flushPendingUnlocked()
+        }
+        self.flushItem = item
+        self.queue.asyncAfter(deadline: .now() + 0.2, execute: item)
+    }
+
+    /// One write for the lines gathered since the last flush. The file stays open.
+    private func flushPendingUnlocked() {
+        self.flushItem?.cancel()
+        self.flushItem = nil
+        guard !self.pendingLog.isEmpty else { return }
         self.rotateIfNeeded(force: false)
-        let data = (line + "\n").data(using: .utf8) ?? Data()
+        self.ensureLogFileDescriptor()
+        let data = self.pendingLog
+        self.pendingLog.removeAll(keepingCapacity: true)
+        guard self.logFileDescriptor >= 0 else { return }
+        data.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress, raw.count > 0 else { return }
+            _ = Darwin.write(self.logFileDescriptor, base, raw.count)
+        }
+    }
+
+    private func ensureLogFileDescriptor() {
+        if self.logFileDescriptor >= 0 { return }
+        self.createLogDirectoryIfNeeded()
         if !self.fileManager.fileExists(atPath: self.logFileURL.path) {
-            self.fileManager.createFile(atPath: self.logFileURL.path, contents: data)
+            self.fileManager.createFile(atPath: self.logFileURL.path, contents: nil)
+        }
+        self.logFileDescriptor = open(self.logFileURL.path, O_WRONLY | O_APPEND, S_IRUSR | S_IWUSR)
+        if Self.crashFileDescriptor < 0 {
             self.prepareCrashLogging()
-            return
         }
-        guard let handle = try? FileHandle(forWritingTo: self.logFileURL) else {
-            self.prepareCrashLogging()
-            return
+    }
+
+    private func closeLogDescriptors() {
+        if self.logFileDescriptor >= 0 {
+            close(self.logFileDescriptor)
+            self.logFileDescriptor = -1
         }
-        do {
-            try handle.seekToEnd()
-            try handle.write(contentsOf: data)
-            try handle.close()
-        } catch {
-            try? handle.close()
+        if Self.crashFileDescriptor >= 0 {
+            close(Self.crashFileDescriptor)
+            Self.crashFileDescriptor = -1
         }
-        self.prepareCrashLogging()
     }
 
     private func appendRunMetadata() {
@@ -133,8 +178,8 @@ final nonisolated class FileLogger: @unchecked Sendable {
         let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
         let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
         let pid = ProcessInfo.processInfo.processIdentifier
-        self.appendUnlocked(line: "[RUN] PID=\(pid) AppVersion=\(appVersion) Build=\(build) OS=\(osVersion)")
-        self.appendUnlocked(line: "[RUN] Processed by \(Bundle.main.bundleIdentifier ?? "unknown")")
+        self.enqueueUnlocked(line: "[RUN] PID=\(pid) AppVersion=\(appVersion) Build=\(build) OS=\(osVersion)")
+        self.enqueueUnlocked(line: "[RUN] Processed by \(Bundle.main.bundleIdentifier ?? "unknown")")
     }
 
     private func rotateIfNeeded(force: Bool) {
@@ -152,6 +197,8 @@ final nonisolated class FileLogger: @unchecked Sendable {
         }
 
         guard shouldRotate else { return }
+
+        self.closeLogDescriptors()
 
         // Remove existing backup if present
         if self.fileManager.fileExists(atPath: self.backupLogURL.path) {

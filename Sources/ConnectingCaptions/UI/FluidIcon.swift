@@ -71,22 +71,6 @@ enum ConnectingCaptionsLinkMark {
     }
 }
 
-/// Menu bar mark, 22×18pt. The Link mark in a single ink.
-/// Matches `drawMenuBarIcon` in `scripts/generate_connectingcaptions_brand.swift`.
-enum TheaterMenuBarMark {
-    static let pointSize = NSSize(width: 22, height: 18)
-
-    static func draw(in rect: CGRect, color: NSColor) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        ConnectingCaptionsLinkMark.draw(
-            in: rect.insetBy(dx: rect.width * 0.02, dy: rect.height * 0.04),
-            context: ctx,
-            amber: color.cgColor,
-            teal: color.cgColor
-        )
-    }
-}
-
 /// The Link mark as a SwiftUI view. Two-tone by default; pass `color` for a single ink.
 struct FluidIcon: View {
     let size: CGFloat

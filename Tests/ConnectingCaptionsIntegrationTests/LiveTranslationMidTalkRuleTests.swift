@@ -54,6 +54,30 @@ final class LiveTranslationMidTalkRuleTests: XCTestCase {
         XCTAssertEqual(RecognizedSegmentJoin.join("วันนี้", "AI"), "วันนี้ AI")
     }
 
+    func testASpeechCorrectionReplacesTheHeldLine() {
+        let heard = "I think the modal is ready."
+        let fixed = "I think the model is ready."
+        XCTAssertEqual(RecognizedSegmentJoin.absorb(existing: heard, next: fixed), fixed)
+        XCTAssertEqual(
+            RecognizedSegmentJoin.absorb(existing: heard, next: "We should ship it today."),
+            "I think the modal is ready. We should ship it today."
+        )
+        XCTAssertEqual(
+            RecognizedSegmentJoin.absorb(
+                existing: heard,
+                next: "I think the modal is ready. We should ship it today."
+            ),
+            "I think the modal is ready. We should ship it today."
+        )
+        XCTAssertEqual(RecognizedSegmentJoin.absorb(existing: "Hello", next: "Hello."), "Hello.")
+        XCTAssertEqual(RecognizedSegmentJoin.absorb(existing: "Hello.", next: "Hello"), "Hello.")
+        XCTAssertEqual(RecognizedSegmentJoin.absorb(existing: "今日は", next: "晴れ"), "今日は晴れ")
+        XCTAssertEqual(
+            RecognizedSegmentJoin.absorb(existing: "I think the model is ready", next: "the model is ready now"),
+            "I think the model is ready now"
+        )
+    }
+
     func testACompactLineWithAnEnglishTokenStaysThatLanguage() {
         XCTAssertFalse(self.s.isTooThinToCommit("วันนี้ AI ครับ", languageID: "th"))
         XCTAssertFalse(self.s.isTooThinToCommit("今天的AI模型", languageID: "zh"))

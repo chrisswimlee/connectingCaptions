@@ -141,19 +141,32 @@ final class LiveTranslationVisibilityTests: XCTestCase {
     @MainActor
     func testPasteTranslateResolvesThaiAndEnglishEitherWay() {
         let model = TheaterPasteTranslate.shared
+        let settings = SettingsStore.shared
         let originalSource = model.sourceLanguageID
         let originalTarget = model.targetLanguageID
-        let originalAuto = model.autoDetectPairDirection
+        let originalSettingsSource = settings.translationSourceLanguageID
+        let originalSettingsTarget = settings.translationTargetLanguageID
+        let originalMode = settings.theaterSessionMode
+        let originalModel = settings.selectedSpeechModel
+        let originalDynamic = settings.theaterDynamicPairing
         defer {
             model.sourceLanguageID = originalSource
             model.targetLanguageID = originalTarget
-            model.autoDetectPairDirection = originalAuto
+            settings.selectedSpeechModel = originalModel
+            settings.translationSourceLanguageID = originalSettingsSource
+            settings.translationTargetLanguageID = originalSettingsTarget
+            settings.theaterSessionMode = originalMode
+            settings.theaterDynamicPairing = originalDynamic
             model.clear()
         }
 
+        settings.theaterSessionMode = .translation
+        settings.translationSourceLanguageID = "th"
+        settings.translationTargetLanguageID = "en"
+        settings.selectedSpeechModel = .whisperSmall
+        settings.theaterDynamicPairing = true
         model.sourceLanguageID = "th"
         model.targetLanguageID = "en"
-        model.autoDetectPairDirection = true
 
         let thaiPair = model.resolvedPair(for: "สวัสดีครับทุกคน")
         XCTAssertEqual(thaiPair.source.id, "th")

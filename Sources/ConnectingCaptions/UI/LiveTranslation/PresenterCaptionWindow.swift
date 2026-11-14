@@ -581,7 +581,8 @@ final class PresenterCaptionController: NSObject, NSWindowDelegate {
     private func updateOverlayHoverTimer(running: Bool) {
         if running {
             guard self.overlayHoverTimer == nil else { return }
-            let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            // Eight times a second is enough to reveal the hidden toolbar.
+            let timer = Timer(timeInterval: 1.0 / 8.0, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated {
                     self?.refreshOverlayHoverCapture()
                 }

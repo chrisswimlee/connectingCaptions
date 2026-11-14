@@ -371,6 +371,32 @@ final class VoiceEngineLanguageReadinessTests: XCTestCase {
         XCTAssertEqual(settings.selectedSpeechModel, .whisperSmall)
     }
 
+    func testLanguageChangeKeepsEitherWayWhenTheNewPairCanStillHearBothSides() {
+        let settings = SettingsStore.shared
+        let originalModel = settings.selectedSpeechModel
+        let originalSource = settings.translationSourceLanguageID
+        let originalTarget = settings.translationTargetLanguageID
+        let originalDynamic = settings.theaterDynamicPairing
+        let originalMode = settings.theaterSessionMode
+        defer {
+            settings.selectedSpeechModel = originalModel
+            settings.translationSourceLanguageID = originalSource
+            settings.translationTargetLanguageID = originalTarget
+            settings.theaterSessionMode = originalMode
+            settings.theaterDynamicPairing = originalDynamic
+        }
+        settings.theaterSessionMode = .translation
+        settings.selectedSpeechModel = .whisperSmall
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "ko"
+        settings.theaterDynamicPairing = true
+        LiveTranslationController.shared.applyTargetLanguage("ja")
+        XCTAssertEqual(settings.translationTargetLanguageID, "ja")
+        XCTAssertTrue(settings.theaterDynamicPairing)
+        XCTAssertTrue(SpokenLanguageResolver.isDynamicPairingEnabled(settings: settings))
+        XCTAssertTrue(SpokenLanguageResolver.showsEitherWayControl(settings: settings))
+    }
+
     func testSwapCannotSelectAHiddenUnsupportedSpokenLanguage() {
         let settings = SettingsStore.shared
         let originalModel = settings.selectedSpeechModel

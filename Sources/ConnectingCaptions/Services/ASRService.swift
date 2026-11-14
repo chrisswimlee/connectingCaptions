@@ -1167,8 +1167,20 @@ final class ASRService: ObservableObject {
     var didPauseMediaForThisSession: Bool = false
 
     var audioLevelSubject = PassthroughSubject<CGFloat, Never>()
+    /// Readable from the audio callback. A meter subscribes; otherwise the
+    /// level stays off the main thread.
+    nonisolated let audioLevelGate = AudioLevelGate()
     var audioLevelPublisher: AnyPublisher<CGFloat, Never> {
-        self.audioLevelSubject.eraseToAnyPublisher()
+        self.audioLevelSubject
+            .handleEvents(
+                receiveSubscription: { [gate = self.audioLevelGate] _ in
+                    gate.changeSubscribers(by: 1)
+                },
+                receiveCancel: { [gate = self.audioLevelGate] in
+                    gate.changeSubscribers(by: -1)
+                }
+            )
+            .eraseToAnyPublisher()
     }
 
     var lastAudioLevelSentAt: TimeInterval = 0
@@ -1290,7 +1302,7 @@ final class ASRService: ObservableObject {
             return (self.audioBuffer.getRange(startingAt: start, count: available), .incrementalDelta, start)
         }
         let limit = self.speechCapturePolicy?.isSessionActive == true
-            ? LiveAudioRetention.theaterPreviewSamples : LiveAudioRetention.maximumRetainedSamples
+            ? self.theaterPreviewSampleLimit() : LiveAudioRetention.maximumRetainedSamples
         let start = max(logicalStart, logicalSampleCount - limit)
         let retained = self.audioBuffer.getRange(startingAt: start, count: max(0, logicalSampleCount - start))
         return (retained, .retainedWindow, start)
@@ -1298,11 +1310,20 @@ final class ASRService: ObservableObject {
 
     /// Whisper re-reads this slice. The 30 s ring stays for dictation; a Theater
     /// tick must not decode the whole ring and then dump it as one paragraph.
+    /// On battery the slice is shorter so a trailing-window model does less
+    /// repeated work.
     func theaterBoundedWindow(_ samples: [Float]) -> [Float] {
+        let limit = self.theaterPreviewSampleLimit()
         guard self.speechCapturePolicy?.isSessionActive == true,
-              samples.count > LiveAudioRetention.theaterPreviewSamples
+              samples.count > limit
         else { return samples }
-        return Array(samples.suffix(LiveAudioRetention.theaterPreviewSamples))
+        return Array(samples.suffix(limit))
+    }
+
+    func theaterPreviewSampleLimit() -> Int {
+        LiveAudioRetention.sampleRate * SpeechDecodeBudget.theaterPreviewSeconds(
+            onBattery: SpeechPowerSource.isOnBattery
+        )
     }
 
     func dropRetainedAudioAfterPreview(currentSampleCount: Int, usedIncrementalDelta: Bool) {
@@ -1337,7 +1358,10 @@ final class ASRService: ObservableObject {
               self.modelDownloadTask == nil,
               self.speechCapturePolicy?.isSessionActive != true
         else { return }
-        if self.transcriptionProvider is AppleSpeechProvider { return }
+        if self.transcriptionProvider is AppleSpeechProvider {
+            await self.transcriptionProvider.releaseMemory()
+            return
+        }
         await self.transcriptionProvider.releaseMemory()
         self.isAsrReady = false
         DebugLogger.shared.info("Released idle speech model from memory", source: "ASRService")
@@ -1348,7 +1372,11 @@ final class ASRService: ObservableObject {
     }
 
     var streamingChunkDurationSeconds: Double {
-        self.effectiveSpeechModel.streamingPreviewIntervalSeconds
+        SpeechDecodeBudget.tickSeconds(
+            base: self.effectiveSpeechModel.streamingPreviewIntervalSeconds,
+            trailingWindow: self.transcriptionProvider.streamingPreviewMode == .trailingWindow,
+            onBattery: SpeechPowerSource.isOnBattery
+        )
     }
 
     var minimumStreamingPreviewSamples: Int {
@@ -1384,8 +1412,10 @@ final class ASRService: ObservableObject {
                     )
                 }
             },
-            onLevel: { [weak self] level in
-                // Keep Combine sends on the main queue.
+            onLevel: { [weak self, gate = self.audioLevelGate] level in
+                // A progress bar does not need every audio callback, and a
+                // listen with no meter on screen does not need the main thread.
+                guard gate.shouldPublish(now: ProcessInfo.processInfo.systemUptime) else { return }
                 DispatchQueue.main.async { [weak self] in
                     self?.audioLevelSubject.send(level)
                 }

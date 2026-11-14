@@ -870,6 +870,28 @@ final class TheaterRepeatTests: XCTestCase {
         XCTAssertEqual(subscriber.committedLines.count, 1)
     }
 
+    func testCorrectionAfterPrintReplacesTheNewestRow() async {
+        let restore = self.englishToKorean()
+        defer { restore() }
+        let engine = FakeTranslationEngine()
+        engine.result = .success("번역")
+        let subscriber = LiveTranslationSubscriber(translator: engine)
+        subscriber.beginListening()
+        let older = "Please sit down now."
+        let wrong = "Today we trained the modal."
+        let corrected = "Today we trained the model."
+        subscriber.handlePartial("\(older) \(wrong)")
+        subscriber.handlePartial("\(older) \(wrong)")
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, [older, wrong])
+
+        subscriber.handlePartial("\(older) \(corrected)")
+        await subscriber.waitForIdleForTesting()
+        XCTAssertEqual(subscriber.committedSourceLines, [older, corrected])
+        XCTAssertEqual(subscriber.committedLines.count, 2)
+        XCTAssertFalse(subscriber.committedSourceLines.contains(wrong))
+    }
+
     func testCloseSentenceAgainstAnOlderLineStaysUnpeeled() {
         let older = "Today we trained the model."
         let newest = "Please sit down now."

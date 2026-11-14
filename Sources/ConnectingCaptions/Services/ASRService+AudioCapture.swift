@@ -11,6 +11,30 @@ import AVFoundation
 import CoreAudio
 import Foundation
 
+/// Decides when a microphone level may wake the main thread. Meters subscribe
+/// through `ASRService.audioLevelPublisher`. With no subscriber, or more often
+/// than ten times a second, the audio callback keeps the sample.
+final class AudioLevelGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var subscribers = 0
+    private var lastSent = 0.0
+
+    func changeSubscribers(by delta: Int) {
+        self.lock.lock()
+        self.subscribers = max(0, self.subscribers + delta)
+        self.lock.unlock()
+    }
+
+    func shouldPublish(now: TimeInterval) -> Bool {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        guard self.subscribers > 0 else { return false }
+        guard now - self.lastSent >= 0.1 else { return false }
+        self.lastSent = now
+        return true
+    }
+}
+
 // MARK: - Audio capture pipeline
 
 //

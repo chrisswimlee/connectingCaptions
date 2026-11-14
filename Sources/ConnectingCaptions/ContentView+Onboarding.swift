@@ -576,47 +576,6 @@ extension ContentView {
 
 // swiftlint:enable type_body_length
 
-@MainActor
-enum SidebarSymbolCache {
-    static let symbolNames = [
-        "waveform",
-        "brain",
-        "cpu",
-        "wand.and.stars",
-        "text.book.closed.fill",
-        "terminal.fill",
-        "doc.text.fill",
-        "clock.arrow.circlepath",
-        "chart.bar.fill",
-        "house.fill",
-        "doc.text.magnifyingglass",
-        "envelope.fill",
-    ]
-
-    static let images: [String: NSImage] = {
-        let pointSize = NSFont.preferredFont(forTextStyle: .body).pointSize
-        let configuration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
-            .applying(.preferringHierarchical())
-        var images: [String: NSImage] = [:]
-
-        for name in symbolNames {
-            guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-                .withSymbolConfiguration(configuration)
-            else { continue }
-
-            image.isTemplate = true
-            image.cacheMode = .always
-            images[name] = image
-        }
-
-        return images
-    }()
-
-    static func image(named name: String) -> NSImage {
-        self.images[name] ?? NSImage(systemSymbolName: "questionmark", accessibilityDescription: nil) ?? NSImage()
-    }
-}
-
     struct SidebarChromeButtonStyle: ButtonStyle {
     let isHovered: Bool
     let reduceMotion: Bool

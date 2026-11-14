@@ -85,6 +85,19 @@ public enum LiveTranslationPrefetch {
             && TranslationClauseSegmenter.isGrowingClause(earlier.isolatedSource, toward: later.isolatedSource)
     }
 
+    /// Unfinished captions are translated about once a second. A new clause
+    /// still goes immediately. Growing the same clause inside the gap does not.
+    public static let liveRefreshInterval: TimeInterval = 1
+
+    public static func shouldRefreshLiveCaption(
+        now: TimeInterval,
+        lastSent: TimeInterval,
+        sameClause: Bool
+    ) -> Bool {
+        guard sameClause, lastSent > 0 else { return true }
+        return now - lastSent >= self.liveRefreshInterval
+    }
+
     /// Do not prefetch a unit that is already a commit.
     public static func canPrefetch(unit: String, inFlightSources: [String]) -> Bool {
         let cleaned = unit.trimmingCharacters(in: .whitespacesAndNewlines)

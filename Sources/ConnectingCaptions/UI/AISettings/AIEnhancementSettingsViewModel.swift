@@ -434,10 +434,6 @@ final class AIEnhancementSettingsViewModel: ObservableObject {
         self.refreshProviderItems()
     }
 
-    func isEditingAPIKey(for providerID: String) -> Bool {
-        self.editingAPIKeyProviders.contains(self.providerKey(for: providerID))
-    }
-
     func setEditingAPIKey(_ isEditing: Bool, for providerID: String) {
         let key = self.providerKey(for: providerID)
         if isEditing {
@@ -445,10 +441,6 @@ final class AIEnhancementSettingsViewModel: ObservableObject {
         } else {
             self.editingAPIKeyProviders.remove(key)
         }
-    }
-
-    func hasFetchedModels(for providerID: String) -> Bool {
-        self.fetchedModelsProviders.contains(self.providerKey(for: providerID))
     }
 
     func configureProvider(_ providerID: String) {
@@ -1555,13 +1547,6 @@ final class AIEnhancementSettingsViewModel: ObservableObject {
 
     // MARK: - Prompt Editor / Test
 
-    func promptPreview(_ text: String) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return "Empty prompt" }
-        let singleLine = trimmed.replacingOccurrences(of: "\n", with: " ")
-        return singleLine.count > 120 ? String(singleLine.prefix(120)) + "…" : singleLine
-    }
-
     /// Combine a user-visible body with the hidden base prompt to ensure role/intent is always present.
     func combinedDraftPrompt(_ text: String, mode: SettingsStore.PromptMode) -> String {
         let body = SettingsStore.stripBasePrompt(for: mode, from: text)
@@ -1810,18 +1795,6 @@ final class AIEnhancementSettingsViewModel: ObservableObject {
         self.appPromptBindings = self.settings.appPromptBindings
     }
 
-    func addCurrentAppPromptBinding(for mode: SettingsStore.PromptMode) {
-        guard let target = self.resolveBindingTargetApp() else {
-            self.appPromptBindingErrorMessage = "Could not detect a target app. Focus another app window (outside \(ConnectingCaptionsProduct.displayName)) and try again."
-            DebugLogger.shared.info(
-                "App prompt binding skipped: unable to resolve non-Fluid target app",
-                source: "AISettingsView"
-            )
-            return
-        }
-        self.addAppPromptBinding(for: mode, appBundleID: target.bundleID, appName: target.name)
-    }
-
     func addAppPromptBindingFromFilePicker(for mode: SettingsStore.PromptMode) {
         let panel = NSOpenPanel()
         panel.title = "Choose Application"
@@ -1890,14 +1863,6 @@ final class AIEnhancementSettingsViewModel: ObservableObject {
         self.sendCustomPromptOnly = self.settings.sendCustomPromptOnly
     }
 
-    func isPrimaryDictationPromptSelectionOff() -> Bool {
-        return self.settings.isDictationPromptOff
-    }
-
-    func isPromptSelectionOff(for mode: SettingsStore.PromptMode) -> Bool {
-        self.settings.isPromptOff(for: mode)
-    }
-
     func isPrivateAIPromptAvailable() -> Bool {
         PrivateAIProviderPromptFormat.isAvailable(settings: self.settings)
     }
@@ -1927,17 +1892,6 @@ final class AIEnhancementSettingsViewModel: ObservableObject {
         self.refreshPromptSelectionState()
     }
 
-    func setSecondaryDictationPromptSelection(_ selection: SettingsStore.DictationPromptSelection) {
-        guard selection != .privateAI || self.isPrivateAIPromptAvailable() else { return }
-        self.settings.promptModeShortcutEnabled = true
-        self.settings.setDictationPromptSelection(selection, for: .secondary)
-        self.refreshPromptSelectionState()
-    }
-
-    func secondaryDictationShortcutDisplay() -> String {
-        self.settings.promptModeHotkeyShortcut.displayString
-    }
-
     func verifiedPromptProviders() -> [ProviderItemData] {
         self.cachedVerifiedProviderItems.filter { provider in
             provider.id != PrivateAIProviderFeature.shared.providerID
@@ -1953,43 +1907,11 @@ final class AIEnhancementSettingsViewModel: ObservableObject {
         return verified.first?.id ?? ""
     }
 
-    func activeDictationModelSummary(isPrivateAI: Bool = false) -> String {
-        if isPrivateAI {
-            return PrivateAIProviderFeature.displayName
-        }
-
-        let providerID = self.selectedProviderID.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !providerID.isEmpty else { return "Choose provider first" }
-
-        let providerName = self.providerDisplayName(for: providerID)
-        let providerKey = self.providerKey(for: providerID)
-        let modelName = (self.selectedModelByProvider[providerKey] ?? self.selectedModel)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !modelName.isEmpty else { return providerName }
-        return "\(providerName) - \(modelName)"
-    }
-
-    func selectPrivateAIPromptIfAvailable() {
-        guard self.isPrivateAIPromptAvailable() else { return }
-        self.settings.setDictationPromptSelection(.privateAI)
-        self.refreshPromptSelectionState()
-    }
-
     /// No-op: never auto-force the dictation prompt selection. The user's choice is sticky.
     /// Each shortcut binds independently; forcing .privateAI when FI is selected would override
     /// a user's deliberate "off" or "default" choice.
     private func syncPromptSelectionForSelectedProvider() {
         // Intentionally empty. Selection is sticky.
-    }
-
-    func selectPrimaryDictationPromptOff() {
-        self.settings.setDictationPromptSelection(.off)
-        self.refreshPromptSelectionState()
-    }
-
-    func setPromptSelectionOff(_ isOff: Bool, for mode: SettingsStore.PromptMode) {
-        self.settings.setPromptOff(isOff, for: mode)
-        self.refreshPromptSelectionState()
     }
 
     private func refreshPromptSelectionState() {
@@ -2101,12 +2023,5 @@ final class AIEnhancementSettingsViewModel: ObservableObject {
 
     func resetDefaultPromptOverride(for mode: SettingsStore.PromptMode) {
         self.settings.setDefaultPromptOverride(nil, for: mode.normalized)
-    }
-
-    func defaultPromptBodyPreview(for mode: SettingsStore.PromptMode) -> String {
-        if let override = self.settings.defaultPromptOverride(for: mode) {
-            return SettingsStore.stripBasePrompt(for: mode, from: override)
-        }
-        return SettingsStore.defaultPromptBodyText(for: mode)
     }
 }

@@ -1649,6 +1649,8 @@ final class LiveTranslationClauseTests: XCTestCase {
             )
         )
         XCTAssertEqual(LiveTranslationTiming.contextSentenceCount, 4)
+        XCTAssertEqual(LiveTranslationTiming.contextSentenceLimit(languageID: "ko"), 2)
+        XCTAssertEqual(LiveTranslationTiming.contextSentenceLimit(languageID: "en"), 0)
         XCTAssertEqual(LiveTranslationTiming.visibleTheaterLines, 48)
         XCTAssertEqual(LiveTranslationTiming.maxDraftCharacters, 240)
         XCTAssertEqual(LiveTranslationTiming.eouHoldNanoseconds, 400_000_000)
@@ -1833,6 +1835,41 @@ final class LiveTranslationClauseTests: XCTestCase {
                 "\(phase)"
             )
         }
+    }
+
+    func testReplacementForNewestLineRewritesOnlyTheCorrectedCaption() {
+        let wrong = "Today we trained the modal."
+        let fixed = "Today we trained the model."
+        XCTAssertEqual(
+            TranslationClauseSegmenter.replacementForNewestLine(
+                hypothesis: fixed,
+                newest: wrong,
+                languageID: "en"
+            ),
+            fixed
+        )
+        XCTAssertEqual(
+            TranslationClauseSegmenter.replacementForNewestLine(
+                hypothesis: "Please sit down now. \(fixed)",
+                newest: wrong,
+                languageID: "en"
+            ),
+            fixed
+        )
+        XCTAssertNil(
+            TranslationClauseSegmenter.replacementForNewestLine(
+                hypothesis: "\(wrong) \(fixed)",
+                newest: wrong,
+                languageID: "en"
+            )
+        )
+        XCTAssertNil(
+            TranslationClauseSegmenter.replacementForNewestLine(
+                hypothesis: fixed,
+                newest: fixed,
+                languageID: "en"
+            )
+        )
     }
 
     func testLeftoverTailDropsALongOffscreenPrefixWithoutReprinting() {

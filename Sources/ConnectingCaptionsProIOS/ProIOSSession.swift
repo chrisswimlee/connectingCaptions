@@ -27,6 +27,9 @@ final class ProIOSSession: ObservableObject {
     private let speaker = ProIOSSpeaker()
     private var inFlight: [String] = []
     private var identities = Set<String>()
+    /// An in-flight sentence the recognizer replaced. Its translation must not
+    /// append the old wording after the corrected line is admitted.
+    private var droppedSources: [String] = []
     /// Sentences Clear or Undo removed. The recognizer still has them until the next Listen.
     private var suppressedSources: [String] = []
     private var suppressedIdentities = Set<String>()
@@ -266,6 +269,7 @@ final class ProIOSSession: ObservableObject {
             self.openTail = ""
             return
         }
+        self.adoptNewestCorrection(in: heard)
         let unread = self.unread(from: heard)
         self.openTail = unread
         self.drain(unread, hypothesis: heard)
@@ -363,6 +367,10 @@ final class ProIOSSession: ObservableObject {
         targetLanguage: TranslationLanguage
     ) {
         self.inFlight.removeAll { TranslationClauseSegmenter.isSameClause($0, source) }
+        if let index = self.droppedSources.firstIndex(where: { TranslationClauseSegmenter.isSameClause($0, source) }) {
+            self.droppedSources.remove(at: index)
+            return
+        }
         guard !self.board.rows.contains(where: { TranslationClauseSegmenter.isSameClause($0.source, source) }) else {
             return
         }
@@ -386,6 +394,65 @@ final class ProIOSSession: ObservableObject {
         let allowed = ProIOSLicenseStore.shared.blockListenStart() == nil
         let line = self.board.rows.last?.translated ?? ""
         ProIOSAppGroup.publish(line: allowed ? line : "", allowed: allowed && !line.isEmpty)
+    }
+
+    /// FluidVoice restates the whole line when it fixes a word. The newest row
+    /// takes that wording. A sentence that is still sitting beside the old
+    /// wording stays a new row.
+    private func adoptNewestCorrection(in hypothesis: String) {
+        let languageID = self.source.id
+        if let pending = self.inFlight.last,
+           let replacement = TranslationClauseSegmenter.replacementForNewestLine(
+               hypothesis: hypothesis,
+               newest: pending,
+               languageID: languageID
+           )
+        {
+            self.dropSource(pending)
+            self.admit(replacement)
+            return
+        }
+        guard let index = self.board.rows.indices.last else { return }
+        let current = self.board.rows[index].source
+        guard let replacement = TranslationClauseSegmenter.replacementForNewestLine(
+            hypothesis: hypothesis,
+            newest: current,
+            languageID: languageID
+        ) else { return }
+        let id = self.board.rows[index].id
+        self.board.rows[index].source = replacement
+        self.identities.remove(TranslationClauseSegmenter.clauseIdentity(current))
+        self.identities.insert(TranslationClauseSegmenter.clauseIdentity(replacement))
+        if self.source.id == self.target.id {
+            self.board.rows[index].translated = replacement
+            self.refreshInsertLine()
+            return
+        }
+        let source = self.source
+        let target = self.target
+        let generation = self.boardGeneration
+        Task {
+            let translated: String
+            do {
+                translated = try await self.translator.translate(replacement, source: source, target: target)
+            } catch {
+                return
+            }
+            guard generation == self.boardGeneration else { return }
+            guard let row = self.board.rows.firstIndex(where: { $0.id == id }),
+                  TranslationClauseSegmenter.isSameClause(self.board.rows[row].source, replacement)
+            else { return }
+            self.board.rows[row].translated = translated
+            self.refreshInsertLine()
+        }
+    }
+
+    private func dropSource(_ source: String) {
+        self.inFlight.removeAll { TranslationClauseSegmenter.isSameClause($0, source) }
+        self.identities.remove(TranslationClauseSegmenter.clauseIdentity(source))
+        if !self.droppedSources.contains(where: { TranslationClauseSegmenter.isSameClause($0, source) }) {
+            self.droppedSources.append(source)
+        }
     }
 
     private func unread(from hypothesis: String) -> String {
@@ -425,6 +492,7 @@ final class ProIOSSession: ObservableObject {
     private func forgetDroppedSpeech() {
         self.suppressedSources = []
         self.suppressedIdentities = []
+        self.droppedSources = []
         self.heardCut.clear()
         self.lastHypothesis = ""
     }

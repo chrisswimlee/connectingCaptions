@@ -795,9 +795,11 @@ final class LiveTranslationGlossaryTests: XCTestCase {
             forward: engine.cachedPackAvailability(source: source, target: target),
             reverse: engine.cachedPackAvailability(source: target, target: source)
         )
-        XCTAssertEqual(SpokenLanguageResolver.showsEitherWayControl(settings: settings), ready)
+        XCTAssertTrue(SpokenLanguageResolver.showsEitherWayControl(settings: settings))
+        XCTAssertEqual(SpokenLanguageResolver.eitherWayReady(settings: settings), ready)
         settings.translationTargetLanguageID = "en"
         XCTAssertFalse(SpokenLanguageResolver.showsEitherWayControl(settings: settings))
+        XCTAssertFalse(SpokenLanguageResolver.eitherWayReady(settings: settings))
     }
 
     func testEitherWayStaysOffUnlessWhisperHearsBothSides() throws {
@@ -818,8 +820,8 @@ final class LiveTranslationGlossaryTests: XCTestCase {
             settings.translationSourceLanguageID = originalSource
             settings.translationTargetLanguageID = originalTarget
             settings.theaterSessionMode = originalMode
-            settings.theaterDynamicPairing = originalDynamic
             settings.selectedSpeechModel = originalModel
+            settings.theaterDynamicPairing = originalDynamic
             SpokenLanguageResolver.noteDetectedLanguage(nil)
         }
 
@@ -829,6 +831,7 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         settings.theaterDynamicPairing = true
         settings.selectedSpeechModel = .appleSpeech
 
+        XCTAssertFalse(settings.theaterDynamicPairing)
         XCTAssertFalse(SpokenLanguageResolver.dynamicPairingAvailable(settings: settings))
         XCTAssertFalse(SpokenLanguageResolver.isDynamicPairingEnabled(settings: settings))
         let pinned = SpokenLanguageResolver.pairForSpokenText("안녕하세요 여러분", settings: settings)
@@ -836,6 +839,8 @@ final class LiveTranslationGlossaryTests: XCTestCase {
         XCTAssertEqual(pinned.target.id, "ko")
 
         settings.selectedSpeechModel = .whisperSmall
+        XCTAssertFalse(settings.theaterDynamicPairing)
+        settings.theaterDynamicPairing = true
         XCTAssertTrue(SpokenLanguageResolver.dynamicPairingAvailable(settings: settings))
         XCTAssertTrue(SpokenLanguageResolver.isDynamicPairingEnabled(settings: settings))
         let korean = SpokenLanguageResolver.pairForSpokenText("안녕하세요 여러분", settings: settings)
@@ -866,6 +871,48 @@ final class LiveTranslationGlossaryTests: XCTestCase {
             SpokenLanguageResolver.dynamicPairingControlCopy(settings: settings),
             TheaterReadiness.dynamicPairingHint(isWhisper: true)
         )
+    }
+
+    func testEitherWayDecodeStaysInsideThePair() {
+        let settings = SettingsStore.shared
+        let originalSource = settings.translationSourceLanguageID
+        let originalTarget = settings.translationTargetLanguageID
+        let originalMode = settings.theaterSessionMode
+        let originalModel = settings.selectedSpeechModel
+        let originalDynamic = settings.theaterDynamicPairing
+        defer {
+            settings.selectedSpeechModel = originalModel
+            settings.translationSourceLanguageID = originalSource
+            settings.translationTargetLanguageID = originalTarget
+            settings.theaterSessionMode = originalMode
+            settings.theaterDynamicPairing = originalDynamic
+            SpokenLanguageResolver.noteDetectedLanguage(nil)
+        }
+
+        settings.theaterSessionMode = .translation
+        settings.translationSourceLanguageID = "en"
+        settings.translationTargetLanguageID = "ko"
+        settings.selectedSpeechModel = .whisperSmall
+        settings.theaterDynamicPairing = true
+        SpokenLanguageResolver.noteDetectedLanguage(nil)
+
+        XCTAssertEqual(
+            SpokenLanguageResolver.eitherWayDecodeLanguage(detectedCode: "ja", settings: settings),
+            "en"
+        )
+        XCTAssertNil(SpokenLanguageResolver.eitherWayDecodeLanguage(detectedCode: nil, settings: settings))
+        XCTAssertNil(SpokenLanguageResolver.eitherWayDecodeLanguage(detectedCode: "ko", settings: settings))
+        XCTAssertEqual(
+            SpokenLanguageResolver.eitherWayDecodeLanguage(detectedCode: "ja", settings: settings),
+            "ko"
+        )
+        SpokenLanguageResolver.noteDetectedLanguage(nil)
+        XCTAssertEqual(
+            SpokenLanguageResolver.eitherWayDecodeLanguage(detectedCode: "es", settings: settings),
+            "en"
+        )
+        settings.theaterDynamicPairing = false
+        XCTAssertNil(SpokenLanguageResolver.eitherWayDecodeLanguage(detectedCode: "ja", settings: settings))
     }
 
     func testSpeakCaptionsStaysOffForInsertAndSameLanguage() {

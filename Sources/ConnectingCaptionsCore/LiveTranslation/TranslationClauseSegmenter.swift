@@ -1047,6 +1047,48 @@ nonisolated public enum TranslationClauseSegmenter {
         return nil
     }
 
+    /// The newest Theater line, rewritten, when this transcript corrects it.
+    /// Nil when that old wording is still its own sentence: the later line was
+    /// said as well, and it can print on the next row.
+    public static func replacementForNewestLine(
+        hypothesis: String,
+        newest: String,
+        languageID: String
+    ) -> String? {
+        let hypothesis = hypothesis.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newest = newest.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !hypothesis.isEmpty, !newest.isEmpty, !self.isSameClause(hypothesis, newest) else {
+            return nil
+        }
+        let split = self.split(hypothesis, languageID: languageID)
+        var sentences = split.completed
+        let tail = split.tail.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !tail.isEmpty {
+            sentences.append(tail)
+        }
+        if sentences.isEmpty {
+            sentences = [hypothesis]
+        }
+        if sentences.contains(where: { self.isSameClause($0, newest) }) {
+            return nil
+        }
+        for sentence in sentences.reversed() {
+            let sentence = sentence.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !sentence.isEmpty, !self.isSameClause(sentence, newest) else { continue }
+            if self.shouldReplaceLast(previous: newest, incoming: sentence) { return sentence }
+            if self.isTailRevisionGrowth(previous: newest, incoming: sentence) { return sentence }
+            if self.isInPlaceGrowth(previous: newest, incoming: sentence),
+               self.tokens(sentence).count >= self.tokens(newest).count
+            {
+                return sentence
+            }
+            if self.shouldReviseCommitted(previous: newest, incoming: sentence, languageID: languageID) {
+                return sentence
+            }
+        }
+        return nil
+    }
+
     public static func shouldReviseCommitted(
         previous: String,
         incoming: String,

@@ -41,6 +41,10 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
     private var clearPromptQuietUntil = Date.distantPast
     private var packCheck = TranslationPairCheck()
     private var translationWarmTask: Task<Void, Never>?
+    /// Pause keeps the microphone open. After three minutes it stops Listen,
+    /// which is what auto-lock already does on iPhone.
+    private var pauseMicrophoneReleaseTask: Task<Void, Never>?
+    private static let pauseMicrophoneReleaseNanoseconds: UInt64 = 180_000_000_000
 
     var shouldHandleTranslationStop: Bool {
         self.isSessionActive || self.abandonCaptionSession
@@ -106,6 +110,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.abandonCaptionSession = false
         self.isSessionActive = true
         self.isPaused = false
+        self.cancelPauseMicrophoneRelease()
         self.listenKind = kind
         KeywordAnchorSession.shared.capture()
         let trace = LiveTranslationSessionTrace(
@@ -261,6 +266,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         }
         self.isSessionActive = false
         self.isPaused = false
+        self.cancelPauseMicrophoneRelease()
         self.listenKind = nil
         self.clearThermalEngineOverride()
         self.subscriber.endListening()
@@ -281,6 +287,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.isFinishingSession = false
         self.isSessionActive = false
         self.isPaused = false
+        self.cancelPauseMicrophoneRelease()
         self.listenKind = nil
         self.clearThermalEngineOverride()
         TheaterSpeechSession.shared.clear(asr: AppServices.shared.asr)
@@ -308,6 +315,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
             self.stopToken = self.sessionToken
             self.isSessionActive = false
             self.isPaused = false
+            self.cancelPauseMicrophoneRelease()
             self.stopListening()
             PresenterCaptionController.shared.clearDisplay()
             return
@@ -368,13 +376,13 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.finishLanguageChange()
     }
 
-    /// Either way. Requires Whisper Small already downloaded in Voice Engine
-    /// settings and translation ready in both directions. Turning it off keeps
-    /// the selected engine, which may be the only one that hears this language.
+    /// Either way. Turning it on requires Whisper Small and both translation
+    /// directions. The switch stays on only while the selected Voice Engine
+    /// can hear both languages. Turning it off keeps that engine.
     func applyDynamicPairing(_ enabled: Bool) {
         let settings = SettingsStore.shared
         let addOn = SettingsStore.SpeechModel.eitherWayAddOn
-        guard !enabled || SpokenLanguageResolver.showsEitherWayControl(settings: settings) else { return }
+        guard !enabled || SpokenLanguageResolver.eitherWayReady(settings: settings) else { return }
         settings.theaterDynamicPairing = enabled
         if enabled {
             if settings.selectedSpeechModel != addOn {
@@ -389,9 +397,9 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
 
     private func finishLanguageChange() {
         let settings = SettingsStore.shared
-        if settings.theaterDynamicPairing, !SpokenLanguageResolver.showsEitherWayControl(settings: settings) {
-            settings.theaterDynamicPairing = false
-        }
+        // A new pair stays on until both directions have been probed. Same
+        // language, Voice mode, or a one-language engine turns the switch off now.
+        SpokenLanguageResolver.reconcileDynamicPairing(settings: settings)
         self.packCheck.invalidate()
         self.notePack(.unknown)
         self.translationWarmTask?.cancel()
@@ -542,16 +550,32 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.trace(LiveTranslationTrace.event("session pause", token: self.sessionToken))
         self.subscriber.holdUnacceptedForPause()
         AppServices.shared.asr.setCapturePaused(true)
+        self.armPauseMicrophoneRelease()
         self.refreshPresenter()
     }
 
     func resumeListening() {
         guard self.isSessionActive, self.isPaused else { return }
+        self.cancelPauseMicrophoneRelease()
         self.isPaused = false
         self.trace(LiveTranslationTrace.event("session resume", token: self.sessionToken))
         self.subscriber.releasePauseHold()
         AppServices.shared.asr.setCapturePaused(false)
         self.refreshPresenter()
+    }
+
+    private func armPauseMicrophoneRelease() {
+        self.cancelPauseMicrophoneRelease()
+        self.pauseMicrophoneReleaseTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.pauseMicrophoneReleaseNanoseconds)
+            guard !Task.isCancelled, let self, self.isPaused, self.isSessionActive else { return }
+            self.stopListening()
+        }
+    }
+
+    private func cancelPauseMicrophoneRelease() {
+        self.pauseMicrophoneReleaseTask?.cancel()
+        self.pauseMicrophoneReleaseTask = nil
     }
 
     func startInsertListening() {
@@ -976,7 +1000,8 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         }
         let resolved = await self.resolvePairPacks(source: source, target: target)
         guard !Task.isCancelled, self.packCheck.accepts(request, currentPair: .current()) else { return }
-        if SettingsStore.shared.theaterDynamicPairing, !SpokenLanguageResolver.showsEitherWayControl(),
+        SpokenLanguageResolver.reconcileDynamicPairing()
+        if SettingsStore.shared.theaterDynamicPairing, !SpokenLanguageResolver.eitherWayReady(),
            !self.isSessionActive, !AppServices.shared.asr.isRunningOrStarting
         {
             SettingsStore.shared.theaterDynamicPairing = false

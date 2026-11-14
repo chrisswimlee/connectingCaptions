@@ -227,7 +227,8 @@ extension SettingsStore {
     }
 
     /// Either way: translate whichever language of the pair was heard.
-    /// Listen uses it only when `dynamicPairingAvailable` is true.
+    /// Listen uses it only when the selected Voice Engine can hear both sides.
+    /// Changing to an engine that cannot hear both sides turns this off.
     var theaterDynamicPairing: Bool {
         get { self.defaults.bool(forKey: TheaterDefaults.dynamicPairing) }
         set {

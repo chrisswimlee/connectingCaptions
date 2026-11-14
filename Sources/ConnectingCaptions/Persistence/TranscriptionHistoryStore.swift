@@ -454,11 +454,6 @@ final class TranscriptionHistoryStore: ObservableObject {
         }
     }
 
-    /// Get entries filtered by date range
-    func entriesInRange(from startDate: Date, to endDate: Date) -> [TranscriptionHistoryEntry] {
-        self.entries.filter { $0.timestamp >= startDate && $0.timestamp <= endDate }
-    }
-
     /// Get total character count across all entries
     var totalCharacterCount: Int {
         self.entries.reduce(0) { $0 + $1.characterCount }
@@ -960,19 +955,6 @@ extension TranscriptionHistoryStore {
 
     // MARK: - Today Time Saved
 
-    /// Calculate time saved today in minutes
-    /// - Parameters:
-    ///   - typingWPM: User's typing speed (default 40)
-    ///   - speakingWPM: Average speaking speed (default 150)
-    func timeSavedTodayMinutes(typingWPM: Int = 40, speakingWPM: Int = 150) -> Double {
-        self.todaySummary.timeSavedMinutes(typingWPM: typingWPM, speakingWPM: speakingWPM)
-    }
-
-    /// Formatted time saved today string (e.g., "2h 45m" or "45m")
-    func formattedTimeSavedToday(typingWPM: Int = 40) -> String {
-        self.todaySummary.formattedTimeSaved(typingWPM: typingWPM)
-    }
-
     // MARK: - Streak Calculation
 
     /// Get unique days with activity (sorted newest first)
@@ -1142,23 +1124,6 @@ extension TranscriptionHistoryStore {
         }
 
         return result.reversed() // oldest to newest for chart display
-    }
-
-    /// Daily transcription counts for the last N days
-    func dailyTranscriptionCounts(days: Int) -> [(date: Date, count: Int)] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-
-        var result: [(date: Date, count: Int)] = []
-
-        for dayOffset in 0..<days {
-            guard let date = calendar.date(byAdding: .day, value: -dayOffset, to: today) else { continue }
-
-            let count = self.summaryRecords.filter { calendar.isDate($0.timestamp, inSameDayAs: date) }.count
-            result.append((date: date, count: count))
-        }
-
-        return result.reversed()
     }
 
     // MARK: - Top Apps

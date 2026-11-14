@@ -24,6 +24,31 @@ final class AppleSpeechProvider: TranscriptionProvider {
     private var recognizer: SFSpeechRecognizer?
     private var recognizerLocaleIdentifier: String?
 
+    /// One recognition task for the whole Listen. Ticks append new audio and
+    /// read the latest partial. They do not start a new recognizer.
+    var streamingPreviewMode: StreamingPreviewMode { .incrementalDelta }
+    var acceptedStreamingSampleCount: Int? {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        return self.streamedSampleCount
+    }
+
+    private let streamingLock = NSLock()
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+    private var streamedSampleCount = 0
+    private var streamEpoch: UInt64 = 0
+    private var streamGeneration = 0
+    private var streamCommitted = ""
+    private var streamVolatile = ""
+    private var streamText = ""
+    private var streamFinished = true
+    private var streamFailure: Error?
+    private var streamSawEnd = false
+    private var streamRestartStreak = 0
+    private var streamLastRestart = Date.distantPast
+    private var streamLocaleID = ""
+
     init() {
         _ = self.updateRecognizerIfNeeded()
     }
@@ -61,6 +86,45 @@ final class AppleSpeechProvider: TranscriptionProvider {
         // No cache to clear for system speech
     }
 
+    func releaseMemory() async {
+        await self.resetStreamingSession()
+    }
+
+    func resetStreamingSession() async {
+        let (task, request) = self.takeDownStream()
+        request?.endAudio()
+        task?.cancel()
+    }
+
+    /// Locking stays in a synchronous function. `NSLock` is not available
+    /// directly inside an async function.
+    private func takeDownStream() -> (SFSpeechRecognitionTask?, SFSpeechAudioBufferRecognitionRequest?) {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        self.streamEpoch += 1
+        let task = self.recognitionTask
+        let request = self.recognitionRequest
+        self.recognitionTask = nil
+        self.recognitionRequest = nil
+        self.streamFinished = true
+        self.streamedSampleCount = 0
+        self.streamCommitted = ""
+        self.streamVolatile = ""
+        self.streamText = ""
+        self.streamGeneration = 0
+        self.streamFailure = nil
+        self.streamSawEnd = false
+        self.streamRestartStreak = 0
+        self.streamLocaleID = ""
+        return (task, request)
+    }
+
+    private func endOpenStreamAudio() {
+        self.streamingLock.lock()
+        self.recognitionRequest?.endAudio()
+        self.streamingLock.unlock()
+    }
+
     func modelsExistOnDisk() -> Bool {
         return true // System models are always "on disk"
     }
@@ -77,8 +141,9 @@ final class AppleSpeechProvider: TranscriptionProvider {
             throw NSError(domain: "AppleSpeechProvider", code: 4, userInfo: [NSLocalizedDescriptionKey: "Failed to create audio buffer"])
         }
 
-        // 2. Ensure recognizer exists for the selected speech language
-        guard let recognizer = self.updateRecognizerIfNeeded() else {
+        // A one-shot buffer uses its own recognizer so it cannot cancel the
+        // continuous Listen task, which is the only task on `self.recognizer`.
+        guard let recognizer = SFSpeechRecognizer(locale: self.theaterSpeechLocale()) else {
             throw NSError(domain: "AppleSpeechProvider", code: 5, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize SFSpeechRecognizer"])
         }
 
@@ -133,7 +198,236 @@ final class AppleSpeechProvider: TranscriptionProvider {
         }
     }
 
+    func transcribeStreamingDelta(
+        _ newSamples: [Float],
+        totalSampleCount: Int
+    ) async throws -> ASRTranscriptionResult {
+        try self.ensureStreamRequest()
+        let generation = self.streamGenerationLocked()
+        if !newSamples.isEmpty {
+            // A request that ends on this audio already has it. Sending the
+            // same samples again starts a second copy of those words.
+            if try self.appendToStream(newSamples) == false {
+                try self.ensureStreamRequest()
+                _ = try self.appendToStream(newSamples)
+            }
+            self.setStreamedCount(totalSampleCount)
+            let wait: TimeInterval = self.streamTextLocked().isEmpty ? 0.7 : 0.12
+            await self.waitForStreamResult(after: generation, timeout: wait)
+        }
+        return try self.streamResult()
+    }
+
+    func transcribeFinalDelta(
+        _ newSamples: [Float],
+        totalSampleCount: Int
+    ) async throws -> ASRTranscriptionResult {
+        if !newSamples.isEmpty {
+            try self.ensureStreamRequest()
+            _ = try self.appendToStream(newSamples)
+            self.setStreamedCount(totalSampleCount)
+        }
+        self.endOpenStreamAudio()
+        let generation = self.streamGenerationLocked()
+        await self.waitForStreamResult(after: generation, timeout: 1)
+        let deadline = Date().addingTimeInterval(1)
+        while Date() < deadline, !self.streamIsFinished() {
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        let snapshot = self.consumeStreamSnapshot()
+        await self.resetStreamingSession()
+        if snapshot.text.isEmpty, let failure = snapshot.failure, !Self.isBenignNoSpeech(failure) {
+            throw failure
+        }
+        return ASRTranscriptionResult(
+            text: snapshot.text,
+            confidence: snapshot.text.isEmpty ? 0 : 1,
+            endOfUtterance: true
+        )
+    }
+
     // MARK: - Helpers
+
+    private func streamResult() throws -> ASRTranscriptionResult {
+        let snapshot = self.consumeStreamSnapshot()
+        if snapshot.text.isEmpty, let failure = snapshot.failure, !Self.isBenignNoSpeech(failure) {
+            throw failure
+        }
+        return ASRTranscriptionResult(
+            text: snapshot.text,
+            confidence: snapshot.text.isEmpty ? 0 : 1,
+            endOfUtterance: snapshot.endOfUtterance
+        )
+    }
+
+    private func ensureStreamRequest() throws {
+        guard let recognizer = self.updateRecognizerIfNeeded(), recognizer.isAvailable else {
+            throw NSError(domain: "AppleSpeechProvider", code: 5, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to initialize SFSpeechRecognizer",
+            ])
+        }
+        guard recognizer.supportsOnDeviceRecognition else {
+            throw NSError(domain: "AppleSpeechProvider", code: 7, userInfo: [
+                NSLocalizedDescriptionKey: "On-device speech recognition is unavailable for this language on this Mac.",
+            ])
+        }
+        self.streamingLock.lock()
+        let currentLocale = self.recognizerLocaleIdentifier ?? ""
+        let open = self.recognitionRequest != nil
+            && !self.streamFinished
+            && self.streamLocaleID == currentLocale
+        let streak = self.streamRestartStreak
+        let hasRequest = self.recognitionRequest != nil
+        self.streamingLock.unlock()
+        if open { return }
+        if streak > 4 {
+            throw NSError(domain: "AppleSpeechProvider", code: 9, userInfo: [
+                NSLocalizedDescriptionKey: "Speech recognition stopped. Press Listen to start again.",
+            ])
+        }
+        if hasRequest {
+            self.abandonOpenStreamKeepingCaption()
+        }
+        self.streamingLock.lock()
+        self.streamEpoch += 1
+        let epoch = self.streamEpoch
+        self.streamFinished = false
+        self.streamFailure = nil
+        self.streamingLock.unlock()
+
+        let request = SFSpeechAudioBufferRecognitionRequest()
+        request.shouldReportPartialResults = true
+        request.requiresOnDeviceRecognition = true
+        let phrases = Array(TranslationGlossary.protectedTerms().prefix(100))
+        if !phrases.isEmpty {
+            request.contextualStrings = phrases
+        }
+        let task = recognizer.recognitionTask(with: request) { [weak self] result, error in
+            self?.noteStream(result: result, error: error, epoch: epoch)
+        }
+        self.streamingLock.lock()
+        if epoch != self.streamEpoch {
+            self.streamingLock.unlock()
+            task.cancel()
+            return
+        }
+        self.recognitionRequest = request
+        self.recognitionTask = task
+        self.streamLocaleID = self.recognizerLocaleIdentifier ?? ""
+        self.streamingLock.unlock()
+    }
+
+    private func abandonOpenStreamKeepingCaption() {
+        self.streamingLock.lock()
+        self.streamEpoch += 1
+        let task = self.recognitionTask
+        let request = self.recognitionRequest
+        self.recognitionTask = nil
+        self.recognitionRequest = nil
+        self.streamFinished = true
+        self.streamVolatile = ""
+        self.streamText = self.streamCommitted
+        self.streamingLock.unlock()
+        request?.endAudio()
+        task?.cancel()
+    }
+
+    /// False when the open request had already ended and did not take the audio.
+    private func appendToStream(_ samples: [Float]) throws -> Bool {
+        guard let buffer = self.createPCMBuffer(from: samples) else {
+            throw NSError(domain: "AppleSpeechProvider", code: 4, userInfo: [
+                NSLocalizedDescriptionKey: "Failed to create audio buffer",
+            ])
+        }
+        self.streamingLock.lock()
+        let request = self.recognitionRequest
+        let finished = self.streamFinished
+        self.streamingLock.unlock()
+        guard let request, !finished else { return false }
+        request.append(buffer)
+        return true
+    }
+
+    private func setStreamedCount(_ count: Int) {
+        self.streamingLock.lock()
+        self.streamedSampleCount = count
+        self.streamingLock.unlock()
+    }
+
+    private func streamIsFinished() -> Bool {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        return self.streamFinished
+    }
+
+    private func streamGenerationLocked() -> Int {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        return self.streamGeneration
+    }
+
+    private func streamTextLocked() -> String {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        return self.streamText
+    }
+
+    private func noteStream(result: SFSpeechRecognitionResult?, error: Error?, epoch: UInt64) {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        guard epoch == self.streamEpoch else { return }
+        if let error {
+            self.streamFinished = true
+            if !Self.isBenignNoSpeech(error) {
+                self.streamFailure = error
+                let now = Date()
+                if now.timeIntervalSince(self.streamLastRestart) < 2 {
+                    self.streamRestartStreak += 1
+                } else {
+                    self.streamRestartStreak = 1
+                }
+                self.streamLastRestart = now
+            }
+            self.streamGeneration += 1
+            return
+        }
+        guard let result else { return }
+        let text = result.bestTranscription.formattedString
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if result.isFinal {
+            if !text.isEmpty {
+                self.streamCommitted = Self.joiningCaption(self.streamCommitted, text)
+            }
+            self.streamVolatile = ""
+            self.streamFinished = true
+            self.streamSawEnd = true
+        } else if !text.isEmpty {
+            self.streamVolatile = text
+            self.streamRestartStreak = 0
+        }
+        self.streamText = Self.joiningCaption(self.streamCommitted, self.streamVolatile)
+        self.streamGeneration += 1
+    }
+
+    private func consumeStreamSnapshot() -> (text: String, failure: Error?, endOfUtterance: Bool) {
+        self.streamingLock.lock()
+        defer { self.streamingLock.unlock() }
+        let end = self.streamSawEnd
+        self.streamSawEnd = false
+        return (self.streamText, self.streamFailure, end)
+    }
+
+    private func waitForStreamResult(after generation: Int, timeout: TimeInterval) async {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if self.streamGenerationLocked() != generation { return }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+    }
+
+    private static func joiningCaption(_ committed: String, _ next: String) -> String {
+        RecognizedSegmentJoin.absorb(existing: committed, next: next)
+    }
 
     private static func isBenignNoSpeech(_ error: Error) -> Bool {
         if error is CancellationError { return true }

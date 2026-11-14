@@ -552,24 +552,6 @@ extension SettingsStore {
         }
     }
 
-    func isPromptOff(for mode: PromptMode) -> Bool {
-        switch mode.normalized {
-        case .dictate:
-            return self.isDictationPromptOff
-        case .edit, .write, .rewrite:
-            return self.isEditPromptOff
-        }
-    }
-
-    func setPromptOff(_ isOff: Bool, for mode: PromptMode) {
-        switch mode.normalized {
-        case .dictate:
-            self.setDictationPromptSelection(isOff ? .off : .default)
-        case .edit, .write, .rewrite:
-            self.isEditPromptOff = isOff
-        }
-    }
-
     func selectedDictationPromptProfile(for slot: DictationShortcutSlot) -> DictationPromptProfile? {
         guard let id = self.selectedDictationPromptID(for: slot) else { return nil }
         return self.dictationPromptProfiles.first(where: { $0.id == id && $0.mode.normalized == .dictate })
@@ -861,16 +843,6 @@ extension SettingsStore {
         """
     }
 
-    /// Legacy wrappers retained for compatibility.
-    static func baseWritePromptText() -> String {
-        self.baseEditPromptText()
-    }
-
-    /// Legacy wrappers retained for compatibility.
-    static func baseRewritePromptText() -> String {
-        self.baseEditPromptText()
-    }
-
     static func basePromptText(for mode: PromptMode) -> String {
         switch mode.normalized {
         case .dictate:
@@ -922,16 +894,6 @@ extension SettingsStore {
         """
     }
 
-    /// Legacy wrappers retained for compatibility.
-    static func defaultWritePromptBodyText() -> String {
-        self.defaultEditPromptBodyText()
-    }
-
-    /// Legacy wrappers retained for compatibility.
-    static func defaultRewritePromptBodyText() -> String {
-        self.defaultEditPromptBodyText()
-    }
-
     static func defaultPromptBodyText(for mode: PromptMode) -> String {
         switch mode.normalized {
         case .dictate:
@@ -964,11 +926,6 @@ extension SettingsStore {
         return "\(base)\n\n\(trimmedBody)"
     }
 
-    /// Remove the hidden base prompt prefix if it was persisted previously.
-    static func stripBaseDictationPrompt(from text: String) -> String {
-        self.stripBasePrompt(for: .dictate, from: text)
-    }
-
     /// Remove a hidden base prompt prefix for a given mode if it was persisted previously.
     static func stripBasePrompt(for mode: PromptMode, from text: String) -> String {
         let base = self.basePromptText(for: mode).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -988,11 +945,6 @@ extension SettingsStore {
         return trimmed
     }
 
-    /// Built-in default dictation system prompt shared across the app.
-    static func defaultDictationPromptText() -> String {
-        self.defaultSystemPromptText(for: .dictate)
-    }
-
     static func defaultSystemPromptText(for mode: PromptMode) -> String {
         self.combineBasePrompt(for: mode, with: self.defaultPromptBodyText(for: mode))
     }
@@ -1002,15 +954,6 @@ extension SettingsStore {
         Use the following selected context to improve your response:
         {context}
         """
-    }
-
-    static func runtimeContextBlock(context: String, template: String) -> String {
-        let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedContext.isEmpty else { return "" }
-        if template.contains("{context}") {
-            return template.replacingOccurrences(of: "{context}", with: trimmedContext)
-        }
-        return "\(template)\n\(trimmedContext)"
     }
 
     func promptResolution(for mode: PromptMode, appBundleID: String? = nil) -> PromptResolution {
@@ -1121,10 +1064,6 @@ extension SettingsStore {
 
     func effectiveSystemPrompt(for mode: PromptMode, appBundleID: String? = nil) -> String {
         self.promptResolution(for: mode, appBundleID: appBundleID).systemPrompt
-    }
-
-    func effectivePromptSource(for mode: PromptMode, appBundleID: String? = nil) -> PromptResolutionSource {
-        self.promptResolution(for: mode, appBundleID: appBundleID).source
     }
 
     /// Literal placeholder that gets substituted with the raw transcription

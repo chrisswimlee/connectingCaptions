@@ -279,25 +279,6 @@ nonisolated struct NemoThinkingParser: ThinkingParser {
     }
 }
 
-// MARK: - No Thinking Parser
-
-/// Parser for models that don't use thinking tokens at all.
-/// Everything is content.
-nonisolated struct NoThinkingParser: ThinkingParser {
-    mutating func processChunk(
-        _ chunk: String,
-        currentState: ThinkingParserState,
-        tagBuffer: inout String
-    ) -> (ThinkingParserState, String, String) {
-        // Everything is content
-        return (.inContent, "", chunk)
-    }
-
-    func finalize(thinkingBuffer: [String], contentBuffer: [String], finalState: ThinkingParserState) -> (thinking: String, content: String) {
-        return ("", contentBuffer.joined())
-    }
-}
-
 // MARK: - Separate Field Thinking Parser
 
 /// Parser for models that use separate fields (reasoning_content, thought, etc.)

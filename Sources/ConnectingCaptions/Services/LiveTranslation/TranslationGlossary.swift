@@ -40,12 +40,50 @@ enum SpokenLanguageResolver {
     /// Latest Whisper language for this Listen. Nil when the model did not name one.
     private(set) static var detectedLanguageID: String?
 
+    /// Last pair language Whisper actually named. A later third-language guess
+    /// is decoded again as this language, or as I speak when none has been named.
+    private static var lastEitherWayLanguageID: String?
+
     static func noteDetectedLanguage(_ code: String?) {
         guard let code else {
             self.detectedLanguageID = nil
+            self.lastEitherWayLanguageID = nil
             return
         }
         self.detectedLanguageID = TranslationLanguageCatalog.language(id: code)?.id
+        if let id = self.detectedLanguageID {
+            self.rememberEitherWayLanguage(id)
+        }
+    }
+
+    /// Nil keeps the transcript. A language outside the pair is the code to
+    /// decode that audio with again, so the caption stays inside the pair.
+    static func eitherWayDecodeLanguage(
+        detectedCode: String?,
+        settings: SettingsStore = .shared
+    ) -> String? {
+        guard self.isDynamicPairingEnabled(settings: settings) else { return nil }
+        let source = self.sourceLanguage(settings: settings).id
+        let target = self.targetLanguage(settings: settings).id
+        guard let detected = TranslationLanguageCatalog.language(id: detectedCode ?? "")?.id else {
+            return nil
+        }
+        if detected == source || detected == target {
+            self.lastEitherWayLanguageID = detected
+            return nil
+        }
+        if let last = self.lastEitherWayLanguageID, last == source || last == target {
+            return last
+        }
+        return source
+    }
+
+    private static func rememberEitherWayLanguage(_ id: String, settings: SettingsStore = .shared) {
+        guard self.isDynamicPairingEnabled(settings: settings) else { return }
+        let source = self.sourceLanguage(settings: settings).id
+        let target = self.targetLanguage(settings: settings).id
+        guard id == source || id == target else { return }
+        self.lastEitherWayLanguageID = id
     }
 
     static func spokenLanguageID(settings: SettingsStore = .shared) -> String {
@@ -347,11 +385,26 @@ enum SpokenLanguageResolver {
         settings.theaterDynamicPairing && self.dynamicPairingAvailable(settings: settings)
     }
 
-    /// Home and Theater chrome. Distinct Translate pair. Whisper Small is the
-    /// add-on that actually hears both languages.
-    @MainActor
+    /// The saved switch is on only while the selected Voice Engine can hear
+    /// both sides. Pack readiness is decided after both directions are probed.
+    static func reconcileDynamicPairing(settings: SettingsStore = .shared) {
+        guard settings.theaterDynamicPairing else { return }
+        guard !self.dynamicPairingAvailable(settings: settings) else { return }
+        settings.theaterDynamicPairing = false
+    }
+
+    /// Home, Theater, Speak & Type, and Paste. Shown for a real pair Whisper
+    /// Small can hear, including while a download or the current engine is
+    /// still keeping the switch off.
     static func showsEitherWayControl(settings: SettingsStore = .shared) -> Bool {
-        guard self.dynamicPairingSupportsCurrentPair(settings: settings) else { return false }
+        self.dynamicPairingSupportsCurrentPair(settings: settings)
+    }
+
+    /// The switch can be turned on. Whisper Small is installed and both
+    /// translation directions are already known to be installed.
+    @MainActor
+    static func eitherWayReady(settings: SettingsStore = .shared) -> Bool {
+        guard self.showsEitherWayControl(settings: settings) else { return false }
         let source = self.sourceLanguage(settings: settings)
         let target = self.targetLanguage(settings: settings)
         let engine = AppleTranslationEngine.shared
@@ -395,26 +448,30 @@ enum SpokenLanguageResolver {
         return configured
     }
 
+    @MainActor
     static func dynamicPairingControlCopy(settings: SettingsStore = .shared) -> String {
         let source = self.sourceLanguage(settings: settings)
         let target = self.targetLanguage(settings: settings)
         if source.id == target.id {
             return "Pick a Show as language that differs from I speak."
         }
+        if self.isDynamicPairingEnabled(settings: settings) {
+            if SpokenScriptDetector.pairSharesOneScript(source.id, target.id) {
+                return "Speak either language. Whisper names which one. If it does not, captions stay \(source.displayName) → \(target.displayName)."
+            }
+            return TheaterReadiness.dynamicPairingHint(isWhisper: true)
+        }
         if !self.dynamicPairingSupportsCurrentPair(settings: settings) {
             return "Either way needs Whisper to hear both \(source.displayName) and \(target.displayName)."
         }
         let addOn = SettingsStore.SpeechModel.eitherWayAddOn
         if !addOn.isInstalled {
-            return "Turn this on from Voice Engine. Apple Speech stays the default for one speaker."
+            return TheaterReadiness.eitherWayNeedsWhisperDownload
         }
-        if settings.selectedSpeechModel != addOn {
-            return "Uses Whisper Small to hear both languages. Turning Either way off keeps this Voice Engine selected."
+        if !self.eitherWayReady(settings: settings) {
+            return TheaterReadiness.eitherWayNeedsBothDirections
         }
-        if SpokenScriptDetector.pairSharesOneScript(source.id, target.id) {
-            return "Speak either language. Whisper names which one. If it does not, captions stay \(source.displayName) → \(target.displayName)."
-        }
-        return TheaterReadiness.dynamicPairingHint(isWhisper: true)
+        return TheaterReadiness.eitherWaySelectsWhisper
     }
 }
 
