@@ -2,7 +2,7 @@ import Combine
 import Darwin
 import Foundation
 
-// swiftlint:disable function_body_length cyclomatic_complexity type_body_length
+// swiftlint:disable file_length function_body_length cyclomatic_complexity type_body_length
 private struct PendingCaptionGrowth: Equatable {
     var id: UInt64
     var source: String
