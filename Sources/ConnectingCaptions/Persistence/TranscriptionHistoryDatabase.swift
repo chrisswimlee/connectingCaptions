@@ -851,6 +851,9 @@ final nonisolated class TranscriptionHistoryWriter: @unchecked Sendable {
             } ?? []
             try database.migrate(legacy.map { try self.record($0) })
         }
+        // Kept only once the import has run. Caching it before would let a retry
+        // after a failed import skip the import and show an empty history.
+        self.database = database
         // The transaction is committed and every payload decoded before retiring legacy storage.
         self.defaults.removeObject(forKey: self.legacyKey)
         // Kept only once the import is in. A failed import must run again on Retry.
