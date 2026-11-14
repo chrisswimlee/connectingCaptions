@@ -8,10 +8,6 @@ enum TheaterReadiness {
 
     static let listeningStatus =
         "Listening. Each sentence appears when it is ready."
-
-    static let listeningEmpty =
-        "Listening. Each sentence appears when it is ready."
-
     static let pressListen =
         "Press Listen. Each sentence appears when it is ready."
 
@@ -88,10 +84,6 @@ enum TheaterReadiness {
 
     static let minimizeHelp =
         "Hides the board. The microphone stays on. Printed lines and talk notes stay."
-
-    static let expandTheaterHelp =
-        "Show the caption board"
-
     static let theaterMinimizedStatus =
         "Theater is minimized."
 
@@ -108,23 +100,12 @@ enum TheaterReadiness {
 
     static let historyFromBoard =
         "The board keeps the latest lines. History keeps the whole talk, including lines that scrolled off."
-
-    static let gettingStartedReady = "Theater is ready"
-
     static let gettingStartedOpen = "Open Theater"
-
-    static let gettingStartedReadyDetail =
-        "A caption appeared. Open Theater anytime from the sidebar."
-
     static let gettingStartedOpenDetail =
         "Voice Engine sharpens speech into text. Translation Engine is Apple Translation on this Mac. Both use the input device you pick — built-in, USB, line-in, Bluetooth, or a loopback input. Open Theater, pick Voice or Translate, then press Listen."
 
     static let gettingStartedMicrophone =
         "Theater needs the microphone to hear you."
-
-    static let gettingStartedMicrophoneReady =
-        "The microphone is allowed. Voice and Translate both use it."
-
     static let printedLinesStay =
         "A line already on screen stays. Each sentence appears when it is ready, and what you are saying stays in the bar under the board. Pause and Stop drop a leftover. Listen, then type still types that leftover into the other app. Lines that scroll off stay in History."
 
@@ -149,10 +130,6 @@ enum TheaterReadiness {
     /// Stage card when Either way is active for the current Whisper pair.
     static let eitherWayCloseMic =
         "Either way: take turns in either language of the pair. Two voices at once will mix. English ↔ Korean is the clearest script pair."
-
-    static let transcriptionCopy =
-        "Voice Engine sharpens speech into text. Voice writes that text in the language you speak. Switch to Translate for a supported language."
-
     static let insertIMECaveat =
         "some keyboards paste it instead of typing each letter"
 
@@ -228,19 +205,11 @@ enum TheaterReadiness {
 
     static let allowMicrophone =
         "Press Listen to allow the microphone."
-
-    static let latencyHUD =
-        "mic is Listen to first audio. e2e is speech-start to the printed caption. ASR is the speech engine. MT is Apple Translation."
-
     static let timedExportHonesty =
         "SRT/VTT use speech timestamps when available. Older or unmatched captions use estimated times from when each caption committed."
 
     static let backingBar =
         "Caption plate puts a dark box behind each Overlay line so the text stays readable on white slides."
-
-    static let talkPackClear =
-        "Clear these notes so their names do not carry into the next talk."
-
     static let presenterHotkeys =
         "Control-Option-H hides or shows Theater, P pauses, K clears, T pins Overlay tools, L starts or stops Listen, R retries a failed translation, = and - change caption size. "
             + "Hover the Overlay Tools bar for the same controls. The menu-bar Theater item changes font, size, plate, and position. Your slides keep focus. A custom Listen shortcut with the same chord wins."
@@ -261,14 +230,23 @@ enum TheaterReadiness {
     static let speakCaptions =
         "Speak each finished Show-as line on the output you pick. Same-language Listen stays quiet."
 
-    /// Either way copy. The Home toggle enables only when Whisper hears both sides.
+    /// Either way copy. The switch is on only while Whisper can hear both sides.
     static let dynamicPairing =
         "Speak either language of this pair. Theater shows both. Whisper hears both; Apple Speech stays on I speak."
+
+    static let eitherWayNeedsWhisperDownload =
+        "Download Whisper Small in Voice Engine. Either way stays off until then."
+
+    static let eitherWayNeedsBothDirections =
+        "Either way stays off until translation is ready in both directions."
+
+    static let eitherWaySelectsWhisper =
+        "Turning this on selects Whisper Small and hears both languages of this pair."
 
     static func dynamicPairingHint(isWhisper: Bool) -> String {
         isWhisper
             ? "Either way: speak either language of this pair. Captions stay both. Whisper Small is the add-on; Apple Speech stays for one speaker."
-            : "Turn Either way on to download Whisper Small. Apple Speech stays on I speak until then."
+            : Self.eitherWayNeedsWhisperDownload
     }
 
     static var macOSNote: String {

@@ -845,7 +845,6 @@ final nonisolated class TranscriptionHistoryWriter: @unchecked Sendable {
         case let .key(key):
             database = try TranscriptionHistoryDatabase(url: self.url, key: key)
         }
-        self.database = database
         if try !database.isMigrated {
             let legacy = try self.defaults.data(forKey: self.legacyKey).map {
                 try JSONDecoder().decode([TranscriptionHistoryEntry].self, from: $0)
@@ -854,6 +853,8 @@ final nonisolated class TranscriptionHistoryWriter: @unchecked Sendable {
         }
         // The transaction is committed and every payload decoded before retiring legacy storage.
         self.defaults.removeObject(forKey: self.legacyKey)
+        // Kept only once the import is in. A failed import must run again on Retry.
+        self.database = database
         return database
     }
 

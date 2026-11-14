@@ -126,7 +126,6 @@ typealias PrivateAIModelDownloadProgressHandler = @Sendable (PrivateAIModelDownl
 
 enum PrivateAIModelUpdateState: String, Sendable, Codable, Equatable {
     case unavailable
-    case notInstalled
     case current
     case updateAvailable
 }

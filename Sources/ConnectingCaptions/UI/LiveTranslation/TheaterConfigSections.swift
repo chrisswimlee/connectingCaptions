@@ -36,8 +36,8 @@ struct TheaterModeSection: View {
 }
 
 /// Either way: speak either language of the pair; Theater flips the clause.
-/// Shared by the language card and Theater chrome. Turning it on downloads
-/// Whisper Small once; Apple Speech stays the default for one speaker.
+/// The switch is on only while that is what Listen will do. Turning it on
+/// selects Whisper Small. Turning it off keeps the Voice Engine.
 struct TheaterEitherWaySection: View {
     @ObservedObject private var settings = SettingsStore.shared
     @ObservedObject private var controller = LiveTranslationController.shared
@@ -48,26 +48,23 @@ struct TheaterEitherWaySection: View {
     /// Board chrome wraps Listen-stopping changes; Home can leave this nil.
     var apply: ((Bool) -> Void)?
 
-    /// Either way only turns on once Whisper Small is already on disk —
-    /// no surprise download kicked off from a toggle flip.
-    private var addOnInstalled: Bool {
-        SettingsStore.SpeechModel.eitherWayAddOn.isInstalled
+    /// On means Listen will flip the pair. Off means it will not.
+    private var running: Bool {
+        SpokenLanguageResolver.isDynamicPairingEnabled(settings: self.settings)
     }
 
-    /// Flipping the toggle forces the Voice Engine to the add-on, so whether
-    /// it's worth tapping depends on what the add-on supports for this pair —
-    /// not on whichever engine happens to be selected before the flip.
-    private var pairSupported: Bool {
-        SpokenLanguageResolver.dynamicPairingSupportsCurrentPair(settings: self.settings)
+    /// Whisper Small and both translation directions are already installed.
+    private var ready: Bool {
+        SpokenLanguageResolver.eitherWayReady(settings: self.settings)
     }
 
     private var detail: String {
-        SpokenLanguageResolver.dynamicPairingControlCopy(settings: self.settings)
+        AppLanguage.text(SpokenLanguageResolver.dynamicPairingControlCopy(settings: self.settings))
     }
 
     private var pairingBinding: Binding<Bool> {
         Binding(
-            get: { self.settings.theaterDynamicPairing },
+            get: { self.running },
             set: { enabled in
                 if let apply = self.apply {
                     apply(enabled)
@@ -90,7 +87,7 @@ struct TheaterEitherWaySection: View {
             Toggle(AppLanguage.text("Either way"), isOn: self.pairingBinding)
                 .toggleStyle(.switch)
                 .controlSize(.small)
-                .disabled(!self.addOnInstalled || !self.pairSupported)
+                .disabled(!self.running && !self.ready)
                 .help(self.detail)
                 .theaterTag(self.detail)
                 .accessibilityLabel(AppLanguage.text("Either way"))
@@ -104,7 +101,7 @@ struct TheaterEitherWaySection: View {
                 Toggle(AppLanguage.text("Either way"), isOn: self.pairingBinding)
                     .toggleStyle(.switch)
                     .labelsHidden()
-                    .disabled(!self.addOnInstalled || !self.pairSupported)
+                    .disabled(!self.running && !self.ready)
                     .help(self.detail)
                     .accessibilityLabel(AppLanguage.text("Either way"))
                     .accessibilityHint(self.detail)

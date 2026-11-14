@@ -54,13 +54,6 @@ final class TheaterPasteTranslate: NSObject, NSWindowDelegate, ObservableObject 
 
     @Published var sourceLanguageID: String
     @Published var targetLanguageID: String
-    @Published var autoDetectPairDirection = true {
-        didSet {
-            guard self.autoDetectPairDirection != oldValue else { return }
-            self.renderedKey = ""
-            self.requestTranslationNow()
-        }
-    }
 
     @Published private(set) var translatedText = ""
     @Published private(set) var translatedLines: [TranslatedLine] = []
@@ -230,11 +223,12 @@ final class TheaterPasteTranslate: NSObject, NSWindowDelegate, ObservableObject 
         self.rememberFrame()
     }
 
-    /// Resolves which direction to translate `text` when `autoDetectPairDirection` is enabled.
+    /// Resolves which direction to translate `text` when Either way is on.
+    /// The switch is the same one Theater Listen uses.
     func resolvedPair(for text: String) -> (source: TranslationLanguage, target: TranslationLanguage) {
         let source = self.sourceLanguage
         let target = self.targetLanguage
-        guard self.autoDetectPairDirection, source.id != target.id else {
+        guard SpokenLanguageResolver.isDynamicPairingEnabled(), source.id != target.id else {
             return (source, target)
         }
         if let detectedID = SpokenScriptDetector.languageID(in: text, among: [source.id, target.id]),
@@ -380,7 +374,7 @@ final class TheaterPasteTranslate: NSObject, NSWindowDelegate, ObservableObject 
         let configuredTarget = self.targetLanguage
         guard configuredSource.id != configuredTarget.id else { return }
 
-        let key = "\(text)\n\(configuredSource.id)>\(configuredTarget.id)\n\(self.autoDetectPairDirection)"
+        let key = "\(text)\n\(configuredSource.id)>\(configuredTarget.id)\n\(SpokenLanguageResolver.isDynamicPairingEnabled())"
         guard key != self.renderedKey else { return }
         self.pumping = true
         self.isTranslating = true
@@ -684,6 +678,12 @@ private struct TheaterPasteTranslateView: View {
         .onChange(of: self.model.focusRequestToken) { _, _ in
             self.isInputFocused = true
         }
+        .onChange(of: self.settings.theaterDynamicPairing) { _, _ in
+            self.model.requestTranslationNow()
+        }
+        .onChange(of: self.settings.selectedSpeechModel) { _, _ in
+            self.model.requestTranslationNow()
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("theater.pasteTranslate")
     }
@@ -741,12 +741,14 @@ private struct TheaterPasteTranslateView: View {
                 accessibilityIdentifier: "theater.pasteTranslate.target"
             )
 
-            Toggle(AppLanguage.text("Either way"), isOn: self.$model.autoDetectPairDirection)
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .disabled(self.model.sourceLanguageID == self.model.targetLanguageID)
-                .help(AppLanguage.text("Automatically detect which language of the pair each line is written in."))
-                .accessibilityIdentifier("theater.pasteTranslate.eitherWay")
+            TheaterEitherWaySection(
+                accessibilityIdentifier: "theater.pasteTranslate.eitherWay",
+                compact: true,
+                apply: { enabled in
+                    LiveTranslationController.shared.applyDynamicPairing(enabled)
+                    self.model.requestTranslationNow()
+                }
+            )
         }
     }
 
@@ -780,7 +782,7 @@ private struct TheaterPasteTranslateView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    if self.model.autoDetectPairDirection,
+                    if SpokenLanguageResolver.isDynamicPairingEnabled(settings: self.settings),
                        self.model.sourceLanguageID != self.model.targetLanguageID
                     {
                         self.directionLegend

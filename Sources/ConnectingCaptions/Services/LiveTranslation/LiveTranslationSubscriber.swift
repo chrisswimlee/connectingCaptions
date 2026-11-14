@@ -2741,7 +2741,11 @@ final class LiveTranslationSubscriber: ObservableObject {
                 hypothesis: incoming,
                 newest: newest,
                 languageID: languageID
-              )
+              ),
+              // Every old word is still there with more after it. The line
+              // grew, or the next sentence began. Peel and in-place growth
+              // own both; adopting it here empties the live row.
+              !TranslationClauseSegmenter.shouldIgnoreAsStalePrefix(previous: replacement, incoming: newest)
         else { return }
         if self.replaceNewestWithRevision(replacement, languageID: languageID) { return }
         if let index = self.newestUnpublishedCommitIndex,

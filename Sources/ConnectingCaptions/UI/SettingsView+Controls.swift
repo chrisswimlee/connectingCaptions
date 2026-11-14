@@ -2,90 +2,10 @@
 //  SettingsView+Controls.swift
 //  fluid
 //
-//  Filler-word editor, flow layout, and dictionary suggestion row.
+//  Flow layout and dictionary suggestion row.
 //
 
 import SwiftUI
-
-// MARK: - Filler Words Editor
-
-struct FillerWordsEditor: View {
-    @State private var fillerWords: [String] = SettingsStore.shared.fillerWords
-    @State private var newWord: String = ""
-    @FocusState private var isAddWordFocused: Bool
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            AppText("Filler words to remove:")
-                .font(self.theme.typography.bodySmall)
-                .foregroundStyle(.secondary)
-
-            // Word chips
-            FlowLayout(spacing: 6) {
-                ForEach(self.fillerWords, id: \.self) { word in
-                    HStack(spacing: 4) {
-                        Text(word)
-                            .font(.caption)
-                        Button {
-                            self.removeWord(word)
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.caption2)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(AppLanguage.format("Remove {0}", String(describing: word)))
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(.quaternary)
-                    )
-                }
-            }
-
-            // Add new word
-            HStack(spacing: 8) {
-                TextField(AppLanguage.text("Add word"), text: self.$newWord)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 100)
-                    .focused(self.$isAddWordFocused)
-                    .onSubmit { self.addWord() }
-
-                AppButton("Add") { self.addWord() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .disabled(self.newWord.trimmingCharacters(in: .whitespaces).isEmpty)
-
-                Spacer()
-
-                AppButton("Reset") {
-                    self.fillerWords = SettingsStore.defaultFillerWords
-                    SettingsStore.shared.fillerWords = self.fillerWords
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-            }
-        }
-        .onAppear {
-            self.isAddWordFocused = false
-        }
-    }
-
-    private func addWord() {
-        let word = self.newWord.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !word.isEmpty, !self.fillerWords.contains(word) else { return }
-        self.fillerWords.append(word)
-        SettingsStore.shared.fillerWords = self.fillerWords
-        self.newWord = ""
-    }
-
-    private func removeWord(_ word: String) {
-        self.fillerWords.removeAll { $0 == word }
-        SettingsStore.shared.fillerWords = self.fillerWords
-    }
-}
 
 // MARK: - Flow Layout
 

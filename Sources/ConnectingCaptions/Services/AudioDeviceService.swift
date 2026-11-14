@@ -229,12 +229,6 @@ nonisolated enum AudioDevice {
     }
 
     @discardableResult
-    static func setDefaultInputDevice(uid: String) -> Bool {
-        guard let device = listInputDevices().first(where: { $0.uid == uid }) else { return false }
-        return self.setDefaultDeviceId(device.id, selector: kAudioHardwarePropertyDefaultInputDevice)
-    }
-
-    @discardableResult
     static func setDefaultOutputDevice(uid: String) -> Bool {
         guard let device = listOutputDevices().first(where: { $0.uid == uid }) else { return false }
         return self.setDefaultDeviceId(device.id, selector: kAudioHardwarePropertyDefaultOutputDevice)
@@ -277,16 +271,6 @@ nonisolated enum AudioDevice {
     static func isInputDeviceUsable(_ device: Device) -> Bool {
         self.isInputDeviceAlive(device) &&
             (device.isUnavailableWhenClamshellClosed == false || ClamshellState.isClosed == false)
-    }
-
-    /// Get output device by UID without affecting system settings
-    static func getOutputDevice(byUID uid: String) -> Device? {
-        return self.listOutputDevices().first { $0.uid == uid }
-    }
-
-    /// Get device AudioObjectID from UID
-    static func getDeviceId(forUID uid: String) -> AudioObjectID? {
-        return self.listAllDevices().first { $0.uid == uid }?.id
     }
 
     private static func getDefaultDeviceId(selector: AudioObjectPropertySelector) -> AudioObjectID? {

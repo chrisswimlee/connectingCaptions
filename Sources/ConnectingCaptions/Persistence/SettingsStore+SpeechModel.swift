@@ -885,6 +885,8 @@ extension SettingsStore {
             objectWillChange.send()
             let model = newValue == .nemotronStreaming320 ? SpeechModel.nemotronStreaming : newValue
             self.defaults.set(model.rawValue, forKey: Keys.selectedSpeechModel)
+            // Either way stays on only while this engine can hear both languages.
+            SpokenLanguageResolver.reconcileDynamicPairing(settings: self)
         }
     }
 

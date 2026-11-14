@@ -325,12 +325,22 @@ final class WhisperProvider: TranscriptionProvider {
         }
 
         let languageCode = self.resolvedLanguageCode()
-        let transcript = try await session.run(samples, options: Self.runOptions(languageCode: languageCode))
+        var transcript = try await session.run(samples, options: Self.runOptions(languageCode: languageCode))
+        var lockedPairLanguage: String?
+        // Either way asks Whisper to guess. A guess outside the pair is decoded
+        // again in the last pair language, so a third language never reaches the board.
+        if languageCode == nil,
+           let locked = SpokenLanguageResolver.eitherWayDecodeLanguage(detectedCode: transcript.language)
+        {
+            let forced = VoiceEngineLanguageCatalog.whisperLanguageCode(for: locked) ?? locked
+            transcript = try await session.run(samples, options: Self.runOptions(languageCode: forced))
+            lockedPairLanguage = locked
+        }
         let fullText = transcript.text.trimmingCharacters(in: .whitespacesAndNewlines)
         return ASRTranscriptionResult(
             text: fullText,
             confidence: 1.0,
-            detectedLanguageID: Self.catalogLanguageID(transcript.language)
+            detectedLanguageID: lockedPairLanguage ?? Self.catalogLanguageID(transcript.language)
         )
     }
 

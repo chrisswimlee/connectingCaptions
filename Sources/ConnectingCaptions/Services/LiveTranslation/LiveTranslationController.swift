@@ -376,13 +376,13 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.finishLanguageChange()
     }
 
-    /// Either way. Requires Whisper Small already downloaded in Voice Engine
-    /// settings and translation ready in both directions. Turning it off keeps
-    /// the selected engine, which may be the only one that hears this language.
+    /// Either way. Turning it on requires Whisper Small and both translation
+    /// directions. The switch stays on only while the selected Voice Engine
+    /// can hear both languages. Turning it off keeps that engine.
     func applyDynamicPairing(_ enabled: Bool) {
         let settings = SettingsStore.shared
         let addOn = SettingsStore.SpeechModel.eitherWayAddOn
-        guard !enabled || SpokenLanguageResolver.showsEitherWayControl(settings: settings) else { return }
+        guard !enabled || SpokenLanguageResolver.eitherWayReady(settings: settings) else { return }
         settings.theaterDynamicPairing = enabled
         if enabled {
             if settings.selectedSpeechModel != addOn {
@@ -397,9 +397,9 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
 
     private func finishLanguageChange() {
         let settings = SettingsStore.shared
-        if settings.theaterDynamicPairing, !SpokenLanguageResolver.showsEitherWayControl(settings: settings) {
-            settings.theaterDynamicPairing = false
-        }
+        // A new pair stays on until both directions have been probed. Same
+        // language, Voice mode, or a one-language engine turns the switch off now.
+        SpokenLanguageResolver.reconcileDynamicPairing(settings: settings)
         self.packCheck.invalidate()
         self.notePack(.unknown)
         self.translationWarmTask?.cancel()
@@ -1000,7 +1000,8 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         }
         let resolved = await self.resolvePairPacks(source: source, target: target)
         guard !Task.isCancelled, self.packCheck.accepts(request, currentPair: .current()) else { return }
-        if SettingsStore.shared.theaterDynamicPairing, !SpokenLanguageResolver.showsEitherWayControl(),
+        SpokenLanguageResolver.reconcileDynamicPairing()
+        if SettingsStore.shared.theaterDynamicPairing, !SpokenLanguageResolver.eitherWayReady(),
            !self.isSessionActive, !AppServices.shared.asr.isRunningOrStarting
         {
             SettingsStore.shared.theaterDynamicPairing = false
