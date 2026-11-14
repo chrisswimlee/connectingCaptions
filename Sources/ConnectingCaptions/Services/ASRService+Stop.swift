@@ -43,7 +43,12 @@ extension ASRService {
         self.isStoppingFinalTranscription = true
         var completedBufferHandoff = false
         var endStreamingSession = false
-        defer {
+        var didRunStopCleanup = false
+        // `defer` cannot await. Cleanup still runs on every exit, and the
+        // streaming reset runs after that cleanup on the paths that started it.
+        func runStopCleanup() {
+            if didRunStopCleanup { return }
+            didRunStopCleanup = true
             if completedBufferHandoff == false {
                 self.recordingBufferHandoffGate.complete(bufferHandoffToken)
             }
@@ -52,9 +57,17 @@ extension ASRService {
             if self.benchmarkSessionID == stoppingSessionID {
                 self.isStoppingFinalTranscription = false
             }
+        }
+        func finishStop(_ text: String) async -> String {
+            runStopCleanup()
             if endStreamingSession {
+                endStreamingSession = false
                 await self.transcriptionProvider.resetStreamingSession()
             }
+            return text
+        }
+        defer {
+            runStopCleanup()
         }
         self.stopStreamingScheduler(sessionID: stoppingSessionID)
         let useDictionaryTrainingPath = forDictionaryTraining || self.isDictionaryTrainingCaptureActive
@@ -153,7 +166,7 @@ extension ASRService {
                 if shouldResumeMedia { await MediaPlaybackService.shared.resumeIfWePaused(true) }
                 self.lastStopOutcome = preview.isEmpty ? .empty : .success
                 self.benchmarkLog("stop_end result=theater_preview_timeout totalMs=\(self.elapsedMilliseconds(since: stopStartedAt))")
-                return preview
+                return await finishStop(preview)
             }
             self.abortStreamingWavWriter()
             self.beginStreamingDrainRecovery(sessionID: stoppingSessionID, token: bufferHandoffToken)
@@ -161,7 +174,7 @@ extension ASRService {
             self.lastStopOutcome = .failed
             if shouldResumeMedia { await MediaPlaybackService.shared.resumeIfWePaused(true) }
             self.benchmarkLog("stop_end result=error reason=streaming_drain_timeout")
-            return ""
+            return await finishStop("")
         }
         self.benchmarkLog("stop_streaming_wait elapsedMs=\(self.elapsedMilliseconds(since: streamingStopStartedAt))")
         DebugLogger.shared.debug("✅ Active streaming work completed", source: "ASRService")
@@ -210,7 +223,7 @@ extension ASRService {
                 DebugLogger.shared.info("🎵 Resumed system media after empty audio", source: "ASRService")
             }
             self.benchmarkLog("stop_end result=empty totalMs=\(self.elapsedMilliseconds(since: stopStartedAt)) reason=no_audio")
-            return ""
+            return await finishStop("")
         }
 
         if Self.shouldAssessShortAudioSilence(
@@ -245,7 +258,7 @@ extension ASRService {
                 self.benchmarkLog(
                     "stop_end result=empty totalMs=\(self.elapsedMilliseconds(since: stopStartedAt)) reason=short_silence"
                 )
-                return ""
+                return await finishStop("")
             }
         } else if hasRecognizedStreamingPreview {
             self.benchmarkLog("silence_gate eligible=false skip=false reason=streaming_preview")
@@ -277,7 +290,7 @@ extension ASRService {
                     self.benchmarkLog(
                         "stop_end result=empty totalMs=\(self.elapsedMilliseconds(since: stopStartedAt)) reason=pause"
                     )
-                    return ""
+                    return await finishStop("")
                 }
             } else {
                 pcm = prepared.samples
@@ -322,7 +335,7 @@ extension ASRService {
                     DebugLogger.shared.info("🎵 Resumed system media after provider not ready", source: "ASRService")
                 }
                 self.benchmarkLog("stop_end result=empty totalMs=\(self.elapsedMilliseconds(since: stopStartedAt)) reason=provider_not_ready")
-                return ""
+                return await finishStop("")
             }
 
             DebugLogger.shared.debug("Starting transcription with \(pcm.count) samples (\(Float(pcm.count) / 16_000.0) seconds)", source: "ASRService")
@@ -341,7 +354,7 @@ extension ASRService {
                     self.benchmarkLog(
                         "stop_end result=theater_preview totalMs=\(self.elapsedMilliseconds(since: stopStartedAt)) chars=\(preview.count)"
                     )
-                    return preview
+                    return await finishStop(preview)
                 }
             }
             let finalStartedAt = Date().timeIntervalSince1970
@@ -496,7 +509,7 @@ extension ASRService {
             self.lastStopOutcome = outputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? .empty
                 : .success
-            return outputText
+            return await finishStop(outputText)
         } catch {
             self.abortStreamingWavWriter()
             self.lastStopOutcome = .failed
@@ -529,7 +542,7 @@ extension ASRService {
             }
 
             self.benchmarkLog("stop_end result=error totalMs=\(self.elapsedMilliseconds(since: stopStartedAt)) error=\(error.localizedDescription)")
-            return ""
+            return await finishStop("")
         }
     }
 
