@@ -221,7 +221,7 @@ enum SettingsSearchIndex {
         .init(
             target: .theaterPlayback,
             title: AppLanguage.text("Playback and session"),
-            terms: ["speak captions speak on voice output", "clear captions board archive wipe reset"]
+            terms: ["speak captions speak on voice output echo feedback", "clear captions board archive wipe reset"]
         ),
         .init(
             target: .captionListenShortcut,

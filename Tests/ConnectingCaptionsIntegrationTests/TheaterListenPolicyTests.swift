@@ -419,4 +419,19 @@ final class FaithfulCaptionContentTests: XCTestCase {
         }
         XCTAssertNil(LiveTranslationCaptionGate.captionSafeForBoard("Error: quota exceeded", sourceText: "Barack Obama."))
     }
+
+    func testSpokenLineHoldsTheMicrophoneOnlyWhileItIsAudible() {
+        XCTAssertTrue(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .playing))
+        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .rendering))
+        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .idle))
+        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: false, phase: .playing))
+    }
+
+    func testPauseAndASpokenLineEachKeepCaptureHeld() {
+        XCTAssertFalse(LiveTranslationController.captureHeld(paused: false, spokenPlayback: false))
+        XCTAssertTrue(LiveTranslationController.captureHeld(paused: true, spokenPlayback: false))
+        XCTAssertTrue(LiveTranslationController.captureHeld(paused: false, spokenPlayback: true))
+        // Resume during a spoken line, and a line ending during Pause, both stay held.
+        XCTAssertTrue(LiveTranslationController.captureHeld(paused: true, spokenPlayback: true))
+    }
 }

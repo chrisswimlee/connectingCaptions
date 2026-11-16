@@ -230,6 +230,9 @@ enum TheaterReadiness {
     static let speakCaptions =
         "Speak each finished Show-as line on the output you pick. Same-language Listen stays quiet."
 
+    static let speakHoldsMicrophone =
+        "Listen stops hearing while a line is spoken, so it does not caption its own voice. Turn off when listeners use headphones or another room."
+
     /// Either way copy. The switch is on only while Whisper can hear both sides.
     static let dynamicPairing =
         "Speak either language of this pair. Theater shows both. Whisper hears both; Apple Speech stays on I speak."

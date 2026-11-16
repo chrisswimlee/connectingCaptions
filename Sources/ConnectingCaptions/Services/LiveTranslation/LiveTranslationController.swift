@@ -9,6 +9,7 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
 
     @Published private(set) var isSessionActive = false
     @Published private(set) var isPaused = false
+    private(set) var spokenPlaybackHoldsCapture = false
     @Published private(set) var listenKind: TranslationListenKind?
     /// Where this caption Listen should appear. Home and menus store `.theater`.
     /// The shortcut stores the user's Caption Listen setting.
@@ -560,8 +561,25 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         self.isPaused = false
         self.trace(LiveTranslationTrace.event("session resume", token: self.sessionToken))
         self.subscriber.releasePauseHold()
-        AppServices.shared.asr.setCapturePaused(false)
+        AppServices.shared.asr.setCapturePaused(
+            Self.captureHeld(paused: false, spokenPlayback: self.spokenPlaybackHoldsCapture)
+        )
         self.refreshPresenter()
+    }
+
+    /// Pause and a spoken line each hold capture. Ending one leaves the other's hold in place.
+    nonisolated static func captureHeld(paused: Bool, spokenPlayback: Bool) -> Bool {
+        paused || spokenPlayback
+    }
+
+    /// Speak captions is playing a line. Capture is held the way Pause holds it,
+    /// without the Pause state: the board, the session, and the button stay as they are.
+    func setSpokenPlaybackHold(_ hold: Bool) {
+        guard self.spokenPlaybackHoldsCapture != hold else { return }
+        self.spokenPlaybackHoldsCapture = hold
+        AppServices.shared.asr.setCapturePaused(
+            Self.captureHeld(paused: self.isPaused, spokenPlayback: hold)
+        )
     }
 
     private func armPauseMicrophoneRelease() {

@@ -251,6 +251,8 @@ final class ProIOSSession: ObservableObject {
 
     private func ingest(_ packet: MicPacket, generation: Int) async {
         guard generation == self.listenGeneration, self.isListening, !self.isPaused else { return }
+        // Read captions aloud is speaking through the phone. Hearing it would caption the voice.
+        guard !self.speaker.holdsMicrophone else { return }
         do {
             try await self.recognizer.ingest(packet)
         } catch {

@@ -312,6 +312,22 @@ struct LiveTranslationSettingsView: View {
 
                 self.speakOutputPicker
 
+                self.settingsToggleRow(
+                    title: AppLanguage.text("Hold microphone while speaking"),
+                    description: AppLanguage.text(TheaterReadiness.speakHoldsMicrophone)
+                ) {
+                    AppToggle("Hold microphone while speaking", isOn: Binding(
+                        get: { self.settings.theaterSpeakHoldsMicrophone },
+                        set: { self.settings.theaterSpeakHoldsMicrophone = $0 }
+                    ))
+                        .disabled(!self.settings.theaterSpeakCaptions)
+                        .toggleStyle(.switch)
+                        .tint(self.theme.palette.accent)
+                        .labelsHidden()
+                        .accessibilityLabel(AppLanguage.text("Hold microphone while speaking"))
+                        .accessibilityIdentifier("theater.settings.speakHoldsMicrophone")
+                }
+
                 self.settingsToggleRow(title: AppLanguage.text("Clear captions"), description: TheaterReadiness.clearCaptions) {
                     AppButton("Clear") { self.showClearConfirmation = true }
                         .buttonStyle(.theaterTextDestructive)

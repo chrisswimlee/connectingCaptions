@@ -47,6 +47,9 @@ final class TheaterSpokenDelivery {
     /// How long `AVAudioEngine.start` may sit before this line is skipped.
     nonisolated static let engineStartNanoseconds: UInt64 = 2_000_000_000
     nonisolated static var maxPendingLines: Int { TheaterInbox.maxLines }
+    /// How long the microphone stays held after a line ends. Covers the output
+    /// device's latency and the room's tail, so Listen does not hear the last word.
+    nonisolated static let microphoneTailNanoseconds: UInt64 = 350_000_000
 
     private var pending: [TheaterSpokenLine] = []
     private var currentID: UInt64?
@@ -73,6 +76,8 @@ final class TheaterSpokenDelivery {
     private var activeFinish: PlaybackFinish?
     private var activeRender: RenderBox?
     private var activeRenderTimeout: Task<Void, Never>?
+    private var microphoneHeld = false
+    private var microphoneReleaseTask: Task<Void, Never>?
 
     func notePublished(id: UInt64, text: String, languageID: String) {
         guard SettingsStore.shared.theaterSpeakCaptions else { return }
@@ -135,6 +140,12 @@ final class TheaterSpokenDelivery {
         if self.playTask == nil, self.currentID == nil, !self.engineStartInFlight {
             self.tearDownEngine()
         }
+    }
+
+    /// Listen holds the microphone only while a line is audible. Preparing a
+    /// line makes no sound, so the microphone stays open for it.
+    nonisolated static func holdsMicrophone(enabled: Bool, phase: TheaterSpokenPhase) -> Bool {
+        enabled && phase == .playing
     }
 
     nonisolated static func shouldSpeak(
@@ -342,6 +353,7 @@ final class TheaterSpokenDelivery {
         self.activePlayer = nil
         self.activeEngine = nil
         self.activeFinish = nil
+        self.releaseMicrophoneAfterTail()
         Task { [weak self] in
             await Self.waitForTask(task, nanoseconds: Self.drainNanoseconds)
             guard let self, self.generation == token else { return }
@@ -351,6 +363,32 @@ final class TheaterSpokenDelivery {
                 return
             }
             self.pump()
+        }
+    }
+
+    /// Without this, Listen captions its own voice. With Either way on, that
+    /// caption is translated back and spoken again.
+    private func holdMicrophone() {
+        guard Self.holdsMicrophone(
+            enabled: SettingsStore.shared.theaterSpeakHoldsMicrophone,
+            phase: self.phase
+        ) else { return }
+        self.microphoneReleaseTask?.cancel()
+        self.microphoneReleaseTask = nil
+        guard !self.microphoneHeld else { return }
+        self.microphoneHeld = true
+        LiveTranslationController.shared.setSpokenPlaybackHold(true)
+    }
+
+    /// The next line cancels the release when it starts inside the tail.
+    private func releaseMicrophoneAfterTail() {
+        guard self.microphoneHeld, self.microphoneReleaseTask == nil else { return }
+        self.microphoneReleaseTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.microphoneTailNanoseconds)
+            guard !Task.isCancelled, let self else { return }
+            self.microphoneReleaseTask = nil
+            self.microphoneHeld = false
+            LiveTranslationController.shared.setSpokenPlaybackHold(false)
         }
     }
 
@@ -368,6 +406,7 @@ final class TheaterSpokenDelivery {
         let finish = PlaybackFinish()
         self.activeFinish = finish
         self.phase = .playing
+        self.holdMicrophone()
         player.play()
         let last = buffers.count - 1
         for (index, buffer) in buffers.enumerated() {
@@ -385,6 +424,7 @@ final class TheaterSpokenDelivery {
         )
         await self.waitForPlayback(finish, timeoutNanoseconds: timeout, player: player)
         player.stop()
+        self.releaseMicrophoneAfterTail()
         if self.activeFinish === finish {
             self.activeFinish = nil
         }

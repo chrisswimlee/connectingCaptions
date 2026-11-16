@@ -65,18 +65,70 @@ enum ProIOSAppGroup {
 }
 
 @MainActor
-final class ProIOSSpeaker {
+final class ProIOSSpeaker: NSObject, AVSpeechSynthesizerDelegate {
+    /// How long the microphone stays held after the last line ends, so Listen
+    /// does not hear the end of its own voice.
+    nonisolated static let microphoneTailSeconds: TimeInterval = 0.35
+
     private let synthesizer = AVSpeechSynthesizer()
+    /// Lines queued or speaking. `isSpeaking` can lag a finish or a Stop.
+    private var pending: Set<ObjectIdentifier> = []
+    private var quietUntil = Date.distantPast
+
+    override init() {
+        super.init()
+        self.synthesizer.delegate = self
+    }
+
+    /// Listen drops microphone packets while this is true. Without it the
+    /// phone captions its own voice through the speaker.
+    var holdsMicrophone: Bool {
+        let speaking = !self.pending.isEmpty || Date() < self.quietUntil
+        guard speaking else { return false }
+        return Self.holdsMicrophone(
+            speaking: speaking,
+            outputPorts: AVAudioSession.sharedInstance().currentRoute.outputs.map(\.portType)
+        )
+    }
+
+    /// Wired headphones, a hands-free headset, and LE earbuds or hearing aids
+    /// keep the voice out of the room, so the microphone stays open. A
+    /// Bluetooth music route may be a loudspeaker and is held like one.
+    nonisolated static func holdsMicrophone(speaking: Bool, outputPorts: [AVAudioSession.Port]) -> Bool {
+        guard speaking else { return false }
+        let inEar: Set<AVAudioSession.Port> = [.headphones, .bluetoothHFP, .bluetoothLE]
+        return outputPorts.isEmpty || outputPorts.contains { !inEar.contains($0) }
+    }
 
     func speak(_ text: String, languageCode: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let utterance = AVSpeechUtterance(string: trimmed)
         utterance.voice = AVSpeechSynthesisVoice(language: languageCode)
+        self.pending.insert(ObjectIdentifier(utterance))
         self.synthesizer.speak(utterance)
     }
 
     func stop() {
         self.synthesizer.stopSpeaking(at: .immediate)
+        if !self.pending.isEmpty {
+            self.pending.removeAll()
+            self.quietUntil = Date().addingTimeInterval(Self.microphoneTailSeconds)
+        }
+    }
+
+    private func utteranceEnded(_ id: ObjectIdentifier) {
+        guard self.pending.remove(id) != nil, self.pending.isEmpty else { return }
+        self.quietUntil = Date().addingTimeInterval(Self.microphoneTailSeconds)
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor in self.utteranceEnded(id) }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+        let id = ObjectIdentifier(utterance)
+        Task { @MainActor in self.utteranceEnded(id) }
     }
 }

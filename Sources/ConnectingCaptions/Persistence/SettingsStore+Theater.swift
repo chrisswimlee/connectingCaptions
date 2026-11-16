@@ -15,6 +15,7 @@ extension SettingsStore {
         static let alsoHearOtherLanguages = "TheaterAlsoHearOtherLanguages"
         static let dynamicPairing = "TheaterDynamicPairing"
         static let speakCaptions = "TheaterSpeakCaptions"
+        static let speakHoldsMicrophone = "TheaterSpeakHoldsMicrophone"
         static let sessionMode = "TheaterSessionMode"
         static let minimized = "TheaterMinimized"
         static let expandedWindowFrame = "TheaterExpandedWindowFrame"
@@ -243,6 +244,16 @@ extension SettingsStore {
         set {
             objectWillChange.send()
             self.defaults.set(newValue, forKey: TheaterDefaults.speakCaptions)
+        }
+    }
+
+    /// Listen stops hearing while a line is spoken, so it cannot caption its own
+    /// voice. On until turned off, for listeners on headphones or in another room.
+    var theaterSpeakHoldsMicrophone: Bool {
+        get { self.defaults.object(forKey: TheaterDefaults.speakHoldsMicrophone) as? Bool ?? true }
+        set {
+            objectWillChange.send()
+            self.defaults.set(newValue, forKey: TheaterDefaults.speakHoldsMicrophone)
         }
     }
 
