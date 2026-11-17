@@ -391,6 +391,26 @@ final class TheaterListenPolicyTests: XCTestCase {
                 .contains { $0.target == .pauseMedia }
         )
     }
+
+    func testSpokenLineHoldsTheMicrophoneOnlyWhileItIsAudible() {
+        XCTAssertTrue(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .playing))
+        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .rendering))
+        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .idle))
+        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: false, phase: .playing))
+    }
+
+    func testPauseAndASpokenLineEachKeepCaptureHeld() {
+        XCTAssertFalse(LiveTranslationController.captureHeld(paused: false, spokenPlayback: false))
+        XCTAssertTrue(LiveTranslationController.captureHeld(paused: true, spokenPlayback: false))
+        XCTAssertTrue(LiveTranslationController.captureHeld(paused: false, spokenPlayback: true))
+        // Resume during a spoken line, and a line ending during Pause, both stay held.
+        XCTAssertTrue(LiveTranslationController.captureHeld(paused: true, spokenPlayback: true))
+    }
+
+    func testACancelledLineThatUnwindsLateDoesNotOpenTheMicrophone() {
+        XCTAssertTrue(TheaterSpokenDelivery.releasesMicrophone(lineGeneration: 3, currentGeneration: 3))
+        XCTAssertFalse(TheaterSpokenDelivery.releasesMicrophone(lineGeneration: 3, currentGeneration: 4))
+    }
 }
 
 private final class SampleBatchSink {
@@ -418,20 +438,5 @@ final class FaithfulCaptionContentTests: XCTestCase {
             XCTAssertEqual(LiveTranslationCaptionGate.captionSafeForBoard(text, sourceText: text), text)
         }
         XCTAssertNil(LiveTranslationCaptionGate.captionSafeForBoard("Error: quota exceeded", sourceText: "Barack Obama."))
-    }
-
-    func testSpokenLineHoldsTheMicrophoneOnlyWhileItIsAudible() {
-        XCTAssertTrue(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .playing))
-        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .rendering))
-        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .idle))
-        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: false, phase: .playing))
-    }
-
-    func testPauseAndASpokenLineEachKeepCaptureHeld() {
-        XCTAssertFalse(LiveTranslationController.captureHeld(paused: false, spokenPlayback: false))
-        XCTAssertTrue(LiveTranslationController.captureHeld(paused: true, spokenPlayback: false))
-        XCTAssertTrue(LiveTranslationController.captureHeld(paused: false, spokenPlayback: true))
-        // Resume during a spoken line, and a line ending during Pause, both stay held.
-        XCTAssertTrue(LiveTranslationController.captureHeld(paused: true, spokenPlayback: true))
     }
 }

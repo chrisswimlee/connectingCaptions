@@ -69,11 +69,16 @@ final class ProIOSSpeaker: NSObject, AVSpeechSynthesizerDelegate {
     /// How long the microphone stays held after the last line ends, so Listen
     /// does not hear the end of its own voice.
     nonisolated static let microphoneTailSeconds: TimeInterval = 0.35
+    /// A voice that reports nothing for this long is treated as finished, so a
+    /// line that never ends cannot keep the microphone closed.
+    nonisolated static let stalledVoiceSeconds: TimeInterval = 10
 
     private let synthesizer = AVSpeechSynthesizer()
     /// Lines queued or speaking. `isSpeaking` can lag a finish or a Stop.
     private var pending: Set<ObjectIdentifier> = []
     private var quietUntil = Date.distantPast
+    /// Last time a line was queued, started, reached a word, or ended.
+    private var lastVoiceActivity = Date.distantPast
 
     override init() {
         super.init()
@@ -83,7 +88,11 @@ final class ProIOSSpeaker: NSObject, AVSpeechSynthesizerDelegate {
     /// Listen drops microphone packets while this is true. Without it the
     /// phone captions its own voice through the speaker.
     var holdsMicrophone: Bool {
-        let speaking = !self.pending.isEmpty || Date() < self.quietUntil
+        let now = Date()
+        if !self.pending.isEmpty, Self.voiceStalled(lastActivity: self.lastVoiceActivity, now: now) {
+            self.pending.removeAll()
+        }
+        let speaking = !self.pending.isEmpty || now < self.quietUntil
         guard speaking else { return false }
         return Self.holdsMicrophone(
             speaking: speaking,
@@ -100,12 +109,17 @@ final class ProIOSSpeaker: NSObject, AVSpeechSynthesizerDelegate {
         return outputPorts.isEmpty || outputPorts.contains { !inEar.contains($0) }
     }
 
+    nonisolated static func voiceStalled(lastActivity: Date, now: Date) -> Bool {
+        now.timeIntervalSince(lastActivity) > Self.stalledVoiceSeconds
+    }
+
     func speak(_ text: String, languageCode: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let utterance = AVSpeechUtterance(string: trimmed)
         utterance.voice = AVSpeechSynthesisVoice(language: languageCode)
         self.pending.insert(ObjectIdentifier(utterance))
+        self.lastVoiceActivity = Date()
         self.synthesizer.speak(utterance)
     }
 
@@ -118,6 +132,7 @@ final class ProIOSSpeaker: NSObject, AVSpeechSynthesizerDelegate {
     }
 
     private func utteranceEnded(_ id: ObjectIdentifier) {
+        self.lastVoiceActivity = Date()
         guard self.pending.remove(id) != nil, self.pending.isEmpty else { return }
         self.quietUntil = Date().addingTimeInterval(Self.microphoneTailSeconds)
     }
@@ -125,6 +140,18 @@ final class ProIOSSpeaker: NSObject, AVSpeechSynthesizerDelegate {
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         let id = ObjectIdentifier(utterance)
         Task { @MainActor in self.utteranceEnded(id) }
+    }
+
+    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        Task { @MainActor in self.lastVoiceActivity = Date() }
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        willSpeakRangeOfSpeechString characterRange: NSRange,
+        utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor in self.lastVoiceActivity = Date() }
     }
 
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {

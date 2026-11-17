@@ -149,6 +149,11 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
 
     func markFirstBuffer() {
         guard self.isSessionActive else { return }
+        // A new recording opens capture. A line from the last Listen may still
+        // be playing, so its hold is put back before this Listen can hear it.
+        if self.spokenPlaybackHoldsCapture {
+            AppServices.shared.asr.setCapturePaused(true)
+        }
         self.subscriber.noteFirstBuffer()
         self.updateTrace { trace in
             guard !trace.loggedFirstBuffer else { return }

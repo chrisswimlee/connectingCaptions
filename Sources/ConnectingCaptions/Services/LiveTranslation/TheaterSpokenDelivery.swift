@@ -148,6 +148,11 @@ final class TheaterSpokenDelivery {
         enabled && phase == .playing
     }
 
+    /// Only the line that is still current may open the microphone when it ends.
+    nonisolated static func releasesMicrophone(lineGeneration: UInt64, currentGeneration: UInt64) -> Bool {
+        lineGeneration == currentGeneration
+    }
+
     nonisolated static func shouldSpeak(
         enabled: Bool,
         listenKind: TranslationListenKind?,
@@ -424,7 +429,11 @@ final class TheaterSpokenDelivery {
         )
         await self.waitForPlayback(finish, timeoutNanoseconds: timeout, player: player)
         player.stop()
-        self.releaseMicrophoneAfterTail()
+        // A cancelled line was released by `stopCurrent`. If it unwinds late, the
+        // next line may already be playing, and its hold must stay.
+        if Self.releasesMicrophone(lineGeneration: token, currentGeneration: self.generation) {
+            self.releaseMicrophoneAfterTail()
+        }
         if self.activeFinish === finish {
             self.activeFinish = nil
         }
