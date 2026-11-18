@@ -300,6 +300,13 @@ private struct ProIOSAdjustView: View {
                 Section {
                     Toggle("Show the original line", isOn: self.$settings.spokenLine)
                     Toggle("Read captions aloud", isOn: self.$settings.speakCaptions)
+                    if self.settings.speakCaptions {
+                        Picker("Voice speed", selection: self.$settings.speakSpeed) {
+                            ForEach(ProIOSSpeakSpeed.allCases) { speed in
+                                Text(speed.title).tag(speed)
+                            }
+                        }
+                    }
                     LabeledContent("Size", value: "\(Int(self.settings.captionSize))")
                     Slider(value: self.$settings.captionSize, in: 18...64, step: 2) {
                         Text("Caption size")

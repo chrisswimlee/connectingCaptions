@@ -312,6 +312,8 @@ struct LiveTranslationSettingsView: View {
 
                 self.speakOutputPicker
 
+                self.speakSpeedPicker
+
                 self.settingsToggleRow(
                     title: AppLanguage.text("Hold microphone while speaking"),
                     description: AppLanguage.text(TheaterReadiness.speakHoldsMicrophone)
@@ -372,6 +374,26 @@ struct LiveTranslationSettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             self.speakOutputDevices = AudioDevice.listOutputDevices()
+        }
+    }
+
+    private var speakSpeedPicker: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            AppText("Voice speed")
+                .font(self.theme.typography.bodyStrong)
+                .foregroundStyle(self.settingsTitleText)
+            Picker(AppLanguage.text("Voice speed"), selection: Binding<TheaterSpokenSpeed>(
+                get: { self.settings.theaterSpeakSpeed },
+                set: { self.settings.theaterSpeakSpeed = $0 }
+            )) {
+                ForEach(TheaterSpokenSpeed.allCases) { speed in
+                    Text(speed.title).tag(speed)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .disabled(!self.settings.theaterSpeakCaptions)
+            .accessibilityIdentifier("theater.settings.speakSpeed")
         }
     }
 

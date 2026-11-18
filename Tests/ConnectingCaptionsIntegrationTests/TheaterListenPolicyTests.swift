@@ -1,4 +1,6 @@
+import AVFoundation
 @testable import ConnectingCaptions_Debug
+import CoreAudio
 import XCTest
 
 final class TheaterListenPolicyTests: XCTestCase {
@@ -393,10 +395,57 @@ final class TheaterListenPolicyTests: XCTestCase {
     }
 
     func testSpokenLineHoldsTheMicrophoneOnlyWhileItIsAudible() {
-        XCTAssertTrue(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .playing))
-        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .rendering))
-        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .idle))
-        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: false, phase: .playing))
+        XCTAssertTrue(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .playing, reachesMicrophone: true))
+        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .rendering, reachesMicrophone: true))
+        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .idle, reachesMicrophone: true))
+        XCTAssertFalse(TheaterSpokenDelivery.holdsMicrophone(enabled: false, phase: .playing, reachesMicrophone: true))
+        XCTAssertFalse(
+            TheaterSpokenDelivery.holdsMicrophone(enabled: true, phase: .playing, reachesMicrophone: false),
+            "Headphones keep the voice out of the microphone"
+        )
+    }
+
+    func testHeadphonesInTheJackKeepTheVoiceOutOfTheMicrophone() {
+        let headphones = TheaterSpokenOutput.headphonesDataSource
+        let speakers: UInt32 = 0x6973_706B // 'ispk'
+        XCTAssertFalse(TheaterSpokenOutput.reachesMicrophone(transportType: kAudioDeviceTransportTypeBuiltIn, outputDataSource: headphones))
+        XCTAssertTrue(TheaterSpokenOutput.reachesMicrophone(transportType: kAudioDeviceTransportTypeBuiltIn, outputDataSource: speakers))
+        XCTAssertTrue(TheaterSpokenOutput.reachesMicrophone(transportType: kAudioDeviceTransportTypeBuiltIn, outputDataSource: nil))
+        // Bluetooth and USB cannot be told from a speaker, so they keep the hold.
+        XCTAssertTrue(TheaterSpokenOutput.reachesMicrophone(transportType: kAudioDeviceTransportTypeBluetooth, outputDataSource: nil))
+        XCTAssertTrue(TheaterSpokenOutput.reachesMicrophone(transportType: kAudioDeviceTransportTypeUSB, outputDataSource: headphones))
+    }
+
+    func testSpokenVoicePrefersADownloadedEnhancedVoice() {
+        typealias Candidate = TheaterSpokenVoice.Candidate
+        let basic = Candidate(identifier: "com.apple.voice.compact.en-US.Samantha", language: "en-US", quality: 1, usable: true)
+        let enhanced = Candidate(identifier: "com.apple.voice.enhanced.en-US.Zoe", language: "en-US", quality: 2, usable: true)
+        let premium = Candidate(identifier: "com.apple.voice.premium.en-US.Ava", language: "en-US", quality: 3, usable: true)
+        let siri = Candidate(identifier: "com.apple.siri.natural.Nora", language: "en-US", quality: 3, usable: false)
+        let british = Candidate(identifier: "com.apple.voice.premium.en-GB.Serena", language: "en-GB", quality: 3, usable: true)
+
+        XCTAssertEqual(
+            TheaterSpokenVoice.bestIdentifier(locale: "en-US", defaultIdentifier: basic.identifier, candidates: [basic, enhanced, premium, siri, british]),
+            premium.identifier
+        )
+        XCTAssertEqual(
+            TheaterSpokenVoice.bestIdentifier(locale: "en_US", defaultIdentifier: basic.identifier, candidates: [basic, enhanced, siri]),
+            enhanced.identifier
+        )
+        XCTAssertEqual(
+            TheaterSpokenVoice.bestIdentifier(locale: "en-US", defaultIdentifier: basic.identifier, candidates: [basic, siri, british]),
+            basic.identifier,
+            "Nothing better installed keeps the default"
+        )
+    }
+
+    func testSpokenSpeedsAreInOrderAndUnknownIsNormal() {
+        let rates = TheaterSpokenSpeed.allCases.map(\.rate)
+        XCTAssertEqual(rates, rates.sorted())
+        XCTAssertEqual(TheaterSpokenSpeed.normal.rate, AVSpeechUtteranceDefaultSpeechRate)
+        XCTAssertEqual(TheaterSpokenSpeed.resolved(nil), .normal)
+        XCTAssertEqual(TheaterSpokenSpeed.resolved("warp"), .normal)
+        XCTAssertEqual(TheaterSpokenSpeed.resolved("faster"), .faster)
     }
 
     func testPauseAndASpokenLineEachKeepCaptureHeld() {

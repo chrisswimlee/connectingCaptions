@@ -142,10 +142,11 @@ final class TheaterSpokenDelivery {
         }
     }
 
-    /// Listen holds the microphone only while a line is audible. Preparing a
-    /// line makes no sound, so the microphone stays open for it.
-    nonisolated static func holdsMicrophone(enabled: Bool, phase: TheaterSpokenPhase) -> Bool {
-        enabled && phase == .playing
+    /// Listen holds the microphone only while a line is audible in the room.
+    /// Preparing a line makes no sound, and headphones keep it out of the
+    /// microphone, so the microphone stays open for both.
+    nonisolated static func holdsMicrophone(enabled: Bool, phase: TheaterSpokenPhase, reachesMicrophone: Bool) -> Bool {
+        enabled && phase == .playing && reachesMicrophone
     }
 
     /// Only the line that is still current may open the microphone when it ends.
@@ -275,7 +276,12 @@ final class TheaterSpokenDelivery {
         return .play
     }
 
+    /// The language's voice, upgraded to an Enhanced or Premium one when installed.
     static func lookupVoice(for languageID: String) -> AVSpeechSynthesisVoice? {
+        self.defaultVoice(for: languageID).map(TheaterSpokenVoice.upgraded)
+    }
+
+    private static func defaultVoice(for languageID: String) -> AVSpeechSynthesisVoice? {
         let code = TranslationLanguageCatalog.language(id: languageID)?.appleLanguageCode ?? languageID
         let prefix = TranslationClauseSegmenter.languageCode(from: code)
         let preferences = Self.preferredVoiceIdentifiers[prefix] ?? [code]
@@ -376,7 +382,10 @@ final class TheaterSpokenDelivery {
     private func holdMicrophone() {
         guard Self.holdsMicrophone(
             enabled: SettingsStore.shared.theaterSpeakHoldsMicrophone,
-            phase: self.phase
+            phase: self.phase,
+            reachesMicrophone: TheaterSpokenOutput.currentReachesMicrophone(
+                preferredUID: SettingsStore.shared.preferredOutputDeviceUID
+            )
         ) else { return }
         self.microphoneReleaseTask?.cancel()
         self.microphoneReleaseTask = nil
@@ -402,6 +411,7 @@ final class TheaterSpokenDelivery {
         guard let voice = self.voice(for: line.languageID) else { return }
         let utterance = AVSpeechUtterance(string: line.text)
         utterance.voice = voice
+        utterance.rate = SettingsStore.shared.theaterSpeakSpeed.rate
         let buffers = await self.render(utterance)
         guard !Task.isCancelled, token == self.generation, self.currentID == line.id else { return }
         guard !buffers.isEmpty else { return }
