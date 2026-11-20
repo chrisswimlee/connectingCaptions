@@ -939,7 +939,13 @@ final class SimpleUpdater {
     private func verifyCodeSignature(for bundleURL: URL) async throws {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
-        proc.arguments = ["--verify", "--deep", "--strict", bundleURL.path]
+        // A self-signed certificate passes a plain --verify. The update must chain
+        // to Apple's Developer ID CA, which is how every release is signed.
+        proc.arguments = [
+            "--verify", "--deep", "--strict",
+            "-R=\(UpdateSignaturePolicy.developerIDRequirement)",
+            bundleURL.path,
+        ]
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             let once = OnceResume()
             proc.terminationHandler = { process in

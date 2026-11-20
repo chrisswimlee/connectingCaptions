@@ -11,6 +11,11 @@ import Foundation
 nonisolated enum UpdateSignaturePolicy {
     static let expectedBundleIdentifier = ConnectingCaptionsProduct.bundleIdentifier
 
+    /// Apple's own requirement for Developer ID Application code: an Apple-anchored
+    /// chain through the Developer ID intermediate, with a Developer ID leaf.
+    static let developerIDRequirement =
+        "anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
+
     static func isUsableTeamID(_ raw: String?) -> Bool {
         guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
               !trimmed.isEmpty
