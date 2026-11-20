@@ -23,6 +23,56 @@ final class LiveAudioRetentionTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(timeline.seconds(at: 40_000)), 10, accuracy: 0.001)
     }
 
+    func testCaptureTimelineFindsTheSampleHeardAtATime() {
+        var timeline = CaptureAudioTimeline()
+        timeline.append(start: 0, count: 16_000, hostTime: LiveTranslationHostClock.ticks(forSeconds: 100))
+        timeline.append(start: 40_000, count: 16_000, hostTime: LiveTranslationHostClock.ticks(forSeconds: 110))
+        XCTAssertEqual(timeline.sample(atSeconds: 0), 0)
+        XCTAssertEqual(timeline.sample(atSeconds: 0.5), 8_000)
+        XCTAssertEqual(timeline.sample(atSeconds: 10.25), 44_000)
+        XCTAssertEqual(timeline.sample(atSeconds: 5), 40_000, "A time in a gap lands on the next packet")
+        XCTAssertNil(timeline.sample(atSeconds: 12), "Audio not captured yet")
+        XCTAssertNil(CaptureAudioTimeline().sample(atSeconds: 1))
+    }
+
+    func testBufferDropsAudioHeardBeforeACaptureTime() {
+        let buffer = ThreadSafeAudioBuffer()
+        buffer.append([Float](repeating: 0.1, count: 32_000), hostTime: LiveTranslationHostClock.ticks(forSeconds: 50))
+        XCTAssertEqual(buffer.dropSamples(beforeCaptureSeconds: 1.5), 24_000)
+        XCTAssertEqual(buffer.logicalStart, 24_000)
+        XCTAssertEqual(buffer.retainedCount, 8_000)
+        XCTAssertEqual(buffer.count, 32_000, "The session length is unchanged")
+        XCTAssertEqual(buffer.dropSamples(beforeCaptureSeconds: 1.0), 0, "An earlier time drops nothing more")
+        XCTAssertEqual(buffer.dropSamples(beforeCaptureSeconds: 9), 0, "A time not captured yet drops nothing")
+        XCTAssertEqual(buffer.retainedCount, 8_000)
+    }
+
+    func testEitherWayCutsTheWindowJustBeforeTheSavedSentenceEnds() throws {
+        let timing = CaptionSpeechTiming(start: 2, end: 5)
+        XCTAssertEqual(
+            try XCTUnwrap(EitherWayWindow.cutSeconds(eitherWay: true, rereadsWindow: true, sentence: timing)),
+            5 - EitherWayWindow.leadSeconds,
+            accuracy: 0.0001
+        )
+        XCTAssertNil(EitherWayWindow.cutSeconds(eitherWay: false, rereadsWindow: true, sentence: timing))
+        XCTAssertNil(EitherWayWindow.cutSeconds(eitherWay: true, rereadsWindow: false, sentence: timing))
+        XCTAssertNil(EitherWayWindow.cutSeconds(eitherWay: true, rereadsWindow: true, sentence: nil))
+        XCTAssertNil(EitherWayWindow.cutSeconds(eitherWay: true, rereadsWindow: true, sentence: CaptionSpeechTiming(start: 3, end: 1)))
+    }
+
+    func testStitchJoinsAnEnglishTurnAfterThaiWithoutRepeatingAWord() {
+        let thai = "สวัสดีครับ ขอบคุณที่มาวันนี้ สถานีรถไฟอยู่ที่ไหน"
+        XCTAssertEqual(
+            StreamingTranscriptStitcher.stitch(committed: "\(thai) Hello.", incoming: "Hello, thank you for coming."),
+            "\(thai) Hello, thank you for coming."
+        )
+        // Thai joining Thai still matches by letter.
+        XCTAssertEqual(
+            StreamingTranscriptStitcher.stitch(committed: "Hello. สวัสดีครับ ขอบ", incoming: "สวัสดีครับ ขอบคุณที่มา"),
+            "Hello. สวัสดีครับ ขอบคุณที่มา"
+        )
+    }
+
     func testRecognizerTimingMapsBackAcrossRemovedSilence() throws {
         let prepared = PauseIntervalAudio.Prepared(
             samples: [], isPauseOnly: false, sourceRanges: [0..<16_000, 48_000..<64_000]

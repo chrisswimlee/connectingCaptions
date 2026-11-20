@@ -95,6 +95,22 @@ final nonisolated public class ThreadSafeAudioBuffer {
     public func dropSamples(before logicalIndex: Int) {
         self.lock.lock()
         defer { self.lock.unlock() }
+        self.dropSamplesLocked(before: logicalIndex)
+    }
+
+    /// Drops audio heard before `seconds` on the capture clock. A time no
+    /// retained packet reaches yet drops nothing. Returns the samples dropped.
+    @discardableResult
+    public func dropSamples(beforeCaptureSeconds seconds: TimeInterval) -> Int {
+        self.lock.lock()
+        defer { self.lock.unlock() }
+        guard let sample = self.captureTimeline.sample(atSeconds: seconds) else { return 0 }
+        let before = self.droppedSampleCount
+        self.dropSamplesLocked(before: sample)
+        return self.droppedSampleCount - before
+    }
+
+    private func dropSamplesLocked(before logicalIndex: Int) {
         let clamped = min(max(logicalIndex, self.droppedSampleCount), self.droppedSampleCount + self.buffer.count)
         let removeCount = clamped - self.droppedSampleCount
         guard removeCount > 0 else { return }
@@ -178,6 +194,22 @@ nonisolated public struct CaptureAudioTimeline {
         else { return nil }
         return Double(anchor.hostTime - origin) / LiveTranslationHostClock.ticksPerSecond
             + Double(sample - anchor.start) / 16_000
+    }
+
+    /// The logical sample heard at `seconds`, the inverse of `seconds(at:)`.
+    /// A time in a gap between packets lands on the next packet. Nil when no
+    /// retained packet reaches that time yet.
+    public func sample(atSeconds seconds: TimeInterval) -> Int? {
+        guard let origin = self.origin, seconds.isFinite else { return nil }
+        for anchor in self.anchors where anchor.hostTime >= origin {
+            let anchorStart = Double(anchor.hostTime - origin) / LiveTranslationHostClock.ticksPerSecond
+            let anchorEnd = anchorStart + Double(anchor.count) / 16_000
+            if seconds < anchorStart { return anchor.start }
+            if seconds <= anchorEnd {
+                return anchor.start + min(anchor.count, Int(((seconds - anchorStart) * 16_000).rounded(.down)))
+            }
+        }
+        return nil
     }
 
     public func map(

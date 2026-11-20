@@ -2122,6 +2122,9 @@ final class LiveTranslationSubscriber: ObservableObject {
             }
             self.forgetTrailingFragment(source)
             self.recordSessionEntries()
+            LiveTranslationController.shared.noteSentenceSaved(
+                self.captionLog.entries.first(where: { $0.id == committed.id })?.speechTiming ?? timing
+            )
             let failed = TheaterCaptionFailure.isLine(translated)
             if let entry = self.captionLog.entries.first(where: { $0.id == committed.id }), !failed {
                 self.rememberListenEntry(entry)

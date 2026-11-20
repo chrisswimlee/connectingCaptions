@@ -587,6 +587,19 @@ final class LiveTranslationController: ObservableObject, PartialTranscriptSink {
         )
     }
 
+    /// A sentence reached the board. With Either way on, its audio leaves the
+    /// window Whisper re-reads, so the next speaker is decoded in their own language.
+    func noteSentenceSaved(_ timing: CaptionSpeechTiming?) {
+        guard self.isSessionActive, self.listenKind == .captions else { return }
+        let asr = AppServices.shared.asr
+        guard let cut = EitherWayWindow.cutSeconds(
+            eitherWay: SpokenLanguageResolver.isDynamicPairingEnabled(),
+            rereadsWindow: asr.rereadsTrailingWindow,
+            sentence: timing
+        ) else { return }
+        asr.releaseSavedSpeech(before: cut)
+    }
+
     private func armPauseMicrophoneRelease() {
         self.cancelPauseMicrophoneRelease()
         self.pauseMicrophoneReleaseTask = Task { [weak self] in

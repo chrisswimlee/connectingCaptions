@@ -298,9 +298,11 @@ public enum StreamingTranscriptStitcher {
     }
 
     private static func overlapJoin(left: String, right: String) -> String? {
-        if TranslationClauseSegmenter.hasUnspacedScript(left)
-            || TranslationClauseSegmenter.hasUnspacedScript(right)
-        {
+        // The join happens in the incoming text's script. After an Either way
+        // turn the running text can hold Thai or Japanese while the new decode
+        // is English; matching letters there misses "Hello." → "Hello," and
+        // repeats the word.
+        if TranslationClauseSegmenter.hasUnspacedScript(right) {
             let maxOverlap = min(left.count, right.count)
             guard maxOverlap >= 2 else { return nil }
             for overlap in stride(from: maxOverlap, through: 2, by: -1) {
