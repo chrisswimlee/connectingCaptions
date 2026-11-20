@@ -8,7 +8,7 @@ All notable changes to connectingCaptions are documented in this file.
 - Either way stays on only while the selected Voice Engine can hear both languages. Speech heard as a third language is recognized again as one of the pair.
 - Retry after History failed to import older saved history now imports it. Before, the retry skipped the import and showed an empty History.
 - A pause no longer keeps the speech model running. A late microphone packet was counted as speech that just started, so Listen kept decoding through the quiet.
-- Release 1.6.16 does not ask for a key. Listen is not limited to 14 days, and the first Listen does not start that clock. A work license can still be pasted in Settings when an organization owns the Mac. A Mac outside that key's seat list does not listen. An earlier download can still say the copy is free and offer Share and Donate. That seal is not required for Listen.
+- Listen runs a 14-day trial from the first Listen, then asks for a key: $49 once for up to two of your own Macs. A Mac that had Connecting Captions Pro before 20 November 2026 keeps Listen without a key. A work license can still be pasted in Settings when an organization owns the Mac. A Mac outside that key's seat list does not listen. An earlier download can still say the copy is free and offer Share and Donate. That seal is not required for Listen.
 - An empty board says Listening at caption size while the microphone is on.
 - Also show puts this Listen on another screen in one more language.
 - Talk notes can import a Keynote file.

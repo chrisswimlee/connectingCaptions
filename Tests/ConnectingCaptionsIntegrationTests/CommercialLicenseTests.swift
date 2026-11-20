@@ -148,7 +148,7 @@ final class CommercialLicenseTests: XCTestCase {
         XCTAssertEqual(ConnectingCaptionsProduct.personalPurchaseURL.absoluteString, "https://local-host.ai/connectingCaptions/pricing/")
         XCTAssertEqual(ConnectingCaptionsProduct.personalMacs, 2)
         XCTAssertEqual(ConnectingCaptionsProduct.listenTrialDays, 14)
-        XCTAssertFalse(ListenAccess.releaseAsksForKey)
+        XCTAssertTrue(ListenAccess.releaseAsksForKey)
         XCTAssertNotNil(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
         XCTAssertEqual(ConnectingCaptionsProduct.commercialSeatMinimum, 5)
         XCTAssertTrue(ConnectingCaptionsProduct.commercialLicenseMailURL.absoluteString.contains("Mac%20count"))
@@ -240,7 +240,8 @@ final class CommercialLicenseTests: XCTestCase {
         XCTAssertNoThrow(try CommercialLicense.verify(token, publicKey: self.privateKey.publicKey, appVersion: "1.9").get())
     }
 
-    func testReleaseDoesNotStartOrEndTheTrial() throws {
+    /// The first Listen starts the 14-day clock. Day 15 asks for a key.
+    func testReleaseStartsTheTrialAndEndsItAfter14Days() throws {
         let start = try XCTUnwrap(CommercialLicense.day(from: "2026-10-01"))
         let lastDay = try XCTUnwrap(CommercialLicense.day(from: "2026-10-14"))
         let nextDay = try XCTUnwrap(CommercialLicense.day(from: "2026-10-15"))
@@ -252,28 +253,30 @@ final class CommercialLicenseTests: XCTestCase {
 
         let settings = SettingsStore.shared
         XCTAssertNil(settings.blockListenStart(now: start))
-        XCTAssertNil(settings.listenTrialStartedOn)
+        XCTAssertEqual(settings.listenTrialStartedOn, start)
         XCTAssertNil(settings.blockListenStart(now: lastDay))
-        XCTAssertNil(settings.blockListenStart(now: nextDay))
-        XCTAssertNil(settings.listenTrialStartedOn)
+        XCTAssertEqual(settings.blockListenStart(now: nextDay), ListenAccess.trialEndedMessage)
+        XCTAssertEqual(settings.listenTrialStartedOn, start)
     }
 
-    func testTrialClockMovedBackwardDoesNotStartATrial() throws {
+    /// Setting the clock back before the first Listen does not open the trial again.
+    func testTrialClockMovedBackwardDoesNotReopenTheTrial() throws {
         let start = try XCTUnwrap(CommercialLicense.day(from: "2026-10-01"))
         let earlier = try XCTUnwrap(CommercialLicense.day(from: "2026-09-01"))
         let settings = SettingsStore.shared
         XCTAssertNil(settings.blockListenStart(now: start))
-        XCTAssertNil(settings.blockListenStart(now: earlier))
-        XCTAssertNil(settings.listenTrialStartedOn)
+        XCTAssertEqual(settings.blockListenStart(now: earlier), ListenAccess.trialEndedMessage)
+        XCTAssertEqual(settings.listenTrialStartedOn, start)
         XCTAssertEqual(ListenAccess.phase(startedOn: start, now: earlier), .ended)
     }
 
-    func testTrialClockYearsAheadDoesNotBlockListen() throws {
+    /// A date years ahead is refused and does not start the trial, so fixing the date keeps all 14 days.
+    func testTrialClockYearsAheadDoesNotStartTheTrial() throws {
         let installed = try XCTUnwrap(CommercialLicense.day(from: "2026-10-01"))
         let ahead = try XCTUnwrap(CommercialLicense.day(from: "2099-01-01"))
         SettingsStore.testingAppBundleCreation = installed
         let settings = SettingsStore.shared
-        XCTAssertNil(settings.blockListenStart(now: ahead))
+        XCTAssertEqual(settings.blockListenStart(now: ahead), ListenAccess.dateAheadMessage)
         XCTAssertNil(settings.listenTrialStartedOn)
         XCTAssertNil(ListenAccess.acceptedNow(ahead, appBirth: installed))
     }
@@ -343,7 +346,8 @@ final class CommercialLicenseTests: XCTestCase {
         XCTAssertNil(settings.listenTrialStartedOn)
     }
 
-    func testNewMacListensWithoutStartingATrialAfterAnOldFileAppears() throws {
+    /// A file copied in after the first launch does not make a new Mac an earlier copy. It gets the trial.
+    func testNewMacGetsTheTrialAfterAnOldFileAppears() throws {
         let cutoff = try XCTUnwrap(CommercialLicense.day(from: ConnectingCaptionsProduct.earlierCopyCutoffDay))
         let home = FileManager.default.temporaryDirectory
             .appendingPathComponent("earlier-copy-\(UUID().uuidString)", isDirectory: true)
@@ -364,8 +368,8 @@ final class CommercialLicenseTests: XCTestCase {
         let start = try XCTUnwrap(CommercialLicense.day(from: "2026-10-01"))
         let ended = try XCTUnwrap(CommercialLicense.day(from: "2026-10-15"))
         XCTAssertNil(settings.blockListenStart(now: start))
-        XCTAssertNil(settings.blockListenStart(now: ended))
-        XCTAssertNil(settings.listenTrialStartedOn)
+        XCTAssertEqual(settings.blockListenStart(now: ended), ListenAccess.trialEndedMessage)
+        XCTAssertEqual(settings.listenTrialStartedOn, start)
     }
 
     func testEarlierCopySealDoesNotOpenForAnotherMacOrATamperedBox() throws {

@@ -59,11 +59,11 @@ final class TheaterSmokeTests: XCTestCase {
         let mode = app.descendants(matching: .any)["theater.mode"]
         XCTAssertTrue(mode.waitForExistence(timeout: 4), "Voice / Translate")
 
-        let voiceButton = app.segmentedControls["theater.mode"].buttons["Original language"]
+        let voiceButton = app.segmentedControls["theater.mode"].buttons["Captions only"]
         if voiceButton.waitForExistence(timeout: 2) {
             voiceButton.click()
         } else {
-            app.buttons["Original language"].firstMatch.click()
+            app.buttons["Captions only"].firstMatch.click()
         }
         let advanced = app.disclosureTriangles["theater.home.advanced"]
         XCTAssertTrue(advanced.waitForExistence(timeout: 4), "Advanced engine controls")

@@ -10,7 +10,7 @@ public enum TheaterSessionMode: String, CaseIterable, Identifiable {
 
     public var displayName: String {
         switch self {
-        case .transcription: return "Original language"
+        case .transcription: return "Captions only"
         case .translation: return "Translate"
         }
     }
@@ -18,9 +18,9 @@ public enum TheaterSessionMode: String, CaseIterable, Identifiable {
     public var help: String {
         switch self {
         case .transcription:
-            return "Show what you say in the original language."
+            return "What you say appears in the language you speak."
         case .translation:
-            return "Translate after each sentence into a supported language. Translation Engine is Apple Translation."
+            return "Each sentence you say appears in the Show as language."
         }
     }
 

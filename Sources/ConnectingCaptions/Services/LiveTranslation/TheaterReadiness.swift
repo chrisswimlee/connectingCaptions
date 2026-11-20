@@ -168,7 +168,7 @@ enum TheaterReadiness {
     static let closeWhileListeningButton = "Stop and Close"
 
     static let modeStopsListen =
-        "Original language shows what you say. Translate turns each sentence into a supported language with Apple Translation. Switching stops Listen."
+        "Captions only shows what you say. Translate turns each sentence into a supported language with Apple Translation. Switching stops Listen."
 
     static let spokenLineTitle = "Show original text"
     static let linePrintTitle = "Caption animation"

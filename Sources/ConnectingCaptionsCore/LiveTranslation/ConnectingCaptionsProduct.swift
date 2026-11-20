@@ -12,12 +12,7 @@ nonisolated public enum ConnectingCaptionsProduct {
     /// signed as `com.fluidsubtitles.app` and is not a zip this build installs.
     public static let legacyReleaseDownloadPrefixes = ["connectingcaptions"]
     public static let shortName = "Connecting Captions Pro"
-    #if os(iOS)
-    /// Direct-download iPhone and iPad app. The App Store app is `com.connectingcaptions.ios`.
-    public static let bundleIdentifier = "com.connectingcaptions.ios.pro"
-    #else
     public static let bundleIdentifier = "com.connectingcaptions.app"
-    #endif
     public static let tagline = "Each sentence appears when it is ready."
     public static let manifesto = "Language is no longer a barrier."
 
@@ -35,7 +30,7 @@ nonisolated public enum ConnectingCaptionsProduct {
     }
 
     public static let githubOwner: String? = "chrisswimlee"
-    /// Mac and direct-download iPhone and iPad builds live in this repo. The App Store app is `connectingCaptions-iOS`.
+    /// The Mac app lives in this repo. The App Store app is `connectingCaptions-iOS`.
     public static let githubRepo: String? = "connectingCaptions"
     public static let helpURL = URL(string: "https://github.com/chrisswimlee/connectingCaptions/issues/new/choose")
     public static let feedbackURL = URL(string: "https://github.com/chrisswimlee/connectingCaptions/issues/new?labels=bug")
@@ -62,11 +57,12 @@ nonisolated public enum ConnectingCaptionsProduct {
     public static let personalLicensePriceLine = "$49 once"
     public static let personalLaunchPriceLine = "$29 once"
     public static let listenTrialDays = 14
-    /// Direct Mac and iPhone downloads stay free until the App Store app is available.
-    /// The 14-day clock stays in the code and starts only when this is true.
-    public static let directDownloadAsksForKey = false
-    /// UTC day the paid Listen gate ships. Files created before this day are an earlier copy.
-    public static let earlierCopyCutoffDay = "2026-11-02"
+    /// The direct Mac download runs a 14-day trial from the first Listen, then asks for a key.
+    /// False makes Listen free again without a trial clock.
+    public static let directDownloadAsksForKey = true
+    /// UTC day the paid Listen gate ships. Files created before this day are an earlier copy,
+    /// and that Mac keeps Listen without a key. Set it to the release day when cutting the release.
+    public static let earlierCopyCutoffDay = "2026-11-20"
     public static let personalMacs = 2
     public static let workNotice =
         "A 14-day trial, then $49 once for up to two Macs you own. Updates for version 1. A named license is $240 per Mac per year, or $120 for schools, five Macs minimum, and is required when an organization owns the Mac. A written SLA is $3,000 per organization per year. An installer package is $2,500 once."

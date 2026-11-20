@@ -156,8 +156,7 @@ PY
     exit 1
 }
 
-# The iPhone and keyboard targets keep their own marketing version.
-# Only the two Mac app configurations match Info.plist.
+# Only the two Mac app configurations carry the app version.
 marketing_hits="$(grep -c "MARKETING_VERSION = ${current};" connectingCaptions.xcodeproj/project.pbxproj || true)"
 project_build_hits="$(grep -c "CURRENT_PROJECT_VERSION = ${build};" connectingCaptions.xcodeproj/project.pbxproj || true)"
 if [ "${marketing_hits}" -ne 2 ] || [ "${project_build_hits}" -ne 2 ]; then

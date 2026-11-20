@@ -1,10 +1,10 @@
 import Foundation
 
-/// Clock math for a 14-day trial. Release 1.6.16 does not apply it:
-/// Listen starts without a key. `releaseAsksForKey` is the switch.
+/// Clock math for the 14-day trial. `releaseAsksForKey` is the switch:
+/// while it is true, Listen needs a key once the trial ends.
 /// The clock is the UTC day of the first Listen. A Listen already running is left alone.
 nonisolated enum ListenAccess {
-    /// The published direct download does not ask for a key. Same switch as iPhone and iPad Pro.
+    /// The direct download runs the trial, then asks for a key.
     static let releaseAsksForKey = ConnectingCaptionsProduct.directDownloadAsksForKey
     enum Phase: Equatable, Sendable {
         case notStarted

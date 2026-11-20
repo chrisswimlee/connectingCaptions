@@ -5,7 +5,6 @@ This repository is Connecting Captions Pro, the direct-download Mac app. iPhone,
 | App | Project | Speech |
 | --- | --- | --- |
 | Connecting Captions Pro | This repo, Mac | FluidVoice, including when Apple Speech is selected |
-| Connecting Captions Pro for iPhone and iPad | This repo, scheme `ConnectingCaptionsProIOS` | FluidVoice (Parakeet on the microphone) |
 | Connecting Captions for iPhone and iPad | `connectingCaptions-iOS` | Apple Speech |
 | Connecting Captions for Mac | `connectingCaptions-iOS`, Mac Catalyst | Apple Speech |
 
@@ -27,7 +26,7 @@ By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
 [Download](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://local-host.ai/connectingCaptions/license/)
 
-**License:** The Mac download is free until the App Store app is available. This repository stays GPLv3. Release 1.6.16 does not ask for a key. A work license, for Macs an organization owns, is on the [pricing page](https://local-host.ai/connectingCaptions/pricing/).
+**License:** Listen is free for 14 days from the first Listen, then a personal key is $49 once for up to two of your own Macs. A Mac that had the app before 20 November 2026 keeps Listen without a key. This repository stays GPLv3. A work license, for Macs an organization owns, is on the [pricing page](https://local-host.ai/connectingCaptions/pricing/).
 
 ---
 
@@ -64,7 +63,7 @@ The systems write-up is [docs/APPLE_SILICON_STREAMING.md](docs/APPLE_SILICON_STR
 - **Languages** — I speak lists the selected engine’s confirmed speech languages. Show as lists compatible translation pairs. The same language needs no translation pack.
 - **Theater captions** — a floating window you turn on and close. Use **Pop-up** for a solid board or **Overlay** so only caption text sits on slides. Change Overlay font, size, and plate from the menu-bar Theater menu. On-screen `mic · e2e · ASR · MT` clock. Screenshots and a whole-screen Zoom or Meet share include Theater. Share the slides window when remote viewers should not see captions. Pause holds capture and drops a leftover; Resume does not bring that leftover back. Minimize hides Theater; Listen stays. Clear wipes the board. Talk notes stay. Lines past the latest 48 leave the board. Translate shows Behind or Caught up so you do not outrun the caption. A sentence appears once when it is accepted. The board is not a text field.
 - **Any input device** — capture works with any Mac input, not just the built-in microphone: wired, USB, or line-in gear, Bluetooth headsets in call (HFP) mode, and virtual loopback devices (BlackHole, Loopback) when audio is routed to them. Choose devices in Settings → **Audio Devices**: the **Input Device Priority** list can be dragged to reorder, and a cleared list falls back to the last device you used if it is still connected, otherwise the system default input. A newly connected device becomes the fallback at once and takes over as soon as the top choice is unplugged.
-- **Original language / Translate** — both use the selected Voice Engine. Translate uses Apple Translation on this Mac for the pair you set. Press the mode control to switch. Both use the selected input device.
+- **Captions only / Translate** — both use the selected Voice Engine. Translate uses Apple Translation on this Mac for the pair you set. Press the mode control to switch. Both use the selected input device.
 - **Translate into an app** — **Speak & Type** has its own shortcut and Settings section; it types this listen’s translation into the app you clicked, including a trailing fragment. Korean, Japanese, and Thai depend on that app’s input method. Accessibility is required.
 - **Speak captions** — when you translate, Theater can read each translated caption aloud through the output you pick. It needs a macOS voice for the Show-as language.
 - **History and export** — past listens stay in History on this Mac. Export a listen as SRT, VTT, or a bilingual text file.
@@ -153,7 +152,7 @@ You need an Apple Silicon Mac on macOS 15 or later, **Xcode 26** (CI uses 26.3),
 
 3. **Launch** `DerivedData/Build/Products/Debug/Connecting Captions Debug.app`. Always launch this same path after rebuilding so macOS keeps its permissions.
 
-4. **First run.** Open **Theater**, allow the microphone, pick **Original language** or **Translate**, and press **Listen**. For Translate, download the Apple Translation pack when asked. Allow Accessibility only if you use Type the board or Listen, then type.
+4. **First run.** Open **Theater**, allow the microphone, pick **Captions only** or **Translate**, and press **Listen**. For Translate, download the Apple Translation pack when asked. Allow Accessibility only if you use Type the board or Listen, then type.
 
 5. **Update later:**
 
@@ -226,7 +225,7 @@ This release does not send analytics, feedback, or update checks to a third-part
 
 ## Commercial license
 
-The Mac download is free until the App Store app is available. Release 1.6.16 does not ask for a key. Organizations buy a work license when the organization owns the Mac:
+Listen is free for 14 days from the first Listen. After that, a personal key is $49 once for up to two of your own Macs, on the [pricing page](https://local-host.ai/connectingCaptions/pricing/). Organizations buy a work license when the organization owns the Mac:
 
 - [local-host.ai/connectingCaptions/pricing](https://local-host.ai/connectingCaptions/pricing/) — work license $240 / Mac / year ($120 for schools), five Macs minimum; written SLA $3,000 / organization / year; installer package $2,500 once
 - Email [support@local-host.ai](mailto:support@local-host.ai?subject=Connecting%20Captions%20commercial%20license) with the organization and Mac count for a work license
