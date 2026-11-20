@@ -1,6 +1,6 @@
 # Key delivery
 
-Paddle sells the personal key ($49, price `pri_01m5vhcet3gp2wxbdz61p4awm4`). When a purchase completes, Paddle calls this Cloudflare Worker with `transaction.completed`. The Worker checks the `Paddle-Signature` header, looks up the buyer's email through the Paddle API, signs a personal key in the format `CommercialLicense.swift` verifies, and emails it through Resend. One key per transaction, even when Paddle retries.
+Paddle sells the personal key ($19.99, price `pri_01m5vhcet3gp2wxbdz61p4awm4`, which is still the old $49 price until a new $19.99 price ID replaces it in `wrangler.toml`). When a purchase completes, Paddle calls this Cloudflare Worker with `transaction.completed`. The Worker checks the `Paddle-Signature` header, looks up the buyer's email through the Paddle API, signs a personal key in the format `CommercialLicense.swift` verifies, and emails it through Resend. One key per transaction, even when Paddle retries.
 
 The key matches what `scripts/issue-commercial-license.sh --personal --buyer EMAIL` prints: `product: connectingCaptions`, `personal: true`, `seats: 2`, `expires: 2099-12-31`, `major` from `KEY_MAJOR`, and the buyer email as `org`. The app checks it offline.
 

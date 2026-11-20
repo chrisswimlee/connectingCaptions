@@ -4,7 +4,7 @@ workers_dev = true
 compatibility_date = "2025-09-01"
 
 [vars]
-# Paddle price ID(s) for the $49 personal key. Comma-separated.
+# Paddle price ID(s) for the $19.99 personal key. Comma-separated.
 # A price with custom data license=personal also counts.
 PERSONAL_PRICE_IDS = "pri_01m5vhcet3gp2wxbdz61p4awm4"
 # "production" or "sandbox". Must match where PADDLE_API_KEY comes from.

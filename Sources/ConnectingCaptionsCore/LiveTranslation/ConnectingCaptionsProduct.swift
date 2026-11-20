@@ -54,8 +54,8 @@ nonisolated public enum ConnectingCaptionsProduct {
     public static let licenseKeychainAccount = "connectingCaptionsCommercialLicense"
     public static let trialKeychainAccount = "connectingCaptionsListenTrial"
     public static let workNoticeTitle = "Trial"
-    public static let personalLicensePriceLine = "$49 once"
-    public static let personalLaunchPriceLine = "$29 once"
+    public static let personalLicensePriceLine = "$19.99 once"
+    public static let personalLaunchPriceLine = "$14.99 once"
     public static let listenTrialDays = 14
     /// The direct Mac download runs a 14-day trial from the first Listen, then asks for a key.
     /// False makes Listen free again without a trial clock.
@@ -65,7 +65,7 @@ nonisolated public enum ConnectingCaptionsProduct {
     public static let earlierCopyCutoffDay = "2026-11-20"
     public static let personalMacs = 2
     public static let workNotice =
-        "A 14-day trial, then $49 once for up to two Macs you own. Updates for version 1. A named license is $240 per Mac per year, or $120 for schools, five Macs minimum, and is required when an organization owns the Mac. A written SLA is $3,000 per organization per year. An installer package is $2,500 once."
+        "A 14-day trial, then $19.99 once for up to two Macs you own. Updates for version 1. A named license is $240 per Mac per year, or $120 for schools, five Macs minimum, and is required when an organization owns the Mac. A written SLA is $3,000 per organization per year. An installer package is $2,500 once."
     public static let commercialSeatPriceLine = "$240 / Mac / year ($120 for schools)"
     public static let commercialSLAPriceLine = "$3,000 / organization / year"
     public static let commercialMDMPriceLine = "$2,500 once"

@@ -26,7 +26,7 @@ By [Chris Swim Lee](https://chrisswimlee.com). Licensed under GPLv3.
 
 [Download](https://github.com/chrisswimlee/connectingCaptions/releases/latest/download/Connecting-Captions.zip) · [Homebrew](https://github.com/chrisswimlee/homebrew-connectingcaptions) · [Product page](https://local-host.ai/connectingCaptions) · [For work](https://local-host.ai/connectingCaptions/license/)
 
-**License:** Listen is free for 14 days from the first Listen, then a personal key is $49 once for up to two of your own Macs. A Mac that had the app before 20 November 2026 keeps Listen without a key. This repository stays GPLv3. A work license, for Macs an organization owns, is on the [pricing page](https://local-host.ai/connectingCaptions/pricing/).
+**License:** Listen is free for 14 days from the first Listen, then a personal key is $19.99 once for up to two of your own Macs. A Mac that had the app before 20 November 2026 keeps Listen without a key. This repository stays GPLv3. A work license, for Macs an organization owns, is on the [pricing page](https://local-host.ai/connectingCaptions/pricing/).
 
 ---
 
@@ -225,7 +225,7 @@ This release does not send analytics, feedback, or update checks to a third-part
 
 ## Commercial license
 
-Listen is free for 14 days from the first Listen. After that, a personal key is $49 once for up to two of your own Macs, on the [pricing page](https://local-host.ai/connectingCaptions/pricing/). Organizations buy a work license when the organization owns the Mac:
+Listen is free for 14 days from the first Listen. After that, a personal key is $19.99 once for up to two of your own Macs, on the [pricing page](https://local-host.ai/connectingCaptions/pricing/). Organizations buy a work license when the organization owns the Mac:
 
 - [local-host.ai/connectingCaptions/pricing](https://local-host.ai/connectingCaptions/pricing/) — work license $240 / Mac / year ($120 for schools), five Macs minimum; written SLA $3,000 / organization / year; installer package $2,500 once
 - Email [support@local-host.ai](mailto:support@local-host.ai?subject=Connecting%20Captions%20commercial%20license) with the organization and Mac count for a work license

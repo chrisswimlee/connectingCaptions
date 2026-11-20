@@ -21,7 +21,7 @@ Private key, standard Base64 of 32 raw bytes:
 Optional: --issued YYYY-MM-DD (UTC, default today)
           --sla              written SLA
           --enforce-seats    Licensed to requires a signed seat list
-          --personal         up to two Macs, $49 once ($29 launch week). Updates for version 1.
+          --personal         up to two Macs, $19.99 once ($14.99 launch week). Updates for version 1.
           --buyer            email stored on a personal key. It is not shown as Licensed to.
           --mac UUID         hardware UUID for a personal key. Repeat for a second Mac.
 EOF
