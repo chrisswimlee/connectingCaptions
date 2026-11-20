@@ -24,18 +24,14 @@ nonisolated enum UpdateSignaturePolicy {
         return trimmed.range(of: "^[A-Z0-9]{10}$", options: .regularExpression) != nil
     }
 
+    /// Only the `TeamIdentifier=` line counts. `codesign -dvvv` always prints it,
+    /// as `not set` for ad-hoc and self-signed code. The signing certificate's
+    /// common name is chosen by whoever signs, so it is never a team.
     static func teamID(fromCodesignOutput output: String) -> String? {
-        if let line = output.split(separator: "\n").first(where: { $0.hasPrefix("TeamIdentifier=") }) {
-            return String(line.dropFirst("TeamIdentifier=".count))
+        guard let line = output.split(separator: "\n").first(where: { $0.hasPrefix("TeamIdentifier=") }) else {
+            return nil
         }
-        if let identity = output.split(separator: "\n").first(where: { $0.hasPrefix("Authority=") }) {
-            let text = String(identity)
-            guard let left = text.lastIndex(of: "("), let right = text.lastIndex(of: ")"), left < right else {
-                return nil
-            }
-            return String(text[text.index(after: left)..<right])
-        }
-        return nil
+        return String(line.dropFirst("TeamIdentifier=".count))
     }
 
     static func bundleIdentifier(fromCodesignOutput output: String) -> String? {

@@ -430,4 +430,15 @@ final class DiagnosticPrivacyTests: XCTestCase {
             }
         }
     }
+
+    func testTeamIDComesOnlyFromTheTeamIdentifierLine() {
+        let signed = "Identifier=com.connectingcaptions.app\nAuthority=Developer ID Application: Someone (ABCD123456)\nTeamIdentifier=ABCD123456\n"
+        XCTAssertEqual(UpdateSignaturePolicy.teamID(fromCodesignOutput: signed), "ABCD123456")
+        // A self-signed bundle can name any team in its certificate. Codesign reports no team for it.
+        let selfSigned = "Identifier=com.connectingcaptions.app\nAuthority=Developer ID Application: Evil (C6BH3WS28B)\nTeamIdentifier=not set\n"
+        XCTAssertFalse(UpdateSignaturePolicy.isUsableTeamID(UpdateSignaturePolicy.teamID(fromCodesignOutput: selfSigned)))
+        // With no TeamIdentifier line at all, the Authority name must not stand in for it.
+        let noTeamLine = "Identifier=com.connectingcaptions.app\nAuthority=Developer ID Application: Evil (C6BH3WS28B)\n"
+        XCTAssertNil(UpdateSignaturePolicy.teamID(fromCodesignOutput: noTeamLine))
+    }
 }
