@@ -231,7 +231,7 @@ enum TheaterReadiness {
         "Speak each finished Show-as line on the output you pick. Same-language Listen stays quiet."
 
     static let speakHoldsMicrophone =
-        "Listen stops hearing while a line is spoken, so it does not caption its own voice. Turn off when listeners use headphones or another room."
+        "Listen stops hearing while a line is spoken, so it does not caption its own voice. Headphones in this Mac's jack stay heard on their own. Turn off for Bluetooth headphones or a speaker in another room."
 
     /// Either way copy. The switch is on only while Whisper can hear both sides.
     static let dynamicPairing =

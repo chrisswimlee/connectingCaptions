@@ -16,6 +16,7 @@ extension SettingsStore {
         static let dynamicPairing = "TheaterDynamicPairing"
         static let speakCaptions = "TheaterSpeakCaptions"
         static let speakHoldsMicrophone = "TheaterSpeakHoldsMicrophone"
+        static let speakSpeed = "TheaterSpeakSpeed"
         static let sessionMode = "TheaterSessionMode"
         static let minimized = "TheaterMinimized"
         static let expandedWindowFrame = "TheaterExpandedWindowFrame"
@@ -247,8 +248,18 @@ extension SettingsStore {
         }
     }
 
+    /// How fast Speak captions reads.
+    var theaterSpeakSpeed: TheaterSpokenSpeed {
+        get { TheaterSpokenSpeed.resolved(self.defaults.string(forKey: TheaterDefaults.speakSpeed)) }
+        set {
+            objectWillChange.send()
+            self.defaults.set(newValue.rawValue, forKey: TheaterDefaults.speakSpeed)
+        }
+    }
+
     /// Listen stops hearing while a line is spoken, so it cannot caption its own
-    /// voice. On until turned off, for listeners on headphones or in another room.
+    /// voice. On until turned off. Headphones in the Mac's jack skip the hold on
+    /// their own; turn it off for Bluetooth headphones or a speaker in another room.
     var theaterSpeakHoldsMicrophone: Bool {
         get { self.defaults.object(forKey: TheaterDefaults.speakHoldsMicrophone) as? Bool ?? true }
         set {
